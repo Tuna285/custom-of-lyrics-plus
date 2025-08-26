@@ -32,8 +32,6 @@ Giao diện được tinh chỉnh để đẹp mắt, gọn gàng và không gâ
 Hệ thống sẽ tự động xử lý để kết quả hiển thị luôn gọn gàng và hợp lý.
 -   **Chống trùng lặp**: Tự động ẩn các bản dịch giống hệt với lời gốc
 
-**(Dự án đang phát triển, nếu có lỗi vui lòng góp ý)**
-
 ---
 
 ## 🚀 Cài đặt
@@ -44,7 +42,7 @@ Hệ thống sẽ tự động xử lý để kết quả hiển thị luôn g�
 <img width="578" height="455" alt="image" src="https://github.com/user-attachments/assets/5f190f70-3185-4e2d-990f-90068d3bcf8d" />
   
 2.  Copy và thay thế toàn bộ thư mục `lyrics-plus` đã giải nén vào thư mục `CustomApps` của Spicetify với path: 
-- Windows: ```%appdata%\spicetify\CustomApps```
+- Windows: ```%LocalAppData%\spicetify\CustomApps```
 - MacOS/Linux: ```~/.config/spicetify/CustomApps```
 
 3.  Mở terminal hoặc PowerShell và chạy lệnh:
@@ -62,4 +60,7 @@ Hệ thống sẽ tự động xử lý để kết quả hiển thị luôn g�
 1.  Mở Spotify, vào lyrics plus và nhấn vào avatar chọn **Lyrics Plus config** từ thanh menu bên trái.
 2.  Tìm đến `Gemini API Key (Display Mode 1)` và `Gemini API Key (Display Mode 2)` và dán API key của bạn vào.
 3.  Mở một bài hát bất kỳ, di chuột vào vùng hiển thị lời bài hát và nhấp vào biểu tượng chuyển ngữ (⇄) để bắt đầu tùy chỉnh chế độ dịch của bạn.
+
+---
+**(Dự án đang phát triển, nếu có lỗi vui lòng góp ý)**
 
