@@ -11,7 +11,7 @@ Phiên bản này đã được thay thế bằng sức mạnh của **Google Ge
 
 ### 1. Dịch lời bài hát với Gemini API
 Dùng mô hình LLM của Google để dịch lời bài hát một cách tự nhiên và chính xác.
--   🌐 **Hỗ trợ 2 chế độ hiển thị cùng lúc**: Chuyển ngữ các bài hát sang phiên âm Latinh và các ngôn ngữ khác sang **Tiếng Việt**, lý tưởng cho việc học ngôn ngữ.
+-   🌐 **Hỗ trợ 2 chế độ hiển thị cùng lúc**: Chuyển ngữ các bài hát sang Romaji và các ngôn ngữ khác sang **Tiếng Việt**, lý tưởng cho việc học ngôn ngữ (Romaja, Pinyin đang phát triển).
 -   🎶 **Chất lượng cao**: Bản dịch được tối ưu cho ngữ cảnh âm nhạc, giữ lại ý nghĩa và cảm xúc của bài hát.
 <img width="1920" height="1020" alt="image" src="https://github.com/user-attachments/assets/9d431f0e-76b5-4e9f-828f-24e8ef3b3b46" />
 <img width="1920" height="1021" alt="image" src="https://github.com/user-attachments/assets/5ebeb416-32e0-4f4d-92ae-2af475a789e0" />
@@ -32,24 +32,26 @@ Giao diện được tinh chỉnh để đẹp mắt, gọn gàng và không gâ
 Hệ thống sẽ tự động xử lý để kết quả hiển thị luôn gọn gàng và hợp lý.
 -   **Chống trùng lặp**: Tự động ẩn các bản dịch giống hệt với lời gốc
 
+**(Dự án đang phát triển, nếu có lỗi vui lòng góp ý)**
+
 ---
 
 ## 🚀 Cài đặt
 
-0.  Cài đặt Spicetify và lyric-plus (CustomApps): https://spicetify.app/docs/getting-started
+0.  **(Yêu cầu Spotify cài đặt từ web, không từ Microsoft Store)** Cài đặt Spicetify và CustomApps (lyrics-plus): https://spicetify.app/docs/getting-started
 
 1.  Tải và giải nén file chứa custom của lyric-plus
 <img width="578" height="455" alt="image" src="https://github.com/user-attachments/assets/5f190f70-3185-4e2d-990f-90068d3bcf8d" />
   
 2.  Copy và thay thế toàn bộ thư mục `lyrics-plus` đã giải nén vào thư mục `CustomApps` của Spicetify với path: 
-- Windows: %appdata%\spicetify\CustomApps
-- MacOS/Linux: ~/.config/spicetify/CustomApps
+- Windows: ```%appdata%\spicetify\CustomApps```
+- MacOS/Linux: ```~/.config/spicetify/CustomApps```
 
 3.  Mở terminal hoặc PowerShell và chạy lệnh:
     ```
     spicetify apply
     ```
-3. Cách lấy API của Gemini:
+3. Cách lấy API của Gemini(free):
 - https://www.youtube.com/watch?v=RVGbLSVFtIk
 
 
