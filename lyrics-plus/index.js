@@ -457,6 +457,9 @@ class LyricsContainer extends react.Component {
 				tempState = { ...tempState, mode: CACHE[info.uri]?.mode };
 			}
 		} else {
+			// Save current mode before loading to maintain UI consistency
+			const currentMode = this.getCurrentMode();
+			this.lastModeBeforeLoading = currentMode !== -1 ? currentMode : SYNCED;
 			this.setState({ ...emptyState, isLoading: true, isCached: false });
 
 			const resp = await this.tryServices(info, mode);
@@ -1112,6 +1115,25 @@ class LyricsContainer extends react.Component {
 		this.mousetrap.bind(CONFIG.visual["fullscreen-key"], this.toggleFullscreen);
 	}
 
+	getCurrentMode() {
+		let mode = -1;
+		if (this.state.explicitMode !== -1 && this.state.explicitMode !== KARAOKE) {
+			mode = this.state.explicitMode;
+		} else if (this.state.lockMode !== -1 && this.state.lockMode !== KARAOKE) {
+			mode = this.state.lockMode;
+		} else {
+			// Auto switch (karaoke disabled)
+			if (this.state.synced) {
+				mode = SYNCED;
+			} else if (this.state.unsynced) {
+				mode = UNSYNCED;
+			} else if (this.state.genius) {
+				mode = GENIUS;
+			}
+		}
+		return mode;
+	}
+
 	render() {
 		const fadLyricsContainer = document.getElementById("fad-lyrics-plus-container");
 		this.state.isFADMode = !!fadLyricsContainer;
@@ -1136,21 +1158,7 @@ class LyricsContainer extends react.Component {
 			"--animation-tempo": this.state.tempo,
 		};
 
-		let mode = -1;
-		if (this.state.explicitMode !== -1 && this.state.explicitMode !== KARAOKE) {
-			mode = this.state.explicitMode;
-		} else if (this.state.lockMode !== -1 && this.state.lockMode !== KARAOKE) {
-			mode = this.state.lockMode;
-		} else {
-			// Auto switch (karaoke disabled)
-			if (this.state.synced) {
-				mode = SYNCED;
-			} else if (this.state.unsynced) {
-				mode = UNSYNCED;
-			} else if (this.state.genius) {
-				mode = GENIUS;
-			}
-		}
+		let mode = this.getCurrentMode();
 
 		let activeItem;
 		let showTranslationButton;
@@ -1170,8 +1178,16 @@ class LyricsContainer extends react.Component {
 		}
 		const hasTranslation = this.state.neteaseTranslation !== null || this.state.musixmatchTranslation !== null;
 
+		// Always render the Conversions button on synced/unsynced pages.
+		// Previously it was gated by detected language/loading state, causing it to
+		// be hidden on initial load or for non-target languages (e.g., English).
+		const potentialMode = this.state.explicitMode !== -1 ? this.state.explicitMode :
+			this.state.lockMode !== -1 ? this.state.lockMode : 
+			(this.state.isLoading ? (this.lastModeBeforeLoading || SYNCED) : mode);
+		
+		showTranslationButton = (potentialMode === SYNCED || potentialMode === UNSYNCED || mode === -1);
+
 		if (mode !== -1) {
-			showTranslationButton = (friendlyLanguage || hasTranslation) && (mode === SYNCED || mode === UNSYNCED);
 
 			if (mode === SYNCED && this.state.synced) {
 				activeItem = react.createElement(CONFIG.visual["synced-compact"] ? SyncedLyricsPage : SyncedExpandedLyricsPage, {
