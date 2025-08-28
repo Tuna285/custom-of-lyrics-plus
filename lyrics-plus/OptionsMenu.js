@@ -279,7 +279,6 @@ const AdjustmentsMenu = react.memo(({ mode }) => {
 	const items = [
 		{ desc: "Font size", key: "font-size", type: ConfigAdjust, min: fontSizeLimit.min, max: fontSizeLimit.max, step: fontSizeLimit.step },
 		{ desc: "Track delay", key: "delay", type: ConfigAdjust, min: Number.NEGATIVE_INFINITY, max: Number.POSITIVE_INFINITY, step: 250, when: () => mode === SYNCED },
-		{ desc: "Compact", key: "synced-compact", type: ConfigSlider, when: () => mode === SYNCED },
 		{ desc: "Dual panel", key: "dual-genius", type: ConfigSlider, when: () => mode === GENIUS },
 	];
 
@@ -287,13 +286,25 @@ const AdjustmentsMenu = react.memo(({ mode }) => {
 		clearTimeout(adjustmentsDebounceTimeout);
 		adjustmentsDebounceTimeout = setTimeout(() => {
 			CONFIG.visual[name] = value;
-			Spicetify.Config.visual[name] = value;
+			try {
+				Spicetify.Config.visual = Spicetify.Config.visual || {};
+				Spicetify.Config.visual[name] = value;
+			} catch {}
 			localStorage.setItem(`${APP_NAME}:visual:${name}`, value);
+			// Persist per-track delay as used by resetDelay()
+			if (name === "delay") {
+				const uri = Spicetify?.Player?.data?.item?.uri;
+				if (uri) {
+					try { localStorage.setItem(`lyrics-delay:${uri}`, String(value)); } catch {}
+				}
+			}
 			if (name.startsWith("translation-mode:") && window.lyricContainer) {
 				window.lyricContainer.lastProcessedUri = null;
 				window.lyricContainer.lastProcessedMode = null;
 				window.lyricContainer.forceUpdate();
 			}
+			// Ensure live UI update for font-size/compact/etc.
+			lyricContainerUpdate?.();
 		}, 200);
 	};
 
