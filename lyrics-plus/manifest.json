@@ -74,10 +74,10 @@
 		"ProviderLRCLIB.js",
 		"Providers.js",
 		"Pages.js",
+		"Settings.js",
 		"OptionsMenu.js",
 		"TabBar.js",
 		"Utils.js",
-		"Settings.js",
 		"Translator.js"
 	],
 	"subfiles_extension": ["PlaybarButton.js"]
