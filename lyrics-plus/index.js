@@ -567,12 +567,12 @@ class LyricsContainer extends react.Component {
 			try {
 				if (String(mode).startsWith("gemini")) {
 					return await this.getGeminiTranslation(lyricsState, baseLyrics, mode === "gemini_romaji");
-		} else {
+				} else {
 					return await this.getTraditionalConversion(lyricsState, baseLyrics, originalLanguage, mode);
 				}
 			} catch (error) {
 				const modeDisplayName = mode === "gemini_romaji" ? "Romaji translation" : "Vietnamese translation";
-				Spicetify.showNotification(`${modeDisplayName} failed: ${error.message}`, true, 4000);
+				Spicetify.showNotification(`${modeDisplayName} failed: ${error.message || "Unknown error"}`, true, 4000);
 				return null; // Return null on failure
 			}
 		};

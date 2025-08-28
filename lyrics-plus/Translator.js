@@ -31,10 +31,12 @@ class Translator {
 1. **EXACT LINE COUNT**: Output must have exactly ${lineCount} lines - no merging or splitting
 2. **Hepburn Standard**: Use proper Hepburn romanization rules
     - Use 'shi', 'chi', 'tsu', 'ji', 'fu'.
-    - Represent long vowels using 'ou' for おう and 'oo' for おお, and 'uu' for うう. For example, 'とうきょう' becomes 'Toukyou'.
+    - Represent sokuon (っ) by doubling the following consonant (e.g., かった → katta).
     - Use "n'" before a vowel or 'y' to avoid ambiguity (e.g., shin'ya).
-3.  **Handle Non-Japanese Text**: If a line contains non-Japanese text (e.g., English words), keep that text as is.
-4.  **No Extra Content**: Do NOT add any translations, explanations, or comments.
+    - Preserve punctuation and spacing; keep non‑Japanese words as is.
+3. **Long vowels**: Do NOT use macrons. Use ASCII-only sequences:
+    - おう/おお → 'ou' or 'oo' as appropriate by spelling; うう → 'uu'.
+4. **No Extra Content**: Do NOT add any translations, explanations, or comments.
 
 SONG INFO:
 - Artist: ${artist}
@@ -55,7 +57,6 @@ INPUT LYRICS:
 ${text}
 ----`;
 		}
-
 		// Default to Vietnamese translation
 		return `You are an expert lyric translator, specializing in Japanese to Vietnamese. Your task is to translate the following song lyrics into natural, poetic, and emotionally resonant Vietnamese.
 
@@ -93,23 +94,40 @@ ${text}
 				return null;
 			}
 		}
-		// Strip code fences and whitespace
+		function decodeJsonString(s) {
+			if (typeof s !== "string") return "";
+			return s
+				.replace(/\\n/g, "\n")
+				.replace(/\\t/g, "\t")
+				.replace(/\\"/g, '"')
+				.replace(/\\\\/g, "\\");
+		}
+		// Normalize and strip common artefacts (code fences, language tags, stray 'json' lines)
 		let raw = String(text || "").trim();
-		raw = raw.replace(/^```[a-z]*\n|```$/gim, "");
-		// Try direct parse
+		// Remove any ```json / ``` fences anywhere, not only at edges
+		raw = raw.replace(/```[a-z]*\n?/gim, "").replace(/```/g, "");
+		// Drop standalone 'json' lines
+		raw = raw.replace(/^\s*json\s*$/gim, "");
+		// First attempt: direct JSON
 		let parsed = safeParse(raw);
 		if (!parsed) {
-			// Try to extract JSON object substring
+			// Second attempt: extract the largest {...} block
 			const start = raw.indexOf("{");
 			const end = raw.lastIndexOf("}");
 			if (start !== -1 && end !== -1 && end > start) {
 				parsed = safeParse(raw.slice(start, end + 1));
 			}
 		}
+		if (!parsed) {
+			// Third attempt: regex pull of JSON string values
+			const mVi = raw.match(/"vi"\s*:\s*"([\s\S]*?)"\s*[},]/);
+			const mRo = raw.match(/"romaji"\s*:\s*"([\s\S]*?)"\s*[},]/);
+			if (mVi || mRo) {
+				return { romaji: decodeJsonString(mRo?.[1] || ""), vi: decodeJsonString(mVi?.[1] || "") };
+			}
+		}
 		if (parsed && (parsed.romaji !== undefined || parsed.vi !== undefined)) {
-			// Normalize escaped newlines
-			const norm = (s) => (typeof s === "string" ? s.replace(/\\n/g, "\n").replace(/\\t/g, "\t") : "");
-			return { romaji: norm(parsed.romaji), vi: norm(parsed.vi) };
+			return { romaji: decodeJsonString(parsed.romaji), vi: decodeJsonString(parsed.vi) };
 		}
 		// Fallback: treat entire text as Vietnamese and unescape \n
 		const fallback = String(text || "").replace(/\\n/g, "\n");
@@ -286,16 +304,32 @@ ${text}
 		}
 	}
 
+	static normalizeRomajiString(s) {
+		if (typeof s !== "string") return "";
+		return s
+			// Replace macrons with ASCII-only long vowels
+			.replace(/ō/g, "ou")
+			.replace(/ū/g, "uu")
+			.replace(/ā/g, "aa")
+			.replace(/ī/g, "ii")
+			.replace(/ē/g, "ee")
+			// Normalize multiple spaces
+			.replace(/\s{2,}/g, " ")
+			.trim();
+	}
+
 	async romajifyText(text, target = "romaji", mode = "spaced") {
 		if (!this.finished.ja) {
 			await Translator.#sleep(100);
 			return this.romajifyText(text, target, mode);
 		}
 
-		return this.kuroshiro.convert(text, {
+		const out = await this.kuroshiro.convert(text, {
 			to: target,
 			mode: mode,
+			romajiSystem: "hepburn",
 		});
+		return Translator.normalizeRomajiString(out);
 	}
 
 	async convertToRomaja(text, target) {
