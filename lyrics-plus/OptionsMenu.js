@@ -90,7 +90,7 @@ const OptionsMenu = react.memo(({ options, onSelect, selected, defaultValue, bol
 });
 
 // Helper: open a compact options modal using existing settings styles
-function openOptionsModal(title, items, onChange) {
+function openOptionsModal(title, items, onChange, eventType = null) {
 	const container = react.createElement(
 		"div",
 		{ id: `${APP_NAME}-config-container` },
@@ -122,7 +122,7 @@ function openOptionsModal(title, items, onChange) {
 `
 			}
 		}),
-		react.createElement(OptionList, { items, onChange })
+		react.createElement(OptionList, Object.assign({ items, onChange }, eventType ? { type: eventType } : {}))
 	);
 
 	Spicetify.PopupModal.display({ title, content: container, isLarge: false });
@@ -232,6 +232,14 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 		];
 	}, [friendlyLanguage, CONFIG.visual["translate:translated-lyrics-source"]]);
 
+	// Re-dispatch dynamic items so an open modal can update its OptionList
+	useEffect(() => {
+		const event = new CustomEvent("lyrics-plus", {
+			detail: { type: "translation-menu", items },
+		});
+		document.dispatchEvent(event);
+	}, [items, friendlyLanguage, CONFIG.visual["translate:translated-lyrics-source"]]);
+
 	// Open modal on click instead of ContextMenu to avoid xpui hook errors
 	const open = () => {
 		openOptionsModal("Conversions", items, (name, value) => {
@@ -261,7 +269,7 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 			}
 
 			lyricContainerUpdate?.();
-		});
+		}, "translation-menu");
 	};
 
 	return react.createElement(
