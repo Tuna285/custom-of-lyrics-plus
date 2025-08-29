@@ -210,7 +210,7 @@ ${text}
 	}
 
 	includeExternal(url) {
-		if ((CONFIG.visual.translate || this.isUsingNetease) && !document.querySelector(`script[src="${url}"]`)) {
+		if (!document.querySelector(`script[src="${url}"]`)) {
 			const script = document.createElement("script");
 			script.setAttribute("type", "text/javascript");
 			script.setAttribute("src", url);
