@@ -235,8 +235,10 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
 									.then(() => Spicetify.showNotification("✓ Lyrics copied to clipboard", false, 2000))
 									.catch(() => Spicetify.showNotification("Failed to copy lyrics to clipboard", true, 2000));
 							},
+							// For Furigana/Hiragana HTML strings
+							...(typeof mainText === "string" && !isKara ? { dangerouslySetInnerHTML: { __html: Utils.rubyTextToHTML(mainText) } } : {}),
 						},
-						!isKara ? mainText : react.createElement(KaraokeLine, { text: mainText, startTime, position, isActive: i === activeElementIndex })
+						!isKara ? (typeof mainText === "string" ? null : mainText) : react.createElement(KaraokeLine, { text: mainText, startTime, position, isActive: i === activeElementIndex })
 					),
 					(() => {
 						if (!subText) return null;
