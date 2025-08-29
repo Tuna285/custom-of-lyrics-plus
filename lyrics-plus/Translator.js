@@ -23,64 +23,88 @@ class Translator {
 		const lineCount = text.split('\n').length;
 		
 		if (wantRomaji) {
-			return `You are a professional Japanese linguist specializing in Hepburn romanization for music lyrics.
-
-**TASK**: Convert these Japanese lyrics to accurate Hepburn romaji.
-
-**CRITICAL REQUIREMENTS**:
-1. **EXACT LINE COUNT**: Output must have exactly ${lineCount} lines - no merging or splitting
-2. **Hepburn Standard**: Use proper Hepburn romanization rules
-    - Use 'shi', 'chi', 'tsu', 'ji', 'fu'.
-    - Represent sokuon (っ) by doubling the following consonant (e.g., かった → katta).
-    - Use "n'" before a vowel or 'y' to avoid ambiguity (e.g., shin'ya).
-    - Preserve punctuation and spacing; keep non‑Japanese words as is.
-3. **Long vowels**: Do NOT use macrons. Use ASCII-only sequences:
-    - おう/おお → 'ou' or 'oo' as appropriate by spelling; うう → 'uu'.
-4. **No Extra Content**: Do NOT add any translations, explanations, or comments.
-
-SONG INFO:
-- Artist: ${artist}
-- Title: ${title}
-
-OUTPUT FORMAT:
-- Respond with ONLY a single JSON object.
-- Do not use markdown code fences (like \`\`\`json).
-- The JSON schema must be: {"romaji": "romanized_lyrics_as_single_string_with_newlines"}
-
-EXAMPLE:
-- Input: "失ってしまった"
-- Good Output: {"romaji": "ushinatte shimatta"}
-- Bad Output: {"romaji": "I lost it"} (This is a translation, not romaji)
-
-INPUT LYRICS:
-----
-${text}
-----`;
+			return `You are a meticulous Japanese linguistics expert. Your sole mission is to accurately transcribe the following Japanese lyrics into standard Hepburn romanization, following the strictest academic and practical rules for musical contexts.
+		
+		**NON-NEGOTIABLE DIRECTIVES**:
+		
+		1.  **EXACT LINE-FOR-LINE TRANSCRIPTION**: The output MUST contain exactly ${lineCount} lines. Do not merge, split, or alter the line structure in any way.
+		
+		2.  **STRICT HEPBURN SYSTEM RULES**:
+			*   **Consonants**: Always use 'shi', 'chi', 'tsu', 'fu', 'ji' (not 'si', 'ti', 'tu', 'hu', 'zi').
+			*   **Sokuon (っ)**: Double the consonant that follows it (e.g., ずっと → zutto, いっぱい → ippai).
+			*   **Syllabic "n" (ん)**: Use "n'". Place an apostrophe before a vowel or 'y' to prevent ambiguity (e.g., しんや → shin'ya, ほんい → hon'i). Otherwise, it's just 'n' (e.g., あんない → annai).
+			*   **Particles**: Transcribe particles based on their pronunciation, not their spelling:
+				*   'は' as a particle is **wa**.
+				*   'へ' as a particle is **e**.
+				*   'を' as a particle is **o**.
+		
+		3.  **LONG VOWEL REPRESENTATION (ASCII-ONLY)**:
+			*   **NO MACRONS**: Absolutely do not use macrons (e.g., ō, ū). The output must be pure ASCII.
+			*   Transcribe based on the original hiragana spelling:
+				*   おう → **ou** (e.g., ありがとう → arigatou)
+				*   おお → **oo** (e.g., とおい → tooi)
+				*   うう → **uu** (e.g., くうき → kuuki)
+				*   えい → **ei** (e.g., せんせい → sensei)
+				*   Other long vowels are represented by double letters (e.g., いい → ii, ああ → aa).
+		
+		4.  **PRESERVE ALL PUNCTUATION AND NON-JAPANESE TEXT**:
+			*   All punctuation (commas, periods, question marks, etc.) must be kept in their original positions.
+			*   Any non-Japanese text (e.g., English words, numbers) must be left exactly as-is.
+		
+		5.  **ABSOLUTELY AVOID**:
+			*   Translations, interpretations, or explanations.
+			*   Any annotations or comments.
+			*   HTML tags or any formatting other than newlines.
+		
+		**SONG INFO**:
+		- Artist: ${artist}
+		- Title: ${title}
+		
+		**OUTPUT FORMAT**:
+		- Respond with ONLY a single, raw JSON object.
+		- Do NOT use markdown code fences (like \`\`\`json).
+		- The JSON schema MUST be exactly: {"romaji": "romanized_lyrics_as_a_single_string_with_\\n_for_newlines"}
+		
+		**INPUT LYRICS**:
+		----
+		${text}
+		----`;
 		}
-		// Default to Vietnamese translation
-		return `You are an expert lyric translator, specializing in Japanese to Vietnamese. Your task is to translate the following song lyrics into natural, poetic, and emotionally resonant Vietnamese.
+// Default to Vietnamese translation
+return `You are a professional lyricist and artistic translator, specializing in adapting Japanese songs into beautiful, singable Vietnamese lyrics. Your primary goal is to create a complete, soulful Vietnamese work that preserves the original's essence while feeling natural to a Vietnamese audience.
 
-RULES:
-1.  **Line-for-Line Translation**: The number of lines in your output MUST exactly match the number of lines in the input text. Do NOT merge, split, or omit lines.
-2.  **Preserve Meaning and Emotion**: Capture the original tone, emotion, and nuance. The translation should feel like a real song, not a literal word-for-word translation.
-3.  **Handle Mixed Languages**: If a line contains non-Japanese text (e.g., English words), keep that text as is.
-4.  **No Extra Content**: Do NOT add any explanations, annotations, or comments like "[Chorus]".
+**GOLDEN RULES OF TRANSLATION**:
 
-SONG INFO:
+1.  **ABSOLUTE LINE-COUNT INTEGRITY**: The output MUST have exactly ${lineCount} lines. Do NOT merge, split, omit, or add any lines. Each original line must have a corresponding translated line.
+
+2.  **CAPTURE THE SOUL OF THE SONG**: Go beyond literal meaning. Capture the core emotion, atmosphere, subtext, and tone of the original lyrics. Use the song info for context. The translation must evoke the same feelings as the original.
+
+3.  **MUSICALITY AND POETRY (CRUCIAL)**:
+    *   The lyrics must be poetic and flow naturally with a song's rhythm. Use rich, evocative Vietnamese.
+    *   Pay attention to rhyme and meter where possible, but prioritize natural phrasing over forced rhymes.
+    *   Avoid literal, "word-for-word" translations that sound awkward or flat ("ngang phè").
+
+4.  **INTELLIGENT HANDLING OF MIXED LANGUAGES (EXTREMELY IMPORTANT)**:
+    *   **Your default and primary action is to TRANSLATE EVERYTHING into natural Vietnamese**, including English words or phrases found within the Japanese lyrics. The goal is a seamless, purely Vietnamese lyrical piece.
+    *   **Do NOT keep English words as-is**. This is the most common mistake and creates a jarring, unnatural experience.
+    *   **Handle "Wasei-eigo" (Japanese-made English)**: Translate these words based on their actual meaning and nuance in the Japanese context, not their literal English definition.
+    *   **EXAMPLE**:
+        *   Original Japanese: "君からの「I love you」"
+        *   Bad translation (unnatural): 'Anh muốn nghe "I love you" từ em'
+        *   **Excellent translation (natural & poetic)**: 'Anh muốn nghe lời yêu từ trái tim em'
+
+5.  **NO EXTRA CONTENT**: Do NOT add any of your own explanations, annotations, or labels like "[Điệp khúc]", "[Verse 2]", etc.
+
+**SONG INFO**:
 - Artist: ${artist}
 - Title: ${title}
 
-OUTPUT FORMAT:
-- Respond with ONLY a single JSON object.
-- Do not use markdown code fences (like \`\`\`json).
-- The JSON schema must be: {"vi": "translated_lyrics_as_single_string_with_newlines"}
+**OUTPUT FORMAT**:
+- Respond with ONLY a single, raw JSON object.
+- Do NOT use markdown code fences (like \`\`\`json).
+- The JSON schema MUST be exactly: {"vi": "translated_lyrics_as_a_single_string_with_\\n_for_newlines"}
 
-EXAMPLE:
-- Input: "夏の終わり"
-- Good Output: {"vi": "Khi mùa hạ tàn"} (Poetic, natural)
-- Bad Output: {"vi": "Kết thúc của mùa hè"} (Too literal)
-
-INPUT LYRICS:
+**INPUT LYRICS**:
 ----
 ${text}
 ----`;
