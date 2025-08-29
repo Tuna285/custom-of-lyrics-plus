@@ -134,6 +134,7 @@ let adjustmentsDebounceTimeout = null;
 // Define static options outside component to avoid recreation
 const STATIC_OPTIONS = {
 	source: {
+		none: "Kuromoji",
 		geminiVi: "Gemini",
 	},
 	translationDisplay: {
@@ -180,11 +181,11 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 		
 		let modeOptions = { ...STATIC_OPTIONS.modeBase };
 
-		const isGeminiProvider = CONFIG.visual["translate:translated-lyrics-source"] === "geminiVi";
-		if (isGeminiProvider) {
+		const provider = CONFIG.visual["translate:translated-lyrics-source"];
+		if (provider === "geminiVi") {
 			modeOptions = STATIC_OPTIONS.geminiModes;
 		} else if (friendlyLanguage) {
-			// Use pre-defined language modes
+			// Local conversions via kuromoji/OpenCC
 			modeOptions = STATIC_OPTIONS.languageModes[friendlyLanguage] || STATIC_OPTIONS.modeBase;
 		}
 
@@ -244,23 +245,19 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 	const open = () => {
 		openOptionsModal("Conversions", items, (name, value) => {
 			if (name === "translate:translated-lyrics-source" && friendlyLanguage) {
+				// Reset display modes appropriately on provider change
 				const modeKey = `translation-mode:${friendlyLanguage}`;
 				const modeKey2 = `translation-mode-2:${friendlyLanguage}`;
-				if (value === "geminiVi") {
-					CONFIG.visual[modeKey] = "none";
-					localStorage.setItem(`${APP_NAME}:visual:${modeKey}`, "none");
-					CONFIG.visual[modeKey2] = "none";
-					localStorage.setItem(`${APP_NAME}:visual:${modeKey2}`, "none");
-				} else if (String(CONFIG.visual[modeKey] || "").startsWith("gemini")) {
-					CONFIG.visual[modeKey] = "none";
-					localStorage.setItem(`${APP_NAME}:visual:${modeKey}`, "none");
-				}
+				CONFIG.visual[modeKey] = "none";
+				localStorage.setItem(`${APP_NAME}:visual:${modeKey}`, "none");
+				CONFIG.visual[modeKey2] = "none";
+				localStorage.setItem(`${APP_NAME}:visual:${modeKey2}`, "none");
 			}
 
 			CONFIG.visual[name] = value;
 			localStorage.setItem(`${APP_NAME}:visual:${name}`, value);
 
-			if (name.startsWith("translation-mode:")) {
+			if (name.startsWith("translation-mode")) {
 				if (window.lyricContainer) {
 					window.lyricContainer.lastProcessedUri = null;
 					window.lyricContainer.lastProcessedMode = null;

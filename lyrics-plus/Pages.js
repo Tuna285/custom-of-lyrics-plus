@@ -238,24 +238,30 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
 						},
 						!isKara ? mainText : react.createElement(KaraokeLine, { text: mainText, startTime, position, isActive: i === activeElementIndex })
 					),
-					subText && react.createElement("p", {
-						className: "lyrics-lyricsContainer-LyricsLine-sub",
-						style: {
-							"--sub-lyric-color": CONFIG.visual["inactive-color"],
-						},
-						dangerouslySetInnerHTML: {
-							__html: subText,
-						},
-					}),
-					subText2 && react.createElement("p", {
-						className: "lyrics-lyricsContainer-LyricsLine-sub",
-						style: {
-							"--sub-lyric-color": CONFIG.visual["inactive-color"],
-						},
-						dangerouslySetInnerHTML: {
-							__html: subText2,
-						},
-					})
+					(() => {
+						if (!subText) return null;
+						const props = {
+							className: "lyrics-lyricsContainer-LyricsLine-sub",
+							style: { "--sub-lyric-color": CONFIG.visual["inactive-color"] },
+						};
+						if (typeof subText === "string") {
+							props.dangerouslySetInnerHTML = { __html: Utils.rubyTextToHTML(subText) };
+							return react.createElement("p", props);
+						}
+						return react.createElement("p", props, subText);
+					})(),
+					(() => {
+						if (!subText2) return null;
+						const props2 = {
+							className: "lyrics-lyricsContainer-LyricsLine-sub",
+							style: { "--sub-lyric-color": CONFIG.visual["inactive-color"] },
+						};
+						if (typeof subText2 === "string") {
+							props2.dangerouslySetInnerHTML = { __html: Utils.rubyTextToHTML(subText2) };
+							return react.createElement("p", props2);
+						}
+						return react.createElement("p", props2, subText2);
+					})()
 				);
 			})
 		),
@@ -557,7 +563,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
 						"--sub-lyric-color": CONFIG.visual["inactive-color"],
 					},
 					dangerouslySetInnerHTML: {
-						__html: subText,
+						__html: Utils.rubyTextToHTML(subText),
 					},
 				}),
 				subText2 && react.createElement("p", {
@@ -566,7 +572,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
 						"--sub-lyric-color": CONFIG.visual["inactive-color"],
 					},
 					dangerouslySetInnerHTML: {
-						__html: subText2,
+						__html: Utils.rubyTextToHTML(subText2),
 					},
 				})
 			);
@@ -630,8 +636,12 @@ const UnsyncedLyricsPage = react.memo(({ lyrics, provider, copyright }) => {
 								.then(() => Spicetify.showNotification("✓ Lyrics copied to clipboard", false, 2000))
 								.catch(() => Spicetify.showNotification("Failed to copy lyrics to clipboard", true, 2000));
 						},
+						// Use HTML for ruby when string
+						...(typeof lineText === "string"
+							? { dangerouslySetInnerHTML: { __html: Utils.rubyTextToHTML(lineText) } }
+							: {}),
 					},
-					lineText
+					typeof lineText === "string" ? null : lineText
 				),
 				belowMode &&
 					react.createElement(
@@ -644,8 +654,11 @@ const UnsyncedLyricsPage = react.memo(({ lyrics, provider, copyright }) => {
 									.then(() => Spicetify.showNotification("✓ Translation copied to clipboard", false, 2000))
 									.catch(() => Spicetify.showNotification("Failed to copy translation to clipboard", true, 2000));
 							},
+							...(typeof text === "string"
+								? { dangerouslySetInnerHTML: { __html: Utils.rubyTextToHTML(text) } }
+								: {}),
 						},
-						text
+						typeof text === "string" ? null : text
 					),
 				showMode2 &&
 					react.createElement(
@@ -658,8 +671,11 @@ const UnsyncedLyricsPage = react.memo(({ lyrics, provider, copyright }) => {
 									.then(() => Spicetify.showNotification("✓ Second translation copied to clipboard", false, 2000))
 									.catch(() => Spicetify.showNotification("Failed to copy second translation to clipboard", true, 2000));
 							},
+							...(typeof text2 === "string"
+								? { dangerouslySetInnerHTML: { __html: Utils.rubyTextToHTML(text2) } }
+								: {}),
 						},
-						text2
+						typeof text2 === "string" ? null : text2
 					)
 			);
 		}),
