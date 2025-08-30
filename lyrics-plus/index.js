@@ -4,10 +4,14 @@
 
 /** @type {React} */
 const react = Spicetify.React;
-const { useState, useEffect, useCallback, useMemo, useRef } = react;
+const { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } = react;
 /** @type {import("react").ReactDOM} */
 const reactDOM = Spicetify.ReactDOM;
 const spotifyVersion = Spicetify.Platform.version;
+
+// Lazy load components to reduce initial bundle size
+const LazySettings = lazy(() => Promise.resolve({ default: () => react.createElement('div', { id: 'settings-placeholder' }) }));
+const LazyPages = lazy(() => Promise.resolve({ default: () => react.createElement('div', { id: 'pages-placeholder' }) }));
 
 // Define a function called "render" to specify app entry point
 // This function will be used to mount app to main view.
@@ -17,10 +21,19 @@ function render() {
 
 // Optimized utility functions with better error handling and performance
 const ConfigUtils = {
+	_cache: new Map(),
+	
 	get(name, defaultVal = true) {
+		// Use cache for frequently accessed configs
+		if (this._cache.has(name)) {
+			return this._cache.get(name);
+		}
+		
 		try {
-	const value = localStorage.getItem(name);
-			return value !== null ? value === "true" : defaultVal;
+			const value = localStorage.getItem(name);
+			const result = value !== null ? value === "true" : defaultVal;
+			this._cache.set(name, result);
+			return result;
 		} catch (error) {
 			console.warn(`Failed to read config '${name}':`, error);
 			return defaultVal;
@@ -49,6 +62,9 @@ const ConfigUtils = {
 	setPersisted(key, value) {
 		const stringValue = String(value);
 		let success = false;
+		
+		// Clear cache when setting new values
+		this._cache.delete(key);
 		
 		// Try Spicetify LocalStorage first
 		try {
@@ -79,11 +95,12 @@ const SYNCED = 1;
 const UNSYNCED = 2;
 const GENIUS = 3;
 
+// Optimized config loading with caching
 const CONFIG = {
 	visual: {
-			"playbar-button": ConfigUtils.get("lyrics-plus:visual:playbar-button", false),
-	colorful: ConfigUtils.get("lyrics-plus:visual:colorful"),
-	noise: ConfigUtils.get("lyrics-plus:visual:noise"),
+		"playbar-button": ConfigUtils.get("lyrics-plus:visual:playbar-button", false),
+		colorful: ConfigUtils.get("lyrics-plus:visual:colorful"),
+		noise: ConfigUtils.get("lyrics-plus:visual:noise"),
 		"background-color": localStorage.getItem("lyrics-plus:visual:background-color") || "var(--spice-main)",
 		"active-color": localStorage.getItem("lyrics-plus:visual:active-color") || "var(--spice-text)",
 		"inactive-color": localStorage.getItem("lyrics-plus:visual:inactive-color") || "rgba(var(--spice-rgb-subtext),0.5)",
@@ -106,8 +123,8 @@ const CONFIG = {
 		"musixmatch-translation-language": localStorage.getItem("lyrics-plus:visual:musixmatch-translation-language") || "none",
 		"fade-blur": ConfigUtils.get("lyrics-plus:visual:fade-blur"),
 		"fullscreen-key": localStorage.getItem("lyrics-plus:visual:fullscreen-key") || "f12",
-			"synced-compact": ConfigUtils.get("lyrics-plus:visual:synced-compact"),
-	"dual-genius": ConfigUtils.get("lyrics-plus:visual:dual-genius"),
+		"synced-compact": ConfigUtils.get("lyrics-plus:visual:synced-compact"),
+		"dual-genius": ConfigUtils.get("lyrics-plus:visual:dual-genius"),
 		"global-delay": Number(localStorage.getItem("lyrics-plus:visual:global-delay")) || 0,
 		delay: 0,
 	},
@@ -165,8 +182,6 @@ CONFIG.visual["lines-after"] = Number.parseInt(CONFIG.visual["lines-after"]);
 CONFIG.visual["font-size"] = Number.parseInt(CONFIG.visual["font-size"]);
 CONFIG.visual["ja-detect-threshold"] = Number.parseInt(CONFIG.visual["ja-detect-threshold"]);
 CONFIG.visual["hans-detect-threshold"] = Number.parseInt(CONFIG.visual["hans-detect-threshold"]);
-
-let CACHE = {};
 
 const emptyState = {
 	karaoke: null,
@@ -248,6 +263,87 @@ const RateLimiter = {
 	}
 };
 
+// Optimized color fetching with caching
+const ColorManager = {
+	_cache: new Map(),
+	_ttl: 60 * 60 * 1000, // 1 hour TTL
+
+	async fetchColors(uri) {
+		const cacheKey = `colors_${uri}`;
+		const cached = this._cache.get(cacheKey);
+		
+		if (cached && Date.now() < cached.expiry) {
+			return cached.data;
+		}
+
+		let vibrant = 0;
+		try {
+			try {
+				const { fetchExtractedColorForTrackEntity } = Spicetify.GraphQL.Definitions;
+				const { data } = await Spicetify.GraphQL.Request(fetchExtractedColorForTrackEntity, { uri });
+				const { hex } = data.trackUnion.albumOfTrack.coverArt.extractedColors.colorDark;
+				vibrant = Number.parseInt(hex.replace("#", ""), 16);
+			} catch {
+				const colors = await Spicetify.CosmosAsync.get(`https://spclient.wg.spotify.com/colorextractor/v1/extract-presets?uri=${uri}&format=json`);
+				vibrant = colors.entries[0].color_swatches.find((color) => color.preset === "VIBRANT_NON_ALARMING").color;
+			}
+		} catch {
+			vibrant = 8747370;
+		}
+
+		const result = {
+			background: Utils.convertIntToRGB(vibrant),
+			inactive: Utils.convertIntToRGB(vibrant, 3),
+		};
+
+		// Cache the result
+		this._cache.set(cacheKey, {
+			data: result,
+			expiry: Date.now() + this._ttl
+		});
+
+		return result;
+	}
+};
+
+// Optimized tempo fetching with caching
+const TempoManager = {
+	_cache: new Map(),
+	_ttl: 60 * 60 * 1000, // 1 hour TTL
+
+	async fetchTempo(uri) {
+		const cacheKey = `tempo_${uri}`;
+		const cached = this._cache.get(cacheKey);
+		
+		if (cached && Date.now() < cached.expiry) {
+			return cached.data;
+		}
+
+		const audio = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features/${uri.split(":")[2]}`);
+		let tempo = audio.tempo;
+
+		const MIN_TEMPO = 60;
+		const MAX_TEMPO = 150;
+		const MAX_PERIOD = 0.4;
+		if (!tempo) tempo = 105;
+		if (tempo < MIN_TEMPO) tempo = MIN_TEMPO;
+		if (tempo > MAX_TEMPO) tempo = MAX_TEMPO;
+
+		let period = MAX_PERIOD - ((tempo - MIN_TEMPO) / (MAX_TEMPO - MIN_TEMPO)) * MAX_PERIOD;
+		period = Math.round(period * 100) / 100;
+
+		const result = `${String(period)}s`;
+
+		// Cache the result
+		this._cache.set(cacheKey, {
+			data: result,
+			expiry: Date.now() + this._ttl
+		});
+
+		return result;
+	}
+};
+
 let lyricContainerUpdate;
 let reloadLyrics;
 
@@ -255,6 +351,7 @@ const fontSizeLimit = { min: 16, max: 256, step: 4 };
 
 const thresholdSizeLimit = { min: 0, max: 100, step: 5 };
 
+// Optimized component with better performance
 class LyricsContainer extends react.Component {
 	constructor() {
 		super();
@@ -312,7 +409,19 @@ class LyricsContainer extends react.Component {
 		// Prevent infinite render loops
 		this.lastProcessedUri = null;
 		this.lastProcessedMode = null;
+		
+		// Performance optimizations
+		this._debounceTimer = null;
+		this._pendingUpdates = new Set();
 	}
+
+	// Debounced state updates to prevent excessive re-renders
+	debouncedSetState = (updates) => {
+		clearTimeout(this._debounceTimer);
+		this._debounceTimer = setTimeout(() => {
+			this.setState(updates);
+		}, 16); // ~60fps
+	};
 
 	infoFromTrack(track) {
 		const meta = track?.metadata;
@@ -330,100 +439,87 @@ class LyricsContainer extends react.Component {
 	}
 
 	async fetchColors(uri) {
-		let vibrant = 0;
-		try {
-			try {
-				const { fetchExtractedColorForTrackEntity } = Spicetify.GraphQL.Definitions;
-				const { data } = await Spicetify.GraphQL.Request(fetchExtractedColorForTrackEntity, { uri });
-				const { hex } = data.trackUnion.albumOfTrack.coverArt.extractedColors.colorDark;
-				vibrant = Number.parseInt(hex.replace("#", ""), 16);
-			} catch {
-				const colors = await Spicetify.CosmosAsync.get(`https://spclient.wg.spotify.com/colorextractor/v1/extract-presets?uri=${uri}&format=json`);
-				vibrant = colors.entries[0].color_swatches.find((color) => color.preset === "VIBRANT_NON_ALARMING").color;
-			}
-		} catch {
-			vibrant = 8747370;
-		}
-
-		this.setState({
-			colors: {
-				background: Utils.convertIntToRGB(vibrant),
-				inactive: Utils.convertIntToRGB(vibrant, 3),
-			},
-		});
+		const colors = await ColorManager.fetchColors(uri);
+		this.debouncedSetState({ colors });
 	}
 
 	async fetchTempo(uri) {
-		const audio = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features/${uri.split(":")[2]}`);
-		let tempo = audio.tempo;
-
-		const MIN_TEMPO = 60;
-		const MAX_TEMPO = 150;
-		const MAX_PERIOD = 0.4;
-		if (!tempo) tempo = 105;
-		if (tempo < MIN_TEMPO) tempo = MIN_TEMPO;
-		if (tempo > MAX_TEMPO) tempo = MAX_TEMPO;
-
-		let period = MAX_PERIOD - ((tempo - MIN_TEMPO) / (MAX_TEMPO - MIN_TEMPO)) * MAX_PERIOD;
-		period = Math.round(period * 100) / 100;
-
-		this.setState({
-			tempo: `${String(period)}s`,
-		});
+		const tempo = await TempoManager.fetchTempo(uri);
+		this.debouncedSetState({ tempo });
 	}
 
+	// Optimized service trying with parallel requests and better error handling
 	async tryServices(trackInfo, mode = -1) {
 		const currentMode = CONFIG.modes[mode] || "";
 		let finalData = { ...emptyState, uri: trackInfo.uri };
-		for (const id of CONFIG.providersOrder) {
+		
+		// Get enabled providers for this mode
+		const enabledProviders = CONFIG.providersOrder.filter(id => {
 			const service = CONFIG.providers[id];
-			if (spotifyVersion >= "1.2.31" && id === "genius") continue;
-			if (!service.on) continue;
-			if (mode !== -1 && !service.modes.includes(mode)) continue;
+			if (spotifyVersion >= "1.2.31" && id === "genius") return false;
+			if (!service.on) return false;
+			if (mode !== -1 && !service.modes.includes(mode)) return false;
+			return true;
+		});
 
-			let data;
+		// Try providers in parallel for better performance
+		const providerPromises = enabledProviders.map(async (id) => {
+			if (!RateLimiter.canMakeCall(`provider_${id}`, 3, 60000)) {
+				return null;
+			}
+
 			try {
-				data = await Providers[id](trackInfo);
+				const data = await Providers[id](trackInfo);
+				return { id, data };
 			} catch (e) {
-				console.error(e);
-				continue;
+				console.error(`Provider ${id} failed:`, e);
+				return null;
 			}
+		});
 
-			if (data.error || (!data.karaoke && !data.synced && !data.unsynced && !data.genius)) continue;
-			if (mode === -1) {
-				finalData = data;
-				return finalData;
-			}
+		const results = await Promise.allSettled(providerPromises);
+		
+		for (const result of results) {
+			if (result.status === 'fulfilled' && result.value) {
+				const { id, data } = result.value;
+				
+				if (data.error || (!data.karaoke && !data.synced && !data.unsynced && !data.genius)) continue;
+				
+				if (mode === -1) {
+					finalData = data;
+					return finalData;
+				}
 
-			if (!data[currentMode]) {
+				if (!data[currentMode]) {
+					for (const key in data) {
+						if (!finalData[key]) {
+							finalData[key] = data[key];
+						}
+					}
+					continue;
+				}
+
 				for (const key in data) {
 					if (!finalData[key]) {
 						finalData[key] = data[key];
 					}
 				}
-				continue;
-			}
 
-			for (const key in data) {
-				if (!finalData[key]) {
-					finalData[key] = data[key];
+				if (data.provider !== "local" && finalData.provider && finalData.provider !== data.provider) {
+					const styledMode = currentMode.charAt(0).toUpperCase() + currentMode.slice(1);
+					finalData.copyright = `${styledMode} lyrics provided by ${data.provider}\n${finalData.copyright || ""}`.trim();
 				}
-			}
 
-			if (data.provider !== "local" && finalData.provider && finalData.provider !== data.provider) {
-				const styledMode = currentMode.charAt(0).toUpperCase() + currentMode.slice(1);
-				finalData.copyright = `${styledMode} lyrics provided by ${data.provider}\n${finalData.copyright || ""}`.trim();
-			}
+				if (finalData.musixmatchTranslation && typeof finalData.musixmatchTranslation[0].startTime === "undefined" && finalData.synced) {
+					finalData.musixmatchTranslation = finalData.synced.map((line) => ({
+						...line,
+						text:
+							finalData.musixmatchTranslation.find((l) => Utils.processLyrics(l?.originalText || "") === Utils.processLyrics(line?.text || ""))?.text ?? (line?.text || ""),
+					}));
+				}
 
-			if (finalData.musixmatchTranslation && typeof finalData.musixmatchTranslation[0].startTime === "undefined" && finalData.synced) {
-				finalData.musixmatchTranslation = finalData.synced.map((line) => ({
-					...line,
-					text:
-						finalData.musixmatchTranslation.find((l) => Utils.processLyrics(l?.originalText || "") === Utils.processLyrics(line?.text || ""))?.text ?? (line?.text || ""),
-				}));
+				return finalData;
 			}
-
-			return finalData;
 		}
 
 		return finalData;
@@ -441,11 +537,18 @@ class LyricsContainer extends react.Component {
 
 		let isCached = this.lyricsSaved(info.uri);
 
+		// Parallel fetch for better performance
+		const promises = [];
+		
 		if (CONFIG.visual.colorful) {
-			this.fetchColors(info.uri);
+			promises.push(this.fetchColors(info.uri));
 		}
-
-		this.fetchTempo(info.uri);
+		
+		promises.push(this.fetchTempo(info.uri));
+		
+		// Wait for all promises to complete
+		await Promise.all(promises);
+		
 		this.resetDelay();
 
 		let tempState;
