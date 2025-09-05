@@ -7,20 +7,19 @@ Phiên bản này đã được thay thế bằng sức mạnh của **Google Ge
 
 ---
 
-## ✨ Tính năng chính của bản custom
-
+## ✨ Dưới đây là những tính năng bổ sung của phiên bản này:
 ### 1. Dịch lời bài hát với Gemini API
 Dùng mô hình LLM của Google để dịch lời bài hát một cách tự nhiên và chính xác.
--   🌐 **Hỗ trợ 2 chế độ hiển thị cùng lúc**: Chuyển ngữ các bài hát sang Romaji và các ngôn ngữ khác sang **Tiếng Việt**, lý tưởng cho việc học ngôn ngữ (Romaja, Pinyin đang phát triển).
+-   🌐 **Hỗ trợ 2 chế độ hiển thị cùng lúc**: Chuyển ngữ các bài hát sang Romaji (Tiếng Nhật), Romaja (Tiếng Hàn), Pinyin (Tiếng Trung Phồn-Giản Thể) và dịch lời bài hát sang **Tiếng Việt**, lý tưởng cho việc học ngôn ngữ.
 -   🎶 **Chất lượng cao**: Bản dịch được tối ưu cho ngữ cảnh âm nhạc, giữ lại ý nghĩa và cảm xúc của bài hát.
-<img width="1920" height="1020" alt="image" src="https://github.com/user-attachments/assets/9d431f0e-76b5-4e9f-828f-24e8ef3b3b46" />
-<img width="1920" height="1021" alt="image" src="https://github.com/user-attachments/assets/5ebeb416-32e0-4f4d-92ae-2af475a789e0" />
-
+<img width="1919" height="1020" alt="image" src="https://github.com/user-attachments/assets/6b49032b-704e-4f35-8aec-cad9f42083f3" />
+<img width="1919" height="1022" alt="image" src="https://github.com/user-attachments/assets/aadf0f62-2c67-4396-89cd-15da4ed6882d" />
+<img width="1919" height="1021" alt="image" src="https://github.com/user-attachments/assets/90c26e06-d7f0-441f-a766-393e3a9ece72" />
+<img width="1919" height="1023" alt="image" src="https://github.com/user-attachments/assets/2a1d4b24-97e4-4c8b-9374-931dfaded08a" />
 
 ### 2. Giao diện hiện đại & Tối ưu trải nghiệm
 Giao diện được tinh chỉnh để đẹp mắt, gọn gàng và không gây xao nhãng.
 -   🖼️ **Nền trong suốt**: Lời bài hát được hiển thị trên một lớp nền trong suốt, hòa hợp với giao diện của các theme của spicetify.
--   ✍️ **Chữ dễ đọc**: Văn bản có viền nhẹ, đảm bảo luôn rõ nét trên mọi hình nền bìa album.
 -   🖱️ **Nút điều khiển tự ẩn**: Các nút cài đặt chỉ xuất hiện khi bạn di chuột vào khu vực lời bài hát, trả lại không gian hiển thị tối đa.
 -   🎬 **Hiệu ứng chuyển dòng mượt mà**: Animation được tối ưu để tạo cảm giác chuyển tiếp uyển chuyển giữa các dòng lyric.
 
