@@ -95,9 +95,14 @@ const CONFIG = {
 		"translate:translated-lyrics-source": localStorage.getItem("lyrics-plus:visual:translate:translated-lyrics-source") || "geminiVi",
 		"translate:display-mode": localStorage.getItem("lyrics-plus:visual:translate:display-mode") || "replace",
 		"translate:detect-language-override": localStorage.getItem("lyrics-plus:visual:translate:detect-language-override") || "off",
-		"translation-mode:japanese": "none", // Force default to none
-		"translation-mode:korean": "none", // Force default to none
-		"translation-mode:chinese": "none", // Force default to none
+		"translation-mode:japanese": localStorage.getItem("lyrics-plus:visual:translation-mode:japanese") || "none",
+		"translation-mode:korean": localStorage.getItem("lyrics-plus:visual:translation-mode:korean") || "none",
+		"translation-mode:chinese": localStorage.getItem("lyrics-plus:visual:translation-mode:chinese") || "none",
+		"translation-mode:gemini": localStorage.getItem("lyrics-plus:visual:translation-mode:gemini") || "none",
+		"translation-mode-2:japanese": localStorage.getItem("lyrics-plus:visual:translation-mode-2:japanese") || "none",
+		"translation-mode-2:korean": localStorage.getItem("lyrics-plus:visual:translation-mode-2:korean") || "none",
+		"translation-mode-2:chinese": localStorage.getItem("lyrics-plus:visual:translation-mode-2:chinese") || "none",
+		"translation-mode-2:gemini": localStorage.getItem("lyrics-plus:visual:translation-mode-2:gemini") || "none",
 		"gemini-api-key": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key") || "",
 		"gemini-api-key-romaji": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key-romaji") || "",
 		translate: ConfigUtils.get("lyrics-plus:visual:translate", false),
@@ -500,7 +505,28 @@ class LyricsContainer extends react.Component {
 
 		// if song changed one time
 		if (tempState.uri !== this.state.uri || refresh) {
-			const defaultLanguage = Utils.detectLanguage(this.state.currentLyrics);
+			// Detect language from the new lyrics data
+			let defaultLanguage = null;
+			if (tempState.synced) {
+				defaultLanguage = Utils.detectLanguage(tempState.synced);
+			} else if (tempState.unsynced) {
+				defaultLanguage = Utils.detectLanguage(tempState.unsynced);
+			} else if (tempState.genius) {
+				// For genius lyrics, we need to convert HTML to text first
+				const geniusText = tempState.genius.replace(/<br>/g, "\n").replace(/<[^>]*>/g, "");
+				defaultLanguage = Utils.detectLanguage([{ text: geniusText }]);
+			}
+
+			// Debug logging
+			if (window.lyricsPlusDebug) {
+				console.log("fetchLyrics language detection:", {
+					uri: tempState.uri,
+					defaultLanguage,
+					hasSynced: !!tempState.synced,
+					hasUnsynced: !!tempState.unsynced,
+					hasGenius: !!tempState.genius
+				});
+			}
 
 			// reset and apply
 			this.setState({
@@ -554,9 +580,34 @@ class LyricsContainer extends react.Component {
 
 		// Handle translation and display modes efficiently
 		const originalLanguage = this.provideLanguageCode(lyrics);
-		const friendlyLanguage = originalLanguage && new Intl.DisplayNames(["en"], { type: "language" }).of(originalLanguage.split("-")[0])?.toLowerCase();
-		const displayMode1 = CONFIG.visual[`translation-mode:${friendlyLanguage}`];
-		const displayMode2 = CONFIG.visual[`translation-mode-2:${friendlyLanguage}`];
+		let friendlyLanguage = null;
+		
+		if (originalLanguage) {
+			try {
+				friendlyLanguage = new Intl.DisplayNames(["en"], { type: "language" }).of(originalLanguage.split("-")[0])?.toLowerCase();
+			} catch (error) {
+				console.warn("Failed to get friendly language name:", error);
+			}
+		}
+		
+		// Debug logging for troubleshooting
+		if (window.lyricsPlusDebug) {
+			console.log("Language detection debug:", {
+				originalLanguage,
+				friendlyLanguage,
+				lyricsLength: lyrics?.length,
+				firstLineText: lyrics?.[0]?.text?.substring(0, 50),
+				languageOverride: CONFIG.visual["translate:detect-language-override"],
+				stateLanguage: this.state.language
+			});
+		}
+		
+		// For Gemini mode, use generic keys if no specific language detected
+		const provider = CONFIG.visual["translate:translated-lyrics-source"];
+		const modeKey = provider === "geminiVi" && !friendlyLanguage ? "gemini" : friendlyLanguage;
+		
+		const displayMode1 = CONFIG.visual[`translation-mode:${modeKey}`];
+		const displayMode2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
 
 		this.language = originalLanguage;
 		this.displayMode = displayMode1; // Keep for legacy compatibility
@@ -566,12 +617,12 @@ class LyricsContainer extends react.Component {
 			if (!mode || mode === "none") return null;
 			try {
 				if (String(mode).startsWith("gemini")) {
-					return await this.getGeminiTranslation(lyricsState, baseLyrics, mode === "gemini_romaji");
+					return await this.getGeminiTranslation(lyricsState, baseLyrics, mode);
 				} else {
 					return await this.getTraditionalConversion(lyricsState, baseLyrics, originalLanguage, mode);
 				}
 			} catch (error) {
-				const modeDisplayName = mode === "gemini_romaji" ? "Romaji translation" : "Vietnamese translation";
+				const modeDisplayName = mode === "gemini_romaji" ? "Romaji, Romaja, Pinyin translation" : "Vietnamese translation";
 				Spicetify.showNotification(`${modeDisplayName} failed: ${error.message || "Unknown error"}`, true, 4000);
 				return null; // Return null on failure
 			}
@@ -710,18 +761,30 @@ class LyricsContainer extends react.Component {
 		return processedLyrics;
 	}
 
-	getGeminiTranslation(lyricsState, lyrics, wantRomaji) {
+	getGeminiTranslation(lyricsState, lyrics, mode) {
 		return new Promise((resolve, reject) => {
-					const viKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini-api-key`);
-		const romajiKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini-api-key-romaji`);
-			// Prefer per-mode key; if missing, gracefully fall back to the other one
-			const apiKey = wantRomaji ? (romajiKey || viKey) : (viKey || romajiKey);
+			const viKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini-api-key`);
+			const romajiKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini-api-key-romaji`);
+			
+			// Determine mode type and API key
+			let wantRomaji = false;
+			let wantSmartPhonetic = false;
+			let apiKey;
+			
+			if (mode === "gemini_romaji") {
+				// Use Smart Phonetic logic for the unified Romaji, Romaja, Pinyin button
+				wantSmartPhonetic = true;
+				apiKey = romajiKey || viKey;
+			} else {
+				// Default to Vietnamese
+				apiKey = viKey || romajiKey;
+			}
 
 			if (!apiKey || !Array.isArray(lyrics) || lyrics.length === 0) {
 				return reject(new Error("Gemini API key missing. Please add at least one key in Settings."));
 			}
 
-			const cacheKey = wantRomaji ? "gemini_romaji" : "gemini_vi";
+			const cacheKey = mode;
 			const cacheKey2 = `${lyricsState.uri}:${cacheKey}`;
 			const cached = CacheManager.get(cacheKey2);
 
@@ -734,15 +797,29 @@ class LyricsContainer extends react.Component {
 			}
 
 			// Use optimized rate limiter with separate keys for each translation type
-			const rateLimitKey = wantRomaji ? 'gemini-romaji' : 'gemini-vietnamese';
+			const rateLimitKey = mode.replace('gemini_', 'gemini-');
 			if (!RateLimiter.canMakeCall(rateLimitKey, 5, 60000)) {
-				return reject(new Error(`${wantRomaji ? 'Romaji' : 'Vietnamese'} translation rate limit reached. Please wait.`));
+				const modeName = mode === "gemini_romaji" ? "Romaji, Romaja, Pinyin" : "Vietnamese";
+				return reject(new Error(`${modeName} translation rate limit reached. Please wait.`));
 			}
 
 			const text = lyrics.map((l) => l?.text || "").filter(Boolean).join("\n");
-			const inflightPromise = Translator.callGemini({ apiKey, artist: this.state.artist || lyricsState.artist, title: this.state.title || lyricsState.title, text, wantRomaji })
-				.then(({ romaji, vi }) => {
-					const outText = wantRomaji ? romaji : vi;
+			const inflightPromise = Translator.callGemini({ 
+				apiKey, 
+				artist: this.state.artist || lyricsState.artist, 
+				title: this.state.title || lyricsState.title, 
+				text, 
+				wantRomaji, 
+				wantSmartPhonetic 
+			})
+				.then(({ romaji, vi, phonetic }) => {
+					let outText;
+					if (wantSmartPhonetic) {
+						outText = phonetic;
+					} else {
+						outText = vi;
+					}
+					
 					if (!outText) throw new Error("Empty result from Gemini.");
 					const lines = outText.split("\n");
 					const mapped = lyrics.map((line, i) => ({
@@ -793,15 +870,66 @@ class LyricsContainer extends react.Component {
 	}
 
 	provideLanguageCode(lyrics) {
-		if (!lyrics) return;
+		if (!lyrics) return null;
 
-		if (CONFIG.visual["translate:detect-language-override"] !== "off") {
-			return CONFIG.visual["translate:detect-language-override"];
+		const provider = CONFIG.visual["translate:translated-lyrics-source"];
+		
+		// For Gemini API, always detect language from lyrics (no override needed)
+		if (provider === "geminiVi") {
+			// If we have a cached language in state, use it
+			if (this.state.language) {
+				if (window.lyricsPlusDebug) {
+					console.log("Gemini mode - Using cached language:", this.state.language);
+				}
+				return this.state.language;
+			}
+			
+			// Otherwise, detect language from lyrics
+			const detectedLanguage = Utils.detectLanguage(lyrics);
+			
+			// Debug logging
+			if (window.lyricsPlusDebug) {
+				console.log("Gemini mode - Language detection result:", {
+					detectedLanguage,
+					lyricsLength: lyrics?.length,
+					firstLineText: lyrics?.[0]?.text?.substring(0, 50)
+				});
+			}
+			
+			return detectedLanguage;
 		}
+		
+		// For Kuromoji mode, use language override if set
+		if (CONFIG.visual["translate:detect-language-override"] !== "off") {
+			const overrideLanguage = CONFIG.visual["translate:detect-language-override"];
+			// Debug logging
+			if (window.lyricsPlusDebug) {
+				console.log("Kuromoji mode - Using language override:", overrideLanguage);
+			}
+			return overrideLanguage;
+		}
+		
+		// If we have a cached language in state, use it
 		if (this.state.language) {
+			if (window.lyricsPlusDebug) {
+				console.log("Kuromoji mode - Using cached language:", this.state.language);
+			}
 			return this.state.language;
 		}
-		return Utils.detectLanguage(lyrics);
+		
+		// Otherwise, detect language from lyrics
+		const detectedLanguage = Utils.detectLanguage(lyrics);
+		
+		// Debug logging
+		if (window.lyricsPlusDebug) {
+			console.log("Kuromoji mode - Language detection result:", {
+				detectedLanguage,
+				lyricsLength: lyrics?.length,
+				firstLineText: lyrics?.[0]?.text?.substring(0, 50)
+			});
+		}
+		
+		return detectedLanguage;
 	}
 
 	async translateLyrics(language, lyrics, targetConvert) {
@@ -1166,8 +1294,13 @@ class LyricsContainer extends react.Component {
 		// Get current display modes to track changes
 		const originalLanguage = this.provideLanguageCode(this.state.currentLyrics);
 		const friendlyLanguage = originalLanguage && new Intl.DisplayNames(["en"], { type: "language" }).of(originalLanguage.split("-")[0])?.toLowerCase();
-		const displayMode1 = CONFIG.visual[`translation-mode:${friendlyLanguage}`];
-		const displayMode2 = CONFIG.visual[`translation-mode-2:${friendlyLanguage}`];
+		
+		// For Gemini mode, use generic keys if no specific language detected
+		const provider = CONFIG.visual["translate:translated-lyrics-source"];
+		const modeKey = provider === "geminiVi" && !friendlyLanguage ? "gemini" : friendlyLanguage;
+		
+		const displayMode1 = CONFIG.visual[`translation-mode:${modeKey}`];
+		const displayMode2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
 		const currentModeKey = `${mode}_${displayMode1 || 'none'}_${displayMode2 || 'none'}`;
 
 		// Only call lyricsSource on state/mode/translation changes, not every render

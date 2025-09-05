@@ -148,7 +148,13 @@ const Utils = {
 	},
 
 	detectLanguage(lyrics) {
-		if (!Array.isArray(lyrics) || lyrics.length === 0) return;
+		if (!Array.isArray(lyrics) || lyrics.length === 0) {
+			// Debug logging
+			if (window.lyricsPlusDebug) {
+				console.log("detectLanguage: No lyrics provided", { lyrics });
+			}
+			return null;
+		}
 
 		// Create cache key from lyrics text
 		const rawLyrics = lyrics[0]?.originalText ? 
@@ -173,7 +179,18 @@ const Utils = {
 			new RegExp(`${kanaRegex.source}|${hanziRegex.source}|${hangulRegex.source}|${/\p{Unified_Ideograph}/gu.source}`, "gu")
 		);
 
-		if (!cjkMatch) return;
+		if (!cjkMatch) {
+			// Debug logging for non-CJK languages
+			if (window.lyricsPlusDebug) {
+				console.log("detectLanguage: No CJK characters found", { 
+					rawLyrics: rawLyrics.substring(0, 100),
+					lyricsLength: lyrics.length 
+				});
+			}
+			// Return null instead of undefined for non-CJK languages
+			this._cacheLanguageResult(cacheKey, null);
+			return null;
+		}
 
 		const kanaCount = cjkMatch.filter((glyph) => kanaRegex.test(glyph)).length;
 		const hanziCount = cjkMatch.filter((glyph) => hanziRegex.test(glyph)).length;

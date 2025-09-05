@@ -152,7 +152,7 @@ const STATIC_OPTIONS = {
 		none: "None",
 	},
 	geminiModes: {
-		gemini_romaji: "Romaji (Gemini)",
+		gemini_romaji: "Romaji, Romaja, Pinyin (Gemini)",
 		gemini_vi: "Vietnamese (Gemini)",
 	},
 	languageModes: {
@@ -189,7 +189,8 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 			modeOptions = STATIC_OPTIONS.languageModes[friendlyLanguage] || STATIC_OPTIONS.modeBase;
 		}
 
-		return [
+		// Always show basic options, even when friendlyLanguage is not available
+		const baseItems = [
 			{
 				desc: "Translation Provider",
 				key: "translate:translated-lyrics-source",
@@ -204,33 +205,69 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 				options: translationDisplayOptions,
 				renderInline: true,
 			},
-			{
+		];
+
+		// Show Language Override option only for Kuromoji mode
+		if (provider !== "geminiVi") {
+			baseItems.push({
 				desc: "Language Override",
 				key: "translate:detect-language-override",
 				type: ConfigSelection,
 				options: languageOptions,
 				renderInline: true,
-				// for songs in languages that support translation but not Convert (e.g., English), the option is disabled.
-				when: () => friendlyLanguage,
-			},
-			{
-				desc: "Display Mode",
-				key: `translation-mode:${friendlyLanguage}`,
-				type: ConfigSelection,
-				options: { none: "None", ...modeOptions }, // Add "None" option
-				renderInline: true,
-				// for songs in languages that support translation but not Convert (e.g., English), the option is disabled.
-				when: () => friendlyLanguage,
-			},
-			{
-				desc: "Display Mode 2",
-				key: `translation-mode-2:${friendlyLanguage}`,
-				type: ConfigSelection,
-				options: { none: "None", ...modeOptions }, // Add "None" option
-				renderInline: true,
-				when: () => friendlyLanguage,
-			},
-		];
+			});
+		}
+
+		// Add language-specific display modes
+		if (friendlyLanguage) {
+			// For detected CJK languages, show specific language modes
+			baseItems.push(
+				{
+					desc: "Display Mode",
+					key: `translation-mode:${friendlyLanguage}`,
+					type: ConfigSelection,
+					options: { none: "None", ...modeOptions },
+					renderInline: true,
+				},
+				{
+					desc: "Display Mode 2",
+					key: `translation-mode-2:${friendlyLanguage}`,
+					type: ConfigSelection,
+					options: { none: "None", ...modeOptions },
+					renderInline: true,
+				}
+			);
+		} else if (provider === "geminiVi") {
+			// For Gemini mode, show generic display modes even without detected language
+			baseItems.push(
+				{
+					desc: "Display Mode",
+					key: "translation-mode:gemini",
+					type: ConfigSelection,
+					options: { none: "None", ...modeOptions },
+					renderInline: true,
+				},
+				{
+					desc: "Display Mode 2", 
+					key: "translation-mode-2:gemini",
+					type: ConfigSelection,
+					options: { none: "None", ...modeOptions },
+					renderInline: true,
+				}
+			);
+		} else {
+			// For Kuromoji mode without detected language, show info message
+			baseItems.push({
+				desc: "Language-specific options",
+				key: "language-info",
+				type: ConfigButton,
+				text: "Language not detected",
+				onChange: () => {}, // No-op button
+				info: "Display Mode options will appear when CJK languages (Japanese, Korean, Chinese) are detected in the lyrics. You can use Language Override above to force a specific language.",
+			});
+		}
+
+		return baseItems;
 	}, [friendlyLanguage, CONFIG.visual["translate:translated-lyrics-source"]]);
 
 	// Re-dispatch dynamic items so an open modal can update its OptionList
@@ -242,20 +279,56 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 	}, [items, friendlyLanguage, CONFIG.visual["translate:translated-lyrics-source"]]);
 
 	// Open modal on click instead of ContextMenu to avoid xpui hook errors
-	const open = () => {
-		openOptionsModal("Conversions", items, (name, value) => {
-			if (name === "translate:translated-lyrics-source" && friendlyLanguage) {
-				// Reset display modes appropriately on provider change
-				const modeKey = `translation-mode:${friendlyLanguage}`;
-				const modeKey2 = `translation-mode-2:${friendlyLanguage}`;
-				CONFIG.visual[modeKey] = "none";
-				localStorage.setItem(`${APP_NAME}:visual:${modeKey}`, "none");
-				CONFIG.visual[modeKey2] = "none";
-				localStorage.setItem(`${APP_NAME}:visual:${modeKey2}`, "none");
+			const open = () => {
+			openOptionsModal("Conversions", items, (name, value) => {
+				// Skip processing for info-only items
+				if (name === "language-info") {
+					return;
+				}
+
+			if (name === "translate:translated-lyrics-source") {
+				// Only reset display modes when actually changing provider (not when loading new songs)
+				const currentProvider = CONFIG.visual["translate:translated-lyrics-source"];
+				if (currentProvider !== value) {
+					// Reset display modes appropriately on provider change
+					if (friendlyLanguage) {
+						const modeKey = `translation-mode:${friendlyLanguage}`;
+						const modeKey2 = `translation-mode-2:${friendlyLanguage}`;
+						CONFIG.visual[modeKey] = "none";
+						localStorage.setItem(`${APP_NAME}:visual:${modeKey}`, "none");
+						CONFIG.visual[modeKey2] = "none";
+						localStorage.setItem(`${APP_NAME}:visual:${modeKey2}`, "none");
+					}
+					
+					// Reset generic Gemini display modes
+					const geminiModeKey = "translation-mode:gemini";
+					const geminiModeKey2 = "translation-mode-2:gemini";
+					CONFIG.visual[geminiModeKey] = "none";
+					localStorage.setItem(`${APP_NAME}:visual:${geminiModeKey}`, "none");
+					CONFIG.visual[geminiModeKey2] = "none";
+					localStorage.setItem(`${APP_NAME}:visual:${geminiModeKey2}`, "none");
+					
+					// When switching to Gemini, reset language override to "off" since it's not needed
+					if (value === "geminiVi" && CONFIG.visual["translate:detect-language-override"] !== "off") {
+						CONFIG.visual["translate:detect-language-override"] = "off";
+						localStorage.setItem(`${APP_NAME}:visual:translate:detect-language-override`, "off");
+						Spicetify.showNotification("Language Override reset to 'Off' for Gemini mode", false, 3000);
+					}
+				}
 			}
 
 			CONFIG.visual[name] = value;
 			localStorage.setItem(`${APP_NAME}:visual:${name}`, value);
+
+			// Force re-detection of language when language override changes
+			if (name === "translate:detect-language-override" && window.lyricContainer) {
+				// Clear cached language to force re-detection
+				window.lyricContainer.setState({ language: null });
+				// Force re-render of lyrics to update language detection
+				window.lyricContainer.lastProcessedUri = null;
+				window.lyricContainer.lastProcessedMode = null;
+				window.lyricContainer.forceUpdate();
+			}
 
 			if (name.startsWith("translation-mode")) {
 				if (window.lyricContainer) {

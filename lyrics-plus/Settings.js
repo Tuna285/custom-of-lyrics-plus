@@ -708,7 +708,7 @@ function openConfig() {
 					desc: "Gemini API Key (Display Mode 2)",
 					key: "gemini-api-key-romaji",
 					type: ConfigInput,
-					info: "Gemini API for Display Mode 2, leave blank if you only use 1 API.",
+					info: "Gemini API for Display Mode 2 (Romaji, Romaja, Pinyin modes), leave blank if you only use 1 API.",
 				},
 			],
 			onChange: (name, value) => {
