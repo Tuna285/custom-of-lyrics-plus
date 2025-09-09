@@ -229,6 +229,18 @@ const CacheManager = {
 
 	clear() {
 		this._cache.clear();
+	},
+
+	// Clear cache entries for a specific URI
+	clearByUri(uri) {
+		const keysToDelete = [];
+		for (const [key] of this._cache) {
+			if (key.includes(uri)) {
+				keysToDelete.push(key);
+			}
+		}
+		keysToDelete.forEach(key => this._cache.delete(key));
+		return keysToDelete.length;
 	}
 };
 
@@ -528,7 +540,7 @@ class LyricsContainer extends react.Component {
 				});
 			}
 
-			// reset and apply
+			// reset and apply - preserve cached translations if available
 			this.setState({
 				furigana: null,
 				romaji: null,
@@ -543,11 +555,40 @@ class LyricsContainer extends react.Component {
 				neteaseTranslation: null,
 				...tempState,
 				language: defaultLanguage,
+				// Preserve cached translations if they exist in tempState
+				...(tempState.romaji && { romaji: tempState.romaji }),
+				...(tempState.furigana && { furigana: tempState.furigana }),
+				...(tempState.hiragana && { hiragana: tempState.hiragana }),
+				...(tempState.katakana && { katakana: tempState.katakana }),
+				...(tempState.hangul && { hangul: tempState.hangul }),
+				...(tempState.romaja && { romaja: tempState.romaja }),
+				...(tempState.cn && { cn: tempState.cn }),
+				...(tempState.hk && { hk: tempState.hk }),
+				...(tempState.tw && { tw: tempState.tw }),
+				...(tempState.musixmatchTranslation && { musixmatchTranslation: tempState.musixmatchTranslation }),
+				...(tempState.neteaseTranslation && { neteaseTranslation: tempState.neteaseTranslation }),
+				...(tempState.currentLyrics && { currentLyrics: tempState.currentLyrics }),
 			});
 			return;
 		}
 
-		this.setState({ ...tempState });
+		// Preserve cached translations when not changing songs
+		this.setState({ 
+			...tempState,
+			// Preserve cached translations if they exist in tempState
+			...(tempState.romaji && { romaji: tempState.romaji }),
+			...(tempState.furigana && { furigana: tempState.furigana }),
+			...(tempState.hiragana && { hiragana: tempState.hiragana }),
+			...(tempState.katakana && { katakana: tempState.katakana }),
+			...(tempState.hangul && { hangul: tempState.hangul }),
+			...(tempState.romaja && { romaja: tempState.romaja }),
+			...(tempState.cn && { cn: tempState.cn }),
+			...(tempState.hk && { hk: tempState.hk }),
+			...(tempState.tw && { tw: tempState.tw }),
+			...(tempState.musixmatchTranslation && { musixmatchTranslation: tempState.musixmatchTranslation }),
+			...(tempState.neteaseTranslation && { neteaseTranslation: tempState.neteaseTranslation }),
+			...(tempState.currentLyrics && { currentLyrics: tempState.currentLyrics }),
+		});
 	}
 
 	lyricsSource(lyricsState, mode) {
@@ -1052,8 +1093,32 @@ class LyricsContainer extends react.Component {
 			lyrics.genius = null;
 		}
 
+		// Include translations and phonetic conversions in cache
+		const fullLyricsData = {
+			...lyrics,
+			// Japanese conversions
+			romaji: this.state.romaji,
+			furigana: this.state.furigana,
+			hiragana: this.state.hiragana,
+			katakana: this.state.katakana,
+			// Korean conversions
+			hangul: this.state.hangul,
+			romaja: this.state.romaja,
+			// Chinese conversions
+			cn: this.state.cn,
+			hk: this.state.hk,
+			tw: this.state.tw,
+			// Translation services
+			musixmatchTranslation: this.state.musixmatchTranslation,
+			neteaseTranslation: this.state.neteaseTranslation,
+			// Current display mode results
+			currentLyrics: this.state.currentLyrics,
+			// Language detection
+			language: this.state.language
+		};
+
 		const localLyrics = JSON.parse(localStorage.getItem(`${APP_NAME}:local-lyrics`)) || {};
-		localLyrics[uri] = lyrics;
+		localLyrics[uri] = fullLyricsData;
 		localStorage.setItem(`${APP_NAME}:local-lyrics`, JSON.stringify(localLyrics));
 		this.setState({ isCached: true });
 	}
@@ -1068,6 +1133,58 @@ class LyricsContainer extends react.Component {
 	lyricsSaved(uri) {
 		const localLyrics = JSON.parse(localStorage.getItem(`${APP_NAME}:local-lyrics`)) || {};
 		return !!localLyrics[uri];
+	}
+
+	resetTranslationCache(uri) {
+		// Clear translation cache for this URI
+		const clearedCount = CacheManager.clearByUri(uri);
+		
+		// Clear progressive results for this track
+		if (this._dmResults && this._dmResults[uri]) {
+			delete this._dmResults[uri];
+		}
+		
+		// Clear inflight Gemini requests for this track
+		if (this._inflightGemini) {
+			const keysToDelete = [];
+			for (const [key] of this._inflightGemini) {
+				if (key.includes(uri)) {
+					keysToDelete.push(key);
+				}
+			}
+			keysToDelete.forEach(key => this._inflightGemini.delete(key));
+		}
+		
+		// Check if there are any translations to reset
+		const hasTranslations = this.state.romaji || this.state.furigana || this.state.hiragana || 
+			this.state.katakana || this.state.hangul || this.state.romaja || 
+			this.state.cn || this.state.hk || this.state.tw || 
+			this.state.musixmatchTranslation || this.state.neteaseTranslation;
+		
+		// Reset translation states
+		this.setState({
+			romaji: null,
+			furigana: null,
+			hiragana: null,
+			katakana: null,
+			hangul: null,
+			romaja: null,
+			cn: null,
+			hk: null,
+			tw: null,
+			musixmatchTranslation: null,
+			neteaseTranslation: null,
+		});
+		
+		// Force re-process lyrics with current display modes
+		const currentMode = this.getCurrentMode();
+		this.lyricsSource(this.state, currentMode);
+		
+		if (hasTranslations) {
+			Spicetify.showNotification(`✓ Reset ${clearedCount} translation cache entries`, false, 2000);
+		} else {
+			Spicetify.showNotification("✓ Translation cache cleared (no translations found)", false, 2000);
+		}
 	}
 
 	processLyricsFromFile(event) {
@@ -1093,7 +1210,24 @@ class LyricsContainer extends react.Component {
 					return;
 				}
 
-				this.setState({ ...localLyrics, provider: "local" });
+				this.setState({ 
+					...localLyrics, 
+					provider: "local",
+					// Preserve cached translations if they exist in localLyrics
+					...(localLyrics.romaji && { romaji: localLyrics.romaji }),
+					...(localLyrics.furigana && { furigana: localLyrics.furigana }),
+					...(localLyrics.hiragana && { hiragana: localLyrics.hiragana }),
+					...(localLyrics.katakana && { katakana: localLyrics.katakana }),
+					...(localLyrics.hangul && { hangul: localLyrics.hangul }),
+					...(localLyrics.romaja && { romaja: localLyrics.romaja }),
+					...(localLyrics.cn && { cn: localLyrics.cn }),
+					...(localLyrics.hk && { hk: localLyrics.hk }),
+					...(localLyrics.tw && { tw: localLyrics.tw }),
+					...(localLyrics.musixmatchTranslation && { musixmatchTranslation: localLyrics.musixmatchTranslation }),
+					...(localLyrics.neteaseTranslation && { neteaseTranslation: localLyrics.neteaseTranslation }),
+					...(localLyrics.currentLyrics && { currentLyrics: localLyrics.currentLyrics }),
+					...(localLyrics.language && { language: localLyrics.language }),
+				});
 				CACHE[this.currentTrackUri] = { ...localLyrics, provider: "local", uri: this.currentTrackUri };
 				this.saveLocalLyrics(this.currentTrackUri, localLyrics);
 
@@ -1121,6 +1255,16 @@ class LyricsContainer extends react.Component {
 	componentDidMount() {
 		// Register instance for external access
 		window.lyricContainer = this;
+		
+		// Enable debug mode for troubleshooting
+		window.lyricsPlusDebug = localStorage.getItem("lyrics-plus:debug") === "true";
+		
+		// Add global function to toggle debug mode
+		window.toggleLyricsPlusDebug = () => {
+			window.lyricsPlusDebug = !window.lyricsPlusDebug;
+			localStorage.setItem("lyrics-plus:debug", window.lyricsPlusDebug.toString());
+			console.log("Lyrics Plus debug mode:", window.lyricsPlusDebug ? "ON" : "OFF");
+		};
 		
 		this.onQueueChange = async ({ data: queue }) => {
 			this.state.explicitMode = this.state.lockMode;
@@ -1468,6 +1612,49 @@ class LyricsContainer extends react.Component {
 							fill: "currentColor",
 							dangerouslySetInnerHTML: {
 								__html: Spicetify.SVGIcons["plus-alt"],
+							},
+						})
+					)
+				),
+				// Reset Translation button - show when there are lyrics and potential translations
+				(() => {
+					const hasLyrics = this.state.synced || this.state.unsynced || this.state.genius;
+					if (window.lyricsPlusDebug) {
+						console.log("Reset button debug:", {
+							hasLyrics,
+							synced: !!this.state.synced,
+							unsynced: !!this.state.unsynced,
+							genius: !!this.state.genius,
+							romaji: !!this.state.romaji,
+							furigana: !!this.state.furigana,
+							musixmatchTranslation: !!this.state.musixmatchTranslation,
+							neteaseTranslation: !!this.state.neteaseTranslation
+						});
+					}
+					return hasLyrics;
+				})() &&
+				react.createElement(
+					Spicetify.ReactComponent.TooltipWrapper,
+					{
+						label: "Reset translation cache",
+					},
+					react.createElement(
+						"button",
+						{
+							className: "lyrics-config-button",
+							onClick: () => {
+								this.resetTranslationCache(this.currentTrackUri);
+							},
+						},
+						react.createElement("svg", {
+							width: 16,
+							height: 16,
+							viewBox: "0 0 16 16",
+							fill: "currentColor",
+							dangerouslySetInnerHTML: {
+								__html: Spicetify.SVGIcons["x"] || Spicetify.SVGIcons["close"] || Spicetify.SVGIcons["cross"] ||
+								// Simple X icon as fallback for reset
+								'<path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>',
 							},
 						})
 					)
