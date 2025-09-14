@@ -662,6 +662,19 @@ function openConfig() {
 					key: "colorful",
 					type: ConfigSlider,
 				},
+				{
+					desc: "Artwork background",
+					key: "gradient-background",
+					type: ConfigSlider,
+				},
+				{
+					desc: "Background brightness",
+					key: "background-brightness",
+					type: ConfigAdjust,
+					min: 0,
+					max: 100,
+					step: 10,
+				},
 				// Removed four color inputs for a cleaner configuration UI
 				{
 					desc: "Text convertion: Japanese Detection threshold (Advanced)",

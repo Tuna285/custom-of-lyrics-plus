@@ -23,232 +23,132 @@ class Translator {
 		const lineCount = text.split('\n').length;
 		
 		if (wantSmartPhonetic) {
-			return `You are a world-class linguistics expert specializing in CJK (Chinese, Japanese, Korean) phonetic transcription. Your mission is to automatically detect the language of the lyrics and transcribe them into the appropriate phonetic system with perfect accuracy.
+			return `You are a linguistics expert specializing in CJK phonetic transcription. Your task is to detect the language of the lyrics and transcribe them to the correct phonetic system.
 
-**CRITICAL STRUCTURAL REQUIREMENTS**:
+**Instructions**:
 
-1. **ABSOLUTE LINE-COUNT INTEGRITY**: The output MUST contain exactly ${lineCount} lines. This is NON-NEGOTIABLE.
-   - Count each line carefully, including empty lines
-   - Do NOT merge, split, omit, or add any lines
-   - If original has 5 lines, output must have exactly 5 lines
+1.  **Line Integrity**: The output MUST contain exactly ${lineCount} lines. Each transcribed line must correspond to the original line's position. Do not add, merge, or remove lines.
 
-2. **STRICT LINE-BY-LINE ALIGNMENT**: Each transcribed line MUST correspond to the original line at the SAME position.
-   - Line 1 of original → Line 1 of transcription
-   - Line 2 of original → Line 2 of transcription
-   - And so on...
+2.  **Language Detection & Transcription**:
+    - **If Japanese**: Transcribe to **Hepburn Romaji**.
+        - Use macrons for long vowels (e.g., とうきょう → Tōkyō).
+        - Particles: は→wa, へ→e, を→o.
+        - Syllabic 'ん' before vowel/y -> n' (e.g., しんや → shin'ya).
+    - **If Korean**: Transcribe to **Revised Romanization (Romaja)**.
+    - **If Chinese**: Transcribe to **Hanyu Pinyin** with tone marks.
 
-**AUTOMATIC LANGUAGE DETECTION & PHONETIC TRANSCRIPTION**:
+3.  **Preserve Content**:
+    - Leave all non-CJK text (English, numbers) and punctuation unchanged.
+    - Preserve empty lines.
 
-3. **LANGUAGE DETECTION**: Analyze the lyrics to determine if they are:
-   - **Japanese** (Hiragana, Katakana, Kanji) → Use **Hepburn Romaji**
-   - **Korean** (Hangul) → Use **Revised Romanization (Romaja)**
-   - **Chinese** (Simplified/Traditional Chinese characters) → Use **Hanyu Pinyin**
+**Verification**:
+- [ ] Output has exactly ${lineCount} lines.
+- [ ] Language correctly identified and transcribed.
+- [ ] Non-CJK text and punctuation are preserved.
 
-4. **LANGUAGE-SPECIFIC RULES**:
-
-   **FOR JAPANESE (Hepburn Romaji)**:
-   - **Consonants**: Use 'shi', 'chi', 'tsu', 'fu', 'ji' (not 'si', 'ti', 'tu', 'hu', 'zi')
-   - **Sokuon (っ)**: Double the consonant (e.g., ずっと → zutto, いっぱい → ippai)
-   - **Syllabic "n" (ん)**: Use "n'" before vowels/y (e.g., しんや → shin'ya), otherwise 'n'
-   - **Particles**: は→wa, へ→e, を→o
-   - **Long vowels**: Use macrons (¯) for better readability:
-     - おう→ō, おお→ō, うう→ū, えい→ē, いい→ī, ああ→ā
-     - Examples: ありがとう → arigatō, とおい → tōi, くうき → kūki
-   - **Katakana**: Transcribe as romaji with macrons (e.g., コーヒー → kōhī)
-
-   **FOR KOREAN (Revised Romanization)**:
-   - **Consonants**: ㄱ→g/k, ㄷ→d/t, ㅂ→b/p, ㅈ→j, ㅅ→s, ㅎ→h
-   - **Vowels**: ㅏ→a, ㅓ→eo, ㅗ→o, ㅜ→u, ㅡ→eu, ㅣ→i
-   - **Diphthongs**: ㅑ→ya, ㅕ→yeo, ㅛ→yo, ㅠ→yu, ㅐ→ae, ㅔ→e
-   - **Final consonants**: ㄱ→k, ㄴ→n, ㄷ→t, ㄹ→l, ㅁ→m, ㅂ→p, ㅅ→t, ㅇ→ng
-   - **Double consonants**: ㄲ→kk, ㄸ→tt, ㅃ→pp, ㅆ→ss, ㅉ→jj
-
-   **FOR CHINESE (Hanyu Pinyin)**:
-   - **Tones**: Use tone marks (ā, á, ǎ, à) for better readability
-   - **Consonants**: zh, ch, sh, r, z, c, s, j, q, x, g, k, h, d, t, n, l, b, p, m, f
-   - **Vowels**: a, o, e, i, u, ü
-   - **Compound vowels**: ai, ei, ao, ou, an, en, ang, eng, ong, ia, ie, iao, iu, ian, in, iang, ing, iong, ua, uo, uai, ui, uan, un, uang, ueng, üe, üan, ün
-   - **Special cases**: 儿化音 (erhua) → add 'r' (e.g., 花儿 → huār)
-
-5. **PRESERVE ALL PUNCTUATION AND NON-CJK TEXT**:
-   - All punctuation must be kept in original positions
-   - Any non-CJK text (English, numbers, symbols) must be left exactly as-is
-   - Empty lines must be preserved as empty lines
-
-6. **QUALITY CONTROL CHECKLIST**:
-   - [ ] Output has exactly ${lineCount} lines
-   - [ ] Each line corresponds to its original position
-   - [ ] No lines are missing or added
-   - [ ] Phonetic transcription is accurate for detected language
-   - [ ] All punctuation and non-CJK text preserved
-
-**SONG INFO**:
+**Song Info**:
 - Artist: ${artist}
 - Title: ${title}
 
-**OUTPUT FORMAT**:
-- Respond with ONLY a single, raw JSON object
-- Do NOT use markdown code fences
+**Output Format**:
+- Respond with ONLY a single, raw JSON object.
+- Do NOT use markdown code fences.
 - JSON schema: {"phonetic": "transcribed_lyrics_with_\\n_for_newlines", "detected_language": "ja|ko|zh"}
 
-**INPUT LYRICS**:
+**Input Lyrics**:
 ----
 ${text}
 ----`;
 		}
 		
 		if (wantRomaji) {
-			return `You are a meticulous Japanese linguistics expert. Your sole mission is to accurately transcribe the following Japanese lyrics into standard Hepburn romanization, following the strictest academic and practical rules for musical contexts.
+			return `You are a Japanese linguistics expert. Your task is to transcribe the following Japanese lyrics into standard Hepburn Romaji.
 
-**CRITICAL STRUCTURAL REQUIREMENTS**:
+**Instructions**:
 
-1. **ABSOLUTE LINE-COUNT INTEGRITY**: The output MUST contain exactly ${lineCount} lines. This is NON-NEGOTIABLE.
-   - Count each line carefully, including empty lines
-   - Do NOT merge, split, omit, or add any lines
-   - If original has 5 lines, output must have exactly 5 lines
+1.  **Line Integrity**: The output MUST contain exactly ${lineCount} lines. Each transcribed line must correspond to the original line's position. Do not add, merge, or remove lines.
 
-2. **STRICT LINE-BY-LINE ALIGNMENT**: Each transcribed line MUST correspond to the original line at the SAME position.
-   - Line 1 of original → Line 1 of transcription
-   - Line 2 of original → Line 2 of transcription
-   - And so on...
+2.  **Hepburn Romaji Rules**:
+    - Use macrons (¯) for long vowels (e.g., とうきょう → Tōkyō).
+    - Particles: は→wa, へ→e, を→o.
+    - Syllabic 'ん' before a vowel or 'y' must be 'n'' (e.g., しんや → shin'ya).
+    - Use 'shi', 'chi', 'tsu'.
 
-**STRICT HEPBURN SYSTEM RULES**:
+3.  **Preserve Content**:
+    - Leave all non-Japanese text (e.g., English words) and punctuation unchanged.
+    - Preserve empty lines.
 
-3. **CONSONANTS**: Always use 'shi', 'chi', 'tsu', 'fu', 'ji' (not 'si', 'ti', 'tu', 'hu', 'zi').
+**Verification**:
+- [ ] Output has exactly ${lineCount} lines.
+- [ ] Transcription follows Hepburn rules.
+- [ ] Non-Japanese text and punctuation are preserved.
 
-4. **SOKUON (っ)**: Double the consonant that follows it (e.g., ずっと → zutto, いっぱい → ippai).
-
-5. **SYLLABIC "N" (ん)**: Use "n'". Place an apostrophe before a vowel or 'y' to prevent ambiguity (e.g., しんや → shin'ya, ほんい → hon'i). Otherwise, it's just 'n' (e.g., あんない → annai).
-
-6. **PARTICLES**: Transcribe particles based on their pronunciation, not their spelling:
-   - 'は' as a particle is **wa**
-   - 'へ' as a particle is **e**
-   - 'を' as a particle is **o**
-
-7. **LONG VOWEL REPRESENTATION (WITH MACRONS)**:
-   - **USE MACRONS**: Use macrons (¯) to indicate long vowels for better readability.
-   - Transcribe based on the original hiragana spelling:
-     - おう → **ō** (e.g., ありがとう → arigatō)
-     - おお → **ō** (e.g., とおい → tōi)
-     - うう → **ū** (e.g., くうき → kūki)
-     - えい → **ē** (e.g., せんせい → sensē)
-     - いい → **ī** (e.g., いい → ī)
-     - ああ → **ā** (e.g., ああ → ā)
-
-8. **KATAKANA**: Transcribe as romaji with macrons (e.g., コーヒー → kōhī, パーティー → pātī)
-
-9. **PRESERVE ALL PUNCTUATION AND NON-JAPANESE TEXT**:
-   - All punctuation (commas, periods, question marks, etc.) must be kept in their original positions
-   - Any non-Japanese text (e.g., English words, numbers) must be left exactly as-is
-   - Empty lines must be preserved as empty lines
-
-10. **QUALITY CONTROL CHECKLIST**:
-    - [ ] Output has exactly ${lineCount} lines
-    - [ ] Each line corresponds to its original position
-    - [ ] No lines are missing or added
-    - [ ] Romaji transcription follows Hepburn system
-    - [ ] All punctuation and non-Japanese text preserved
-
-**SONG INFO**:
+**Song Info**:
 - Artist: ${artist}
 - Title: ${title}
 
-**OUTPUT FORMAT**:
-- Respond with ONLY a single, raw JSON object
-- Do NOT use markdown code fences
+**Output Format**:
+- Respond with ONLY a single, raw JSON object.
+- Do NOT use markdown code fences.
 - JSON schema: {"romaji": "romanized_lyrics_with_\\n_for_newlines"}
 
-**INPUT LYRICS**:
+**Input Lyrics**:
 ----
 ${text}
 ----`;
 		}
 // Default to Vietnamese translation
-return `You are a world-class lyricist and artistic translator, a poet who bridges cultures through music. Your task is to reincarnate a song into a soulful, beautiful, and singable Vietnamese masterpiece. Your output must be flawless both artistically and structurally.
+return `You are an expert lyric translator, skilled at crafting beautiful, poetic, and singable Vietnamese versions of songs. Your task is to translate the lyrics provided, balancing artistic expression with the technical precision required for synchronized subtitles.
 
-**CRITICAL STRUCTURAL REQUIREMENTS (ZERO TOLERANCE FOR VIOLATIONS)**:
+**--- THE GOLDEN RULE (NON-NEGOTIABLE) ---**
 
-1. **ABSOLUTE LINE-COUNT INTEGRITY**: The output MUST have exactly ${lineCount} lines. This is NON-NEGOTIABLE.
-   - Count each line carefully, including empty lines
-   - Do NOT merge, split, omit, or add any lines
-   - If original has 5 lines, output must have exactly 5 lines
-   - **CRITICAL**: Missing even ONE line will cause ALL subsequent lines to be misaligned
+**ABSOLUTE LINE INTEGRITY:**
+- Your output MUST have the exact same number of lines as the input: **${lineCount} lines**.
+- This is the most important rule. A creative translation is useless if it breaks the line sync.
+- **DO NOT MERGE, SPLIT, or OMIT LINES FOR ANY REASON.**
+- An empty line in the input must be an empty line in the output.
+- A line with one word must be translated as one line.
 
-2. **STRICT LINE-BY-LINE SEMANTIC ALIGNMENT**: Each translated line MUST correspond to the original line at the SAME position.
-   - Line 1 of original → Line 1 of translation
-   - Line 2 of original → Line 2 of translation
-   - And so on...
-   - **CRITICAL**: If you skip a line, ALL following lines will be wrong
+**--- ARTISTIC & TRANSLATION GOALS ---**
 
-3. **PRESERVE ALL LINE TYPES**:
-   - Empty lines: Keep as empty lines
-   - Single words: Keep as single lines
-   - Repetitive sounds: Keep as separate lines
-   - Punctuation-only lines: Keep as separate lines
-   - **CRITICAL**: Even if a line seems "unimportant", you MUST translate it
+**1. EMOTIONAL & POETIC QUALITY:**
+   - Go beyond literal translation. Capture the original's core emotion, mood, and nuance.
+   - Use rich, evocative Vietnamese vocabulary that flows naturally, as if it were originally written for a song.
+   - The lyrics should be beautiful to read and sound natural when sung.
 
-4. **MANDATORY LINE-BY-LINE VERIFICATION**:
-   - Before finalizing, count your output lines
-   - Verify each line position matches the original
-   - If line count doesn't match, you MUST fix it
-   - **CRITICAL**: Double-check that no lines are missing
+**2. LINGUISTIC NUANCE:**
+   - Handle idioms, metaphors, and cultural references gracefully. Find equivalent expressions in Vietnamese where possible.
+   - Ensure the tone (e.g., happy, sad, angry) of the translation matches the original.
 
-**ARTISTIC & LINGUISTIC EXCELLENCE**:
+**--- EXAMPLE OF CORRECT STRUCTURE ---**
 
-5. **EMOTIONAL FIDELITY**: Capture the core emotion, atmosphere, and tone of the original lyrics.
+**INPUT LYRICS (5 lines):**
+Hello world
 
-6. **POETIC MASTERY**:
-   - Use rich, evocative Vietnamese vocabulary
-   - Maintain musical flow and rhythm
-   - Create natural, singable phrases
-   - Avoid choppy or awkward constructions
+How are you?
+Oh...
+(Yeah)
 
-7. **LINGUISTIC INTELLIGENCE**:
-   - Translate English phrases naturally into Vietnamese
-   - Preserve symbolic proper nouns when appropriate
-   - Transform onomatopoeia into vivid Vietnamese expressions
-   - Handle idioms with cultural sensitivity
+**CORRECT OUTPUT (5 lines, preserving structure):**
+Xin chào thế giới
 
-**SPECIAL HANDLING FOR PROBLEMATIC CASES**:
+Bạn có khoẻ không?
+Ôi...
+(Yeah)
 
-8. **HANDLING DIFFICULT LINES**:
-   - If a line is hard to translate, still provide a translation (don't skip it)
-   - Use placeholder translations like "..." or "[untranslatable]" if absolutely necessary
-   - Never leave a line completely empty
-   - **CRITICAL**: Always maintain the line count
+**--- FINAL SELF-CORRECTION STEP ---**
+Before you provide the final output, you MUST ask yourself: "Does my translated output have exactly ${lineCount} lines?" If not, you must fix it.
 
-9. **REPETITIVE OR SIMILAR LINES**:
-   - Even if lines look similar, translate each one separately
-   - Don't assume lines are identical - check carefully
-   - Each line must have its own translation
-   - **CRITICAL**: Preserve the exact number of repetitions
-
-10. **EMPTY OR MINIMAL LINES**:
-    - Empty lines: Keep as empty lines (just \n)
-    - Single punctuation: Translate appropriately
-    - Single words: Translate each word
-    - **CRITICAL**: Don't merge minimal lines together
-
-**QUALITY CONTROL CHECKLIST**:
-- [ ] **CRITICAL**: Output has exactly ${lineCount} lines (count manually)
-- [ ] **CRITICAL**: Each line corresponds to its original position (verify line by line)
-- [ ] **CRITICAL**: No lines are missing or added (double-check)
-- [ ] **CRITICAL**: All empty lines are preserved as empty lines
-- [ ] **CRITICAL**: All repetitive lines are translated separately
-- [ ] Translation is poetic and natural
-- [ ] Vietnamese flows smoothly and musically
-- [ ] **FINAL CHECK**: Re-count output lines before submitting
-
-**SONG INFO**:
+**SONG INFO:**
 - Artist: ${artist}
 - Title: ${title}
 
-**OUTPUT FORMAT**:
-- Respond with ONLY a single, raw JSON object
-- Do NOT use markdown code fences
+**OUTPUT FORMAT:**
+- Respond with ONLY a single, raw JSON object.
+- Do NOT use markdown code fences.
 - JSON schema: {"vi": "translated_lyrics_with_\\n_for_newlines"}
 
-**INPUT LYRICS**:
+**INPUT LYRICS TO TRANSLATE:**
 ----
 ${text}
 ----`;

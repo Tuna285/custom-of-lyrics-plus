@@ -83,6 +83,8 @@ const CONFIG = {
 	visual: {
 			"playbar-button": ConfigUtils.get("lyrics-plus:visual:playbar-button", false),
 	colorful: ConfigUtils.get("lyrics-plus:visual:colorful"),
+	"gradient-background": ConfigUtils.get("lyrics-plus:visual:gradient-background"),
+	"background-brightness": localStorage.getItem("lyrics-plus:visual:background-brightness") || "80",
 	noise: ConfigUtils.get("lyrics-plus:visual:noise"),
 		"background-color": localStorage.getItem("lyrics-plus:visual:background-color") || "var(--spice-main)",
 		"active-color": localStorage.getItem("lyrics-plus:visual:active-color") || "var(--spice-text)",
@@ -168,6 +170,7 @@ CONFIG.locked = Number.parseInt(CONFIG.locked);
 CONFIG.visual["lines-before"] = Number.parseInt(CONFIG.visual["lines-before"]);
 CONFIG.visual["lines-after"] = Number.parseInt(CONFIG.visual["lines-after"]);
 CONFIG.visual["font-size"] = Number.parseInt(CONFIG.visual["font-size"]);
+CONFIG.visual["background-brightness"] = Number.parseInt(CONFIG.visual["background-brightness"]);
 CONFIG.visual["ja-detect-threshold"] = Number.parseInt(CONFIG.visual["ja-detect-threshold"]);
 CONFIG.visual["hans-detect-threshold"] = Number.parseInt(CONFIG.visual["hans-detect-threshold"]);
 
@@ -458,7 +461,7 @@ class LyricsContainer extends react.Component {
 
 		let isCached = this.lyricsSaved(info.uri);
 
-		if (CONFIG.visual.colorful) {
+		if (CONFIG.visual.colorful || CONFIG.visual["gradient-background"]) {
 			this.fetchColors(info.uri);
 		}
 
@@ -1374,6 +1377,14 @@ class LyricsContainer extends react.Component {
 				"--lyrics-highlight-background": CONFIG.visual["highlight-color"],
 				"--lyrics-background-noise": CONFIG.visual.noise ? "var(--background-noise)" : "unset",
 			};
+		} else if (CONFIG.visual.colorful) {
+			this.styleVariables = {
+				"--lyrics-color-active": "white",
+				"--lyrics-color-inactive": "rgba(255, 255, 255, 0.7)",
+				"--lyrics-color-background": this.state.colors.background || "transparent",
+				"--lyrics-highlight-background": this.state.colors.inactive,
+				"--lyrics-background-noise": CONFIG.visual.noise ? "var(--background-noise)" : "unset",
+			};
 		}
 
 		this.styleVariables = {
@@ -1413,15 +1424,24 @@ class LyricsContainer extends react.Component {
 		if (this.state.isFADMode) {
 			// Text colors will be set by FAD extension
 			this.styleVariables = {};
-		} else if (CONFIG.visual.colorful) {
+		} else if (CONFIG.visual.colorful && this.state.colors.background) {
+			const isLight = Utils.isColorLight(this.state.colors.background);
 			this.styleVariables = {
-				"--lyrics-color-active": "white",
-				"--lyrics-color-inactive": this.state.colors.inactive,
-				"--lyrics-color-background": this.state.colors.background || "transparent",
+				"--lyrics-color-active": isLight ? "black" : "white",
+				"--lyrics-color-inactive": isLight ? "rgba(0, 0, 0, 0.7)" : "rgba(255, 255, 255, 0.7)",
+				"--lyrics-color-background": this.state.colors.background,
 				"--lyrics-highlight-background": this.state.colors.inactive,
 				"--lyrics-background-noise": CONFIG.visual.noise ? "var(--background-noise)" : "unset",
 			};
 		}
+
+		const backgroundStyle = {};
+		if (CONFIG.visual["gradient-background"] && this.state.colors.background) {
+			const brightness = CONFIG.visual["background-brightness"] / 100;
+			backgroundStyle.backgroundColor = this.state.colors.background;
+			backgroundStyle.filter = `brightness(${brightness})`;
+		}
+
 
 		this.styleVariables = {
 			...this.styleVariables,
@@ -1530,6 +1550,10 @@ class LyricsContainer extends react.Component {
 					el.onmousewheel = this.onFontSizeChange;
 				},
 			},
+			react.createElement("div", {
+				id: "lyrics-plus-gradient-background",
+				style: backgroundStyle,
+			}),
 			react.createElement("div", {
 				className: "lyrics-lyricsContainer-LyricsBackground",
 			}),
