@@ -806,12 +806,11 @@ class LyricsContainer extends react.Component {
 	}
 
 	getGeminiTranslation(lyricsState, lyrics, mode) {
-		return new Promise((resolve, reject) => {
+		return(new Promise((resolve, reject) => {
 			const viKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini-api-key`);
 			const romajiKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini-api-key-romaji`);
 			
 			// Determine mode type and API key
-			let wantRomaji = false;
 			let wantSmartPhonetic = false;
 			let apiKey;
 			
@@ -848,15 +847,22 @@ class LyricsContainer extends react.Component {
 			}
 
 			const text = lyrics.map((l) => l?.text || "").filter(Boolean).join("\n");
+
+			// Show pending notification if conversion takes longer than 3s
+			const pendingTimer = setTimeout(() => {
+				try {
+					Spicetify.showNotification("Still converting...", false, 2000);
+				} catch {}
+			}, 3000);
+
 			const inflightPromise = Translator.callGemini({ 
 				apiKey, 
 				artist: this.state.artist || lyricsState.artist, 
 				title: this.state.title || lyricsState.title, 
 				text, 
-				wantRomaji, 
 				wantSmartPhonetic 
 			})
-				.then(({ romaji, vi, phonetic }) => {
+				.then(({ vi, phonetic }) => {
 					let outText;
 					if (wantSmartPhonetic) {
 						outText = phonetic;
@@ -865,7 +871,17 @@ class LyricsContainer extends react.Component {
 					}
 					
 					if (!outText) throw new Error("Empty result from Gemini.");
-					const lines = outText.split("\n");
+					
+					// Handle both array and string formats
+					let lines;
+					if (Array.isArray(outText)) {
+						lines = outText;
+					} else if (typeof outText === 'string') {
+						lines = outText.split("\n");
+					} else {
+						throw new Error("Invalid translation format received from Gemini.");
+					}
+					
 					const mapped = lyrics.map((line, i) => ({
 						...line,
 						text: lines[i]?.trim() || line?.text || "",
@@ -875,41 +891,54 @@ class LyricsContainer extends react.Component {
 					return mapped;
 				})
 				.finally(() => {
+					clearTimeout(pendingTimer);
+					this._inflightGemini = this._inflightGemini || new Map();
 					this._inflightGemini?.delete(inflightKey);
 				});
 
 			this._inflightGemini = this._inflightGemini || new Map();
 			this._inflightGemini.set(inflightKey, inflightPromise);
 			inflightPromise.then(resolve).catch(reject);
-		});
+		}));
 	}
 
 	getTraditionalConversion(lyricsState, lyrics, language, displayMode) {
 		return new Promise((resolve, reject) => {
 			if (!Array.isArray(lyrics)) return reject(new Error("Invalid lyrics format for conversion."));
 
-					const cacheKey = `${lyricsState.uri}:${displayMode}`;
-		const cached = CacheManager.get(cacheKey);
-		if (cached) return resolve(cached);
+			const cacheKey = `${lyricsState.uri}:trad:${language}:${displayMode}`;
+			const cached = CacheManager.get(cacheKey);
+			if (cached) return resolve(cached);
 
-			const progressKey = `${lyricsState.uri}:${displayMode}:inProgress`;
-			if (this[progressKey]) return reject(new Error("Conversion already in progress."));
+			// De-duplicate concurrent calls per (uri, language, mode)
+			this._inflightTrad = this._inflightTrad || new Map();
+			const inflightKey = `${lyricsState.uri}:trad:${language}:${displayMode}`;
+			if (this._inflightTrad.has(inflightKey)) {
+				return this._inflightTrad.get(inflightKey).then(resolve).catch(reject);
+			}
 
-			this[progressKey] = true;
+			// Show pending notification if conversion takes longer than 3s
+			const pendingTimer = setTimeout(() => {
+				try {
+					Spicetify.showNotification("Still converting...", false, 2000);
+				} catch {}
+			}, 3000);
 
-			this.translateLyrics(language, lyrics, displayMode)
+			const inflightPromise = this.translateLyrics(language, lyrics, displayMode)
 				.then((translated) => {
-					if (translated) {
+					if (translated !== undefined && translated !== null) {
 						CacheManager.set(cacheKey, translated);
-						resolve(translated);
-					} else {
-						reject(new Error("Empty result from conversion."));
+						return translated;
 					}
+					throw new Error("Empty result from conversion.");
 				})
-				.catch(reject)
 				.finally(() => {
-					delete this[progressKey];
+					clearTimeout(pendingTimer);
+					this._inflightTrad.delete(inflightKey);
 				});
+
+			this._inflightTrad.set(inflightKey, inflightPromise);
+			inflightPromise.then(resolve).catch(reject);
 		});
 	}
 
@@ -948,7 +977,7 @@ class LyricsContainer extends react.Component {
 			const overrideLanguage = CONFIG.visual["translate:detect-language-override"];
 			// Debug logging
 			if (window.lyricsPlusDebug) {
-				console.log("Kuromoji mode - Using language override:", overrideLanguage);
+				console.log("Traditional mode - Using language override:", overrideLanguage);
 			}
 			return overrideLanguage;
 		}
@@ -956,7 +985,7 @@ class LyricsContainer extends react.Component {
 		// If we have a cached language in state, use it
 		if (this.state.language) {
 			if (window.lyricsPlusDebug) {
-				console.log("Kuromoji mode - Using cached language:", this.state.language);
+				console.log("Traditional mode - Using cached language:", this.state.language);
 			}
 			return this.state.language;
 		}
@@ -1004,41 +1033,61 @@ class LyricsContainer extends react.Component {
 				);
 			} else if (language === "ko") {
 				// Korean
-				result = await Promise.all(lyrics.map(async (lyric) => await this.translator.convertToRomaja(lyric?.text || "", "romaji")));
+				if (targetConvert !== "romaja") return lyrics;
+				result = await Promise.all(lyrics.map(async (lyric) => await this.translator.convertToRomaja(lyric?.text || "", targetConvert)));
 			} else if (language === "zh-hans") {
 				// Chinese (Simplified)
-				const map = {
-					cn: { from: "cn", target: "cn" },
-					tw: { from: "cn", target: "tw" },
-					hk: { from: "cn", target: "hk" },
-				};
+				if (targetConvert === "pinyin") {
+					result = await Promise.all(
+						lyrics.map(async (lyric) => await this.translator.convertToPinyin(lyric?.text || "", { toneType: "mark", type: "string" }))
+					);
+					// Warn if pinyin conversion produced no visible changes (likely CDN blocked -> fallback)
+					const anyChanged = lyrics.some((lyric, i) => (result?.[i] ?? "") !== (lyric?.text || ""));
+					if (!anyChanged) {
+						Spicetify.showNotification("Pinyin library unavailable. Showing original. Allow jsDelivr or unpkg.", true, 4000);
+					}
+				} else {
+					const map = {
+						cn: { from: "cn", target: "cn" },
+						tw: { from: "cn", target: "tw" },
+						hk: { from: "cn", target: "hk" },
+					};
 
-				// prevent conversion between the same language.
-				if (targetConvert === "cn") {
-					Spicetify.showNotification("Conversion skipped: Already in Simplified Chinese", false, 2000);
-					return lyrics;
+					// prevent conversion between the same language.
+					if (targetConvert === "cn") {
+						Spicetify.showNotification("Conversion skipped: Already in Simplified Chinese", false, 2000);
+						return lyrics;
+					}
+
+					result = await Promise.all(
+						lyrics.map(async (lyric) => await this.translator.convertChinese(lyric?.text || "", map[targetConvert].from, map[targetConvert].target))
+					);
 				}
-
-				result = await Promise.all(
-					lyrics.map(async (lyric) => await this.translator.convertChinese(lyric?.text || "", map[targetConvert].from, map[targetConvert].target))
-				);
 			} else if (language === "zh-hant") {
 				// Chinese (Traditional)
-				const map = {
-					cn: { from: "t", target: "cn" },
-					hk: { from: "t", target: "hk" },
-					tw: { from: "t", target: "tw" },
-				};
+				if (targetConvert === "pinyin") {
+					result = await Promise.all(
+						lyrics.map(async (lyric) => await this.translator.convertToPinyin(lyric?.text || "", { toneType: "mark", type: "string" }))
+					);
+					// Warn if pinyin conversion produced no visible changes (likely CDN blocked -> fallback)
+					const anyChanged = lyrics.some((lyric, i) => (result?.[i] ?? "") !== (lyric?.text || ""));
+					if (!anyChanged) {
+						Spicetify.showNotification("Pinyin library unavailable. Showing original. Allow jsDelivr or unpkg.", true, 4000);
+					}
+				} else {
+					const map = {
+						cn: { from: "t", target: "cn" },
+						hk: { from: "t", target: "hk" },
+						tw: { from: "t", target: "tw" },
+					};
 
-				// prevent conversion between the same language.
-				if (targetConvert === "tw") {
-					Spicetify.showNotification("Conversion skipped: Already in Traditional Chinese", false, 2000);
-					return lyrics;
+					if (!map[targetConvert]) return lyrics;
+
+					// Allow conversion from Traditional Chinese to different variants/simplified
+					result = await Promise.all(
+						lyrics.map(async (lyric) => await this.translator.convertChinese(lyric?.text || "", map[targetConvert].from, map[targetConvert].target))
+					);
 				}
-
-				result = await Promise.all(
-					lyrics.map(async (lyric) => await this.translator.convertChinese(lyric?.text || "", map[targetConvert].from, map[targetConvert].target))
-				);
 			}
 
 			const res = Utils.processTranslatedLyrics(result, lyrics);

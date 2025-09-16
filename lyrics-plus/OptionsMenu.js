@@ -134,7 +134,7 @@ let adjustmentsDebounceTimeout = null;
 // Define static options outside component to avoid recreation
 const STATIC_OPTIONS = {
 	source: {
-		none: "Kuromoji",
+		traditional: "Traditional",
 		geminiVi: "Gemini",
 	},
 	translationDisplay: {
@@ -169,6 +169,7 @@ const STATIC_OPTIONS = {
 			cn: "Simplified Chinese",
 			hk: "Traditional Chinese (Hong Kong)", 
 			tw: "Traditional Chinese (Taiwan)",
+			pinyin: "Pinyin",
 		}
 	}
 };

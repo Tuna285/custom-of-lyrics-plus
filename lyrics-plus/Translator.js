@@ -2,8 +2,10 @@ const kuroshiroPath = "https://cdn.jsdelivr.net/npm/kuroshiro@1.2.0/dist/kuroshi
 const kuromojiPath = "https://cdn.jsdelivr.net/npm/kuroshiro-analyzer-kuromoji@1.1.0/dist/kuroshiro-analyzer-kuromoji.min.js";
 const aromanize = "https://cdn.jsdelivr.net/npm/aromanize@0.1.5/aromanize.min.js";
 const openCCPath = "https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.min.js";
+const pinyinProPath = "https://cdn.jsdelivr.net/npm/pinyin-pro@3.19.7/dist/index.min.js";
+const tinyPinyinPath = "https://cdn.jsdelivr.net/npm/tiny-pinyin/dist/tiny-pinyin.min.js";
 
-const dictPath = "https:/cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict";
+const dictPath = "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict";
 
 class Translator {
 	constructor(lang, isUsingNetease = false) {
@@ -13,13 +15,29 @@ class Translator {
 			zh: false,
 		};
 		this.isUsingNetease = isUsingNetease;
+		this.initializationPromise = null;
 
 		this.applyKuromojiFix();
-		this.injectExternals(lang);
-		this.createTranslator(lang);
+		// Start initialization asynchronously but don't await in constructor
+		this.initializationPromise = this.initializeAsync(lang);
 	}
 
-	static buildGeminiPrompt({ artist, title, text, wantRomaji = false, wantSmartPhonetic = false }) {
+	/**
+	 * Async initialization method that can be awaited
+	 * @param {string} lang - Language code
+	 * @returns {Promise<void>}
+	 */
+	async initializeAsync(lang) {
+		try {
+			await this.injectExternals(lang);
+			await this.createTranslator(lang);
+		} catch (error) {
+			console.error(`Failed to initialize translator for language ${lang}:`, error);
+			throw error;
+		}
+	}
+
+	static buildGeminiPrompt({ artist, title, text, wantSmartPhonetic = false }) {
 		const lineCount = text.split('\n').length;
 		
 		if (wantSmartPhonetic) {
@@ -60,99 +78,64 @@ class Translator {
 ${text}
 ----`;
 		}
-		
-		if (wantRomaji) {
-			return `You are a Japanese linguistics expert. Your task is to transcribe the following Japanese lyrics into standard Hepburn Romaji.
-
-**Instructions**:
-
-1.  **Line Integrity**: The output MUST contain exactly ${lineCount} lines. Each transcribed line must correspond to the original line's position. Do not add, merge, or remove lines.
-
-2.  **Hepburn Romaji Rules**:
-    - Use macrons (¯) for long vowels (e.g., とうきょう → Tōkyō).
-    - Particles: は→wa, へ→e, を→o.
-    - Syllabic 'ん' before a vowel or 'y' must be 'n'' (e.g., しんや → shin'ya).
-    - Use 'shi', 'chi', 'tsu'.
-
-3.  **Preserve Content**:
-    - Leave all non-Japanese text (e.g., English words) and punctuation unchanged.
-    - Preserve empty lines.
-
-**Verification**:
-- [ ] Output has exactly ${lineCount} lines.
-- [ ] Transcription follows Hepburn rules.
-- [ ] Non-Japanese text and punctuation are preserved.
-
-**Song Info**:
-- Artist: ${artist}
-- Title: ${title}
-
-**Output Format**:
-- Respond with ONLY a single, raw JSON object.
-- Do NOT use markdown code fences.
-- JSON schema: {"romaji": "romanized_lyrics_with_\\n_for_newlines"}
-
-**Input Lyrics**:
-----
-${text}
-----`;
-		}
 // Default to Vietnamese translation
-return `You are an expert lyric translator, skilled at crafting beautiful, poetic, and singable Vietnamese versions of songs. Your task is to translate the lyrics provided, balancing artistic expression with the technical precision required for synchronized subtitles.
+return `Bạn là một chuyên gia dịch thuật lời bài hát, một người kể chuyện bằng âm nhạc, có kỹ năng bậc thầy trong việc tạo ra các phiên bản tiếng Việt vừa nên thơ, giàu cảm xúc, vừa giữ được nhịp điệu để có thể hát theo. Nhiệm vụ của bạn là dịch lời bài hát được cung cấp, cân bằng giữa biểu đạt nghệ thuật và độ chính xác kỹ thuật cần thiết cho phụ đề đồng bộ.
 
-**--- THE GOLDEN RULE (NON-NEGOTIABLE) ---**
+**--- QUY TẮC VÀNG (BẤT DI BẤT DỊCH) ---**
 
-**ABSOLUTE LINE INTEGRITY:**
-- Your output MUST have the exact same number of lines as the input: **${lineCount} lines**.
-- This is the most important rule. A creative translation is useless if it breaks the line sync.
-- **DO NOT MERGE, SPLIT, or OMIT LINES FOR ANY REASON.**
-- An empty line in the input must be an empty line in the output.
-- A line with one word must be translated as one line.
+**TOÀN VẸN SỐ DÒNG TUYỆT ĐỐI:**
+- Output của bạn BẮT BUỘC phải có số dòng chính xác bằng với input: **${lineCount} dòng**.
+- Đây là quy tắc quan trọng nhất. Một bản dịch sáng tạo sẽ trở nên vô dụng nếu nó phá vỡ đồng bộ hóa thời gian của phụ đề.
+- **TUYỆT ĐỐI KHÔNG GỘP, TÁCH, hay BỎ QUA DÒNG VÌ BẤT KỲ LÝ DO NÀO.**
+- Một dòng trống trong input phải là một dòng trống trong output.
+- Một dòng chỉ có một từ phải được dịch thành một dòng.
 
-**--- ARTISTIC & TRANSLATION GOALS ---**
+**--- MỤC TIÊU NGHỆ THUẬT & DỊCH THUẬT ---**
 
-**1. EMOTIONAL & POETIC QUALITY:**
-   - Go beyond literal translation. Capture the original's core emotion, mood, and nuance.
-   - Use rich, evocative Vietnamese vocabulary that flows naturally, as if it were originally written for a song.
-   - The lyrics should be beautiful to read and sound natural when sung.
+**1. KỂ LẠI CÂU CHUYỆN (RETELL THE STORY):**
+   - **Quan trọng nhất:** Trước khi dịch từng dòng, hãy đọc lướt toàn bộ lời bài hát để nắm bắt CÂU CHUYỆN TỔNG THỂ, thông điệp và hành trình cảm xúc của nhân vật.
+   - Bản dịch của bạn phải tạo ra một dòng chảy liền mạch, mỗi câu hát phải là sự tiếp nối tự nhiên của câu trước đó, cùng nhau dệt nên một câu chuyện hoàn chỉnh.
 
-**2. LINGUISTIC NUANCE:**
-   - Handle idioms, metaphors, and cultural references gracefully. Find equivalent expressions in Vietnamese where possible.
-   - Ensure the tone (e.g., happy, sad, angry) of the translation matches the original.
+**2. ƯU TIÊN CẢM XÚC VÀ CHẤT THƠ (PRIORITIZE EMOTION & POETRY):**
+   - Vượt ra ngoài giới hạn của dịch nghĩa đen. Hãy nắm bắt linh hồn, tâm trạng và sắc thái tinh tế của bản gốc.
+   - Sử dụng từ ngữ tiếng Việt giàu hình ảnh, trau chuốt và gần gũi với văn phong thơ ca, âm nhạc Việt Nam. Lời dịch phải đẹp khi đọc và tự nhiên khi cất lên thành tiếng hát.
 
-**--- EXAMPLE OF CORRECT STRUCTURE ---**
+**3. ĐẢM BẢO TÍNH NHẠC ĐIỆU (ENSURE SINGABILITY & RHYTHM):**
+   - Dù không bắt buộc phải có vần điệu, lời dịch phải có nhịp điệu và dòng chảy mượt mà.
+   - Tránh sử dụng những từ ngữ trúc trắc, gượng ép. Hãy đọc thầm lại câu dịch để chắc chắn rằng nó trôi chảy một cách tự nhiên.
 
-**INPUT LYRICS (5 lines):**
+**4. TÔN TRỌNG SẮC THÁI GỐC (RESPECT THE ORIGINAL NUANCE):**
+   - Xử lý các thành ngữ, ẩn dụ và yếu tố văn hóa một cách khéo léo. Tìm những cách diễn đạt tương đương trong tiếng Việt nếu có thể.
+   - Đảm bảo giọng điệu (ví dụ: vui, buồn, giận dữ) của bản dịch khớp với bản gốc.
+
+**--- VÍ DỤ VỀ CẤU TRÚC ĐÚNG ---**
+
+**INPUT (5 dòng):**
 Hello world
 
 How are you?
 Oh...
 (Yeah)
 
-**CORRECT OUTPUT (5 lines, preserving structure):**
-Xin chào thế giới
+**OUTPUT ĐÚNG (5 dòng, bảo toàn cấu trúc):**
+["Xin chào thế giới", "", "Bạn có khoẻ không?", "Ôi...", "(Yeah)"]
 
-Bạn có khoẻ không?
-Ôi...
-(Yeah)
+**--- BƯỚC TỰ KIỂM TRA CUỐI CÙNG ---**
+Trước khi đưa ra output cuối cùng, bạn BẮT BUỘC phải tự hỏi: "Output của mình đã có chính xác ${lineCount} phần tử trong mảng chưa?" Nếu chưa, bạn phải sửa lại.
 
-**--- FINAL SELF-CORRECTION STEP ---**
-Before you provide the final output, you MUST ask yourself: "Does my translated output have exactly ${lineCount} lines?" If not, you must fix it.
+**THÔNG TIN BÀI HÁT:**
+- Nghệ sĩ: ${artist}
+- Tên bài hát: ${title}
 
-**SONG INFO:**
-- Artist: ${artist}
-- Title: ${title}
+**ĐỊNH DẠNG OUTPUT:**
+- Chỉ trả lời bằng một đối tượng JSON thô duy nhất.
+- KHÔNG sử dụng ký tự markdown.
+- Cấu trúc JSON: {"vi": ["dòng dịch 1", "dòng dịch 2", ...]}
 
-**OUTPUT FORMAT:**
-- Respond with ONLY a single, raw JSON object.
-- Do NOT use markdown code fences.
-- JSON schema: {"vi": "translated_lyrics_with_\\n_for_newlines"}
-
-**INPUT LYRICS TO TRANSLATE:**
+**LỜI BÀI HÁT CẦN DỊCH:**
 ----
 ${text}
-----`;
-	}
+----`}
 
 	static extractGeminiJson(text) {
 		function safeParse(s) {
@@ -187,37 +170,48 @@ ${text}
 			}
 		}
 		if (!parsed) {
-			// Third attempt: regex pull of JSON string values
+			// Third attempt: regex pull of JSON string values (handle both string and array formats)
 			const mVi = raw.match(/"vi"\s*:\s*"([\s\S]*?)"\s*[},]/);
-			const mRo = raw.match(/"romaji"\s*:\s*"([\s\S]*?)"\s*[},]/);
+			const mViArray = raw.match(/"vi"\s*:\s*(\[[\s\S]*?\])\s*[},]/);
 			const mPhonetic = raw.match(/"phonetic"\s*:\s*"([\s\S]*?)"\s*[},]/);
-			if (mVi || mRo || mPhonetic) {
+			const mPhoneticArray = raw.match(/"phonetic"\s*:\s*(\[[\s\S]*?\])\s*[},]/);
+			
+			if (mVi || mPhonetic || mViArray || mPhoneticArray) {
 				return { 
-					romaji: decodeJsonString(mRo?.[1] || ""), 
-					vi: decodeJsonString(mVi?.[1] || ""),
-					phonetic: decodeJsonString(mPhonetic?.[1] || "")
+					vi: mViArray ? JSON.parse(mViArray[1]) : decodeJsonString(mVi?.[1] || ""),
+					phonetic: mPhoneticArray ? JSON.parse(mPhoneticArray[1]) : decodeJsonString(mPhonetic?.[1] || "")
 				};
 			}
 		}
-		if (parsed && (parsed.romaji !== undefined || parsed.vi !== undefined || parsed.phonetic !== undefined)) {
+		if (parsed && (parsed.vi !== undefined || parsed.phonetic !== undefined)) {
+			// Handle both string and array formats
+			const normalizeField = (field) => {
+				if (Array.isArray(field)) {
+					return field; // Keep arrays as-is
+				}
+				if (typeof field === 'string') {
+					return decodeJsonString(field); // Decode strings
+				}
+				return field;
+			};
+
 			return { 
-				romaji: decodeJsonString(parsed.romaji), 
-				vi: decodeJsonString(parsed.vi),
-				phonetic: decodeJsonString(parsed.phonetic)
+				vi: normalizeField(parsed.vi),
+				phonetic: normalizeField(parsed.phonetic)
 			};
 		}
 		// Fallback: treat entire text as Vietnamese and unescape \n
 		const fallback = String(text || "").replace(/\\n/g, "\n");
-		return { romaji: "", vi: fallback };
+		return { vi: fallback };
 	}
 
-	static async callGemini({ apiKey, artist, title, text, wantRomaji = false, wantSmartPhonetic = false }) {
+	static async callGemini({ apiKey, artist, title, text, wantSmartPhonetic = false }) {
 		// Enhanced validation
 		if (!apiKey?.trim()) throw new Error("Missing or invalid Gemini API key");
 		if (!text?.trim()) throw new Error("No text provided for translation");
 
 		const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-		const prompt = Translator.buildGeminiPrompt({ artist, title, text, wantRomaji, wantSmartPhonetic });
+		const prompt = Translator.buildGeminiPrompt({ artist, title, text, wantSmartPhonetic });
 		
 		const body = {
 			contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -287,42 +281,69 @@ ${text}
 	}
 
 	includeExternal(url) {
-		if (!document.querySelector(`script[src="${url}"]`)) {
+		return new Promise((resolve, reject) => {
+			const existingScript = document.querySelector(`script[src="${url}"]`);
+			if (existingScript) {
+				// If script already exists, resolve immediately; readiness is ensured by waitForGlobals when needed
+				if (existingScript.dataset) existingScript.dataset.loaded = existingScript.dataset.loaded || 'true';
+				return resolve();
+			}
+
 			const script = document.createElement("script");
 			script.setAttribute("type", "text/javascript");
 			script.setAttribute("src", url);
+			
+			script.addEventListener('load', () => {
+				script.dataset.loaded = 'true';
+				resolve();
+			});
+			
+			script.addEventListener('error', () => {
+				reject(new Error(`Failed to load script: ${url}`));
+			});
+			
 			document.head.appendChild(script);
-		}
+		});
 	}
 
-	injectExternals(lang) {
-		switch (lang?.slice(0, 2)) {
-			case "ja":
-				this.includeExternal(kuromojiPath);
-				this.includeExternal(kuroshiroPath);
-				break;
-			case "ko":
-				this.includeExternal(aromanize);
-				break;
-			case "zh":
-				this.includeExternal(openCCPath);
-				break;
+	async injectExternals(lang) {
+		const langCode = lang?.slice(0, 2);
+		try {
+			switch (langCode) {
+				case "ja":
+					await Promise.all([
+						this.includeExternal(kuromojiPath),
+						this.includeExternal(kuroshiroPath)
+					]);
+					break;
+				case "ko":
+					await this.includeExternal(aromanize);
+					break;
+				case "zh":
+					// OpenCC is required
+					await this.includeExternal(openCCPath);
+					// Prefer pinyin-pro (tones). Preload non-blockingly; tiny-pinyin as backup.
+					this.includeExternal(pinyinProPath).catch(() => {});
+					this.includeExternal(tinyPinyinPath).catch(() => {});
+					break;
+			}
+		} catch (error) {
+			console.error(`Failed to load external scripts for language ${langCode}:`, error);
+			throw error;
 		}
 	}
 
 	async awaitFinished(language) {
-		return new Promise((resolve) => {
-			const interval = setInterval(() => {
-				this.injectExternals(language);
-				this.createTranslator(language);
-
-				const lan = language.slice(0, 2);
-				if (this.finished[lan]) {
-					clearInterval(interval);
-					resolve();
-				}
-			}, 100);
-		});
+		const langCode = language?.slice(0, 2);
+		// Wait for any in-flight initial initialization
+		if (this.initializationPromise) {
+			await this.initializationPromise;
+		}
+		// If the requested language is not yet initialized, initialize it now
+		if (langCode && !this.finished[langCode]) {
+			await this.injectExternals(language);
+			await this.createTranslator(language);
+		}
 	}
 
 	/**
@@ -342,43 +363,68 @@ ${text}
 	}
 
 	async createTranslator(lang) {
-		switch (lang.slice(0, 2)) {
+		const langCode = lang.slice(0, 2);
+		
+		switch (langCode) {
 			case "ja":
 				if (this.kuroshiro) return;
-				if (typeof Kuroshiro === "undefined" || typeof KuromojiAnalyzer === "undefined") {
-					await Translator.#sleep(50);
-					return this.createTranslator(lang);
-				}
+				
+				// Wait for libraries to be available with timeout
+				await this.waitForGlobals(['Kuroshiro', 'KuromojiAnalyzer'], 10000);
 
 				this.kuroshiro = new Kuroshiro.default();
-				this.kuroshiro.init(new KuromojiAnalyzer({ dictPath })).then(
-					function () {
-						this.finished.ja = true;
-					}.bind(this)
-				);
-
+				await this.kuroshiro.init(new KuromojiAnalyzer({ dictPath }));
+				this.finished.ja = true;
 				break;
+				
 			case "ko":
 				if (this.Aromanize) return;
-				if (typeof Aromanize === "undefined") {
-					await Translator.#sleep(50);
-					return this.createTranslator(lang);
-				}
-
+				
+				await this.waitForGlobals(['Aromanize'], 5000);
+				
 				this.Aromanize = Aromanize;
 				this.finished.ko = true;
 				break;
+				
 			case "zh":
 				if (this.OpenCC) return;
-				if (typeof OpenCC === "undefined") {
-					await Translator.#sleep(50);
-					return this.createTranslator(lang);
-				}
-
+				
+				await this.waitForGlobals(['OpenCC'], 5000);
+				
 				this.OpenCC = OpenCC;
 				this.finished.zh = true;
 				break;
 		}
+	}
+
+	/**
+	 * Wait for global variables to become available
+	 * @param {string[]} globalNames - Array of global variable names to wait for
+	 * @param {number} timeoutMs - Timeout in milliseconds
+	 * @returns {Promise<void>}
+	 */
+	async waitForGlobals(globalNames, timeoutMs = 5000) {
+		const startTime = Date.now();
+		
+		return new Promise((resolve, reject) => {
+			const checkGlobals = () => {
+				const allAvailable = globalNames.every(name => typeof window[name] !== 'undefined');
+				
+				if (allAvailable) {
+					resolve();
+					return;
+				}
+				
+				if (Date.now() - startTime > timeoutMs) {
+					reject(new Error(`Timeout waiting for globals: ${globalNames.join(', ')}`));
+					return;
+				}
+				
+				setTimeout(checkGlobals, 50);
+			};
+			
+			checkGlobals();
+		});
 	}
 
 	static normalizeRomajiString(s) {
@@ -396,10 +442,8 @@ ${text}
 	}
 
 	async romajifyText(text, target = "romaji", mode = "spaced") {
-		if (!this.finished.ja) {
-			await Translator.#sleep(100);
-			return this.romajifyText(text, target, mode);
-		}
+		// Ensure initialization is complete
+		await this.awaitFinished("ja");
 
 		const out = await this.kuroshiro.convert(text, {
 			to: target,
@@ -410,20 +454,19 @@ ${text}
 	}
 
 	async convertToRomaja(text, target) {
-		if (!this.finished.ko) {
-			await Translator.#sleep(100);
-			return this.convertToRomaja(text, target);
-		}
+		// Ensure initialization is complete
+		await this.awaitFinished("ko");
 
 		if (target === "hangul") return text;
-		return Aromanize.hangulToLatin(text, "rr-translit");
+		if (!this.Aromanize || typeof this.Aromanize.hangulToLatin !== "function") {
+			throw new Error("Korean converter not initialized");
+		}
+		return this.Aromanize.hangulToLatin(text, "rr-translit");
 	}
 
 	async convertChinese(text, from, target) {
-		if (!this.finished.zh) {
-			await Translator.#sleep(100);
-			return this.convertChinese(text, from, target);
-		}
+		// Ensure initialization is complete
+		await this.awaitFinished("zh");
 
 		const converter = this.OpenCC.Converter({
 			from: from,
@@ -433,13 +476,62 @@ ${text}
 		return converter(text);
 	}
 
-	/**
-	 * Async wrapper of `setTimeout`.
-	 *
-	 * @param {number} ms
-	 * @returns {Promise<void>}
-	 */
-	static async #sleep(ms) {
-		return new Promise((resolve) => setTimeout(resolve, ms));
+	async loadPinyinPro() {
+		if (typeof pinyinPro !== "undefined") return true;
+		const urls = [
+			pinyinProPath,
+			"https://cdn.jsdelivr.net/npm/pinyin-pro@3.19.7/dist/index.js",
+			"https://unpkg.com/pinyin-pro@3.19.7/dist/index.min.js",
+			"https://unpkg.com/pinyin-pro@3.19.7/dist/index.js",
+			"https://fastly.jsdelivr.net/npm/pinyin-pro@3.19.7/dist/index.min.js",
+			"https://fastly.jsdelivr.net/npm/pinyin-pro@3.19.7/dist/index.js",
+		];
+		for (const url of urls) {
+			try {
+				await this.includeExternal(url);
+				await this.waitForGlobals(["pinyinPro"], 8000);
+				return true;
+			} catch {}
+		}
+		return false;
 	}
+
+	async loadTinyPinyin() {
+		if (typeof TinyPinyin !== "undefined") return true;
+		const urls = [
+			tinyPinyinPath,
+			"https://unpkg.com/tiny-pinyin/dist/tiny-pinyin.min.js",
+			"https://fastly.jsdelivr.net/npm/tiny-pinyin/dist/tiny-pinyin.min.js",
+		];
+		for (const url of urls) {
+			try {
+				await this.includeExternal(url);
+				await this.waitForGlobals(["TinyPinyin"], 8000);
+				return true;
+			} catch {}
+		}
+		return false;
+	}
+
+	async convertToPinyin(text, options = {}) {
+		try {
+			// Try tiny-pinyin first (highest availability, no tones)
+			if (await this.loadTinyPinyin()) {
+				return TinyPinyin.convertToPinyin(text || "");
+			}
+			// Then try pinyin-pro (tones)
+			if (await this.loadPinyinPro()) {
+				const toneType = options.toneType || "mark"; // mark | num | none
+				const type = options.type || "string"; // string | array
+				const nonZh = options.nonZh || "consecutive"; // keep non-Chinese intact
+				return pinyinPro.pinyin(text || "", { toneType, type, nonZh });
+			}
+			// As a last resort, return original text
+			return text || "";
+		} catch {
+			// Graceful fallback: never break conversion pipeline
+			return text || "";
+		}
+	}
+
 }
