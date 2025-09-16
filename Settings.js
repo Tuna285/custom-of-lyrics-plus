@@ -586,7 +586,12 @@ function openConfig() {
   padding: 6px 10px;
   width: min(360px, 100%);
   outline: none;
+  color: rgba(255,255,255,.95);
 }
+#${APP_NAME}-config-container select:hover { background: rgba(255,255,255,.1); }
+#${APP_NAME}-config-container select option { background-color: #121212; color: #f2f2f2; }
+#${APP_NAME}-config-container select option:hover { background-color: #2a2a2a; color: #fff; }
+#${APP_NAME}-config-container select option:checked { background-color: #2a2a2a; color: #fff; }
 #${APP_NAME}-config-container h2 { margin: 18px 0 10px; font-size: 16px; opacity: .95; }
 #${APP_NAME}-config-container .adjust-value { min-width: 48px; text-align: center; }
 #${APP_NAME}-config-container .switch, #${APP_NAME}-config-container .btn { height: 28px; }

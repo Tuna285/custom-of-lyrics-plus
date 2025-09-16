@@ -89,6 +89,29 @@ const OptionsMenu = react.memo(({ options, onSelect, selected, defaultValue, bol
 	);
 });
 
+const ICONS = {
+	provider: `<path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zM8 10.93a2.93 2.93 0 1 1 0-5.86 2.93 2.93 0 0 1 0 5.86z"/>`,
+	display: `<path d="M1 1h5v5H1V1zm6 0h8v5H7V1zm-6 6h5v8H1V7zm6 0h8v8H7V7z"/>`,
+	mode: `<path d="M10.5 1a.5.5 0 0 1 .5.5v12a.5.5 0 0 1-1 0v-12a.5.5 0 0 1 .5-.5zm-4 0a.5.5 0 0 1 .5.5v12a.5.5 0 0 1-1 0v-12a.5.5 0 0 1 .5-.5zm-4 0a.5.5 0 0 1 .5.5v12a.5.5 0 0 1-1 0v-12a.5.5 0 0 1 .5-.5z"/>`,
+	language: `<path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM1.026 7.5h1.332c.05.586.13 1.15.24 1.696-1.012-.34-1.782-.93-2.13-1.696zM14.974 7.5h-1.332a10.034 10.034 0 0 1-.24 1.696c1.012-.34 1.782-.93 2.13-1.696zM8 15c-1.07 0-2.096-.21-3.034-.604a.5.5 0 0 0-.416.924C5.59 15.8 6.758 16 8 16s2.41-.2 3.45-.68a.5.5 0 0 0-.416-.924C10.096 14.79 9.07 15 8 15zm0-1.5c.983 0 1.912-.18 2.76-.502.848-.323 1.543-.8 2.062-1.405.519-.604.85-1.353.972-2.155H2.206c.122.802.453 1.551.972 2.155.519.605 1.214 1.082 2.062 1.405C6.088 13.32 7.017 13.5 8 13.5z"/>`,
+};
+
+const SettingRowDescription = ({ icon, text }) => {
+	return react.createElement(
+		"div",
+		{ className: "setting-row-with-icon" },
+		react.createElement("svg", {
+			width: 16,
+			height: 16,
+			viewBox: "0 0 16 16",
+			fill: "currentColor",
+			dangerouslySetInnerHTML: { __html: icon },
+		}),
+		react.createElement("span", null, text)
+	);
+};
+
+
 // Helper: open a compact options modal using existing settings styles
 function openOptionsModal(title, items, onChange, eventType = null) {
 	const container = react.createElement(
@@ -100,11 +123,16 @@ function openOptionsModal(title, items, onChange, eventType = null) {
 #${APP_NAME}-config-container { padding: 12px 16px; }
 #${APP_NAME}-config-container .setting-row {
 	display: grid;
-	grid-template-columns: minmax(220px, 1fr) auto;
+	grid-template-columns: minmax(0, 1fr) auto;
 	gap: 12px;
 	align-items: center;
 	padding: 8px 0;
 	border-bottom: 1px solid rgba(255,255,255,.06);
+}
+#${APP_NAME}-config-container .setting-row-with-icon {
+	display: flex;
+	align-items: center;
+	gap: 12px;
 }
 #${APP_NAME}-config-container .setting-row:last-child { border-bottom: none; }
 #${APP_NAME}-config-container .col.description { font-weight: 600; opacity: .9; }
@@ -112,10 +140,27 @@ function openOptionsModal(title, items, onChange, eventType = null) {
 #${APP_NAME}-config-container input, #${APP_NAME}-config-container select {
 	background: rgba(255,255,255,.04);
 	border: 1px solid rgba(255,255,255,.08);
-	border-radius: 8px;
-	padding: 6px 10px;
+	border-radius: 4px;
+	padding: 8px 12px;
 	width: min(320px, 100%);
 	outline: none;
+	transition: background .2s ease;
+	color: rgba(255,255,255,.95);
+}
+#${APP_NAME}-config-container select:hover {
+	background: rgba(255,255,255,.1);
+}
+#${APP_NAME}-config-container select option {
+	background-color: #121212;
+	color: #f2f2f2;
+}
+#${APP_NAME}-config-container select option:hover {
+	background-color: #2a2a2a;
+	color: #fff;
+}
+#${APP_NAME}-config-container select option:checked {
+	background-color: #2a2a2a;
+	color: #fff;
 }
 #${APP_NAME}-config-container .adjust-value { min-width: 48px; text-align: center; }
 #${APP_NAME}-config-container .switch, #${APP_NAME}-config-container .btn { height: 28px; }
@@ -125,7 +170,7 @@ function openOptionsModal(title, items, onChange, eventType = null) {
 		react.createElement(OptionList, Object.assign({ items, onChange }, eventType ? { type: eventType } : {}))
 	);
 
-	Spicetify.PopupModal.display({ title, content: container, isLarge: false });
+	Spicetify.PopupModal.display({ title, content: container, isLarge: true });
 }
 
 // Debounce handle for adjustments modal
@@ -193,14 +238,14 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 		// Always show basic options, even when friendlyLanguage is not available
 		const baseItems = [
 			{
-				desc: "Translation Provider",
+				desc: react.createElement(SettingRowDescription, { icon: ICONS.provider, text: "Translation Provider" }),
 				key: "translate:translated-lyrics-source",
 				type: ConfigSelection,
 				options: sourceOptions,
 				renderInline: true,
 			},
 			{
-				desc: "Translation Display",
+				desc: react.createElement(SettingRowDescription, { icon: ICONS.display, text: "Translation Display" }),
 				key: "translate:display-mode",
 				type: ConfigSelection,
 				options: translationDisplayOptions,
@@ -211,7 +256,7 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 		// Show Language Override option only for Kuromoji mode
 		if (provider !== "geminiVi") {
 			baseItems.push({
-				desc: "Language Override",
+				desc: react.createElement(SettingRowDescription, { icon: ICONS.language, text: "Language Override" }),
 				key: "translate:detect-language-override",
 				type: ConfigSelection,
 				options: languageOptions,
@@ -224,14 +269,14 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 			// For detected CJK languages, show specific language modes
 			baseItems.push(
 				{
-					desc: "Display Mode",
+					desc: react.createElement(SettingRowDescription, { icon: ICONS.mode, text: "Display Mode" }),
 					key: `translation-mode:${friendlyLanguage}`,
 					type: ConfigSelection,
 					options: { none: "None", ...modeOptions },
 					renderInline: true,
 				},
 				{
-					desc: "Display Mode 2",
+					desc: react.createElement(SettingRowDescription, { icon: ICONS.mode, text: "Display Mode 2" }),
 					key: `translation-mode-2:${friendlyLanguage}`,
 					type: ConfigSelection,
 					options: { none: "None", ...modeOptions },
@@ -242,14 +287,14 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 			// For Gemini mode, show generic display modes even without detected language
 			baseItems.push(
 				{
-					desc: "Display Mode",
+					desc: react.createElement(SettingRowDescription, { icon: ICONS.mode, text: "Display Mode" }),
 					key: "translation-mode:gemini",
 					type: ConfigSelection,
 					options: { none: "None", ...modeOptions },
 					renderInline: true,
 				},
 				{
-					desc: "Display Mode 2", 
+					desc: react.createElement(SettingRowDescription, { icon: ICONS.mode, text: "Display Mode 2" }),
 					key: "translation-mode-2:gemini",
 					type: ConfigSelection,
 					options: { none: "None", ...modeOptions },
