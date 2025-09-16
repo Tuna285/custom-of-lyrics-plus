@@ -19,7 +19,7 @@ Dùng mô hình LLM của Google để dịch lời bài hát một cách tự n
 
 ### 2. Giao diện hiện đại & Tối ưu trải nghiệm
 Giao diện được tinh chỉnh để đẹp mắt, gọn gàng và không gây xao nhãng.
--   🖼️ **Nền trong suốt**: Lời bài hát được hiển thị trên một lớp nền trong suốt, hòa hợp với giao diện của các theme của spicetify.
+-   🖼️ **Nền trong suốt (có thể tắt)**: Lời bài hát được hiển thị trên một lớp nền trong suốt, hòa hợp với giao diện của các theme của spicetify.
 -   🖱️ **Nút điều khiển tự ẩn**: Các nút cài đặt chỉ xuất hiện khi bạn di chuột vào khu vực lời bài hát, trả lại không gian hiển thị tối đa.
 -   🎬 **Hiệu ứng chuyển dòng mượt mà**: Animation được tối ưu để tạo cảm giác chuyển tiếp uyển chuyển giữa các dòng lyric.
 
@@ -37,20 +37,20 @@ Hệ thống sẽ tự động xử lý để kết quả hiển thị luôn g�
 
 0.  **(Yêu cầu Spotify cài đặt từ web, không từ Microsoft Store)** Cài đặt Spicetify và CustomApps (lyrics-plus): https://spicetify.app/docs/getting-started
 
-1.  Tải và giải nén file chứa custom của lyric-plus
+1.  Tải và giải nén folder custom-of-lyric-plus
 <img width="578" height="455" alt="image" src="https://github.com/user-attachments/assets/5f190f70-3185-4e2d-990f-90068d3bcf8d" />
   
-2.  Copy và thay thế toàn bộ thư mục `lyrics-plus` đã giải nén vào thư mục `CustomApps` của Spicetify với path: 
+2.  Sao chép và thay thế toàn bộ file trong folder vào thư mục lyric-plus `CustomApps` của Spicetify với path: 
 - Windows: ```%LocalAppData%\spicetify\CustomApps```
 - MacOS/Linux: ```~/.config/spicetify/CustomApps```
 
-3.  Mở terminal hoặc PowerShell và chạy lệnh:
+3.  Mở Terminal hoặc PowerShell và chạy lệnh:
     ```
     spicetify apply
     ```
 3. Cách lấy API của Gemini(free):
 - https://www.youtube.com/watch?v=RVGbLSVFtIk
-
+s
 
 ---
 
@@ -58,7 +58,7 @@ Hệ thống sẽ tự động xử lý để kết quả hiển thị luôn g�
 
 1.  Mở Spotify, vào lyrics plus và nhấn vào avatar chọn **Lyrics Plus config** từ thanh menu bên trái.
 2.  Tìm đến `Gemini API Key (Display Mode 1)` và `Gemini API Key (Display Mode 2)` và dán API key của bạn vào.
-3.  Mở một bài hát bất kỳ, di chuột vào vùng hiển thị lời bài hát và nhấp vào biểu tượng chuyển ngữ (⇄) để bắt đầu tùy chỉnh chế độ dịch của bạn.
+3.  Mở một bài hát bất kỳ, di chuột vào vùng hiển thị lời bài hát và nhấp vào biểu tượng Conversion (⇄) để bắt đầu tùy chỉnh chế độ dịch của bạn.
 
 ---
 **(Dự án đang phát triển, nếu có lỗi vui lòng góp ý)**
