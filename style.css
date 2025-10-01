@@ -54,6 +54,12 @@
 	display: none !important;
 }
 
+/* Hide parent scrollbar when Lyrics Plus is active */
+.main-view-container:has(.lyrics-lyricsContainer-LyricsContainer) .os-scrollbar,
+.main-view-container:has(.lyrics-lyricsContainer-LyricsContainer) .os-scrollbar-handle {
+	display: none !important;
+}
+
 .lyrics-lyricsContainer-LyricsContainer {
 	display: grid;
 	grid-template-rows: 1fr;
@@ -61,6 +67,8 @@
 	height: 100%;
 	width: 100%;
 	top: 0;
+	left: 0;
+	overflow: hidden;
 }
 
 .lyrics-lyricsContainer-Loading {
@@ -86,6 +94,21 @@
 	grid-template-rows: 1fr 20px;
 	user-select: text;
 	text-align: var(--lyrics-align-text);
+	overflow-y: auto;
+	overflow-x: hidden;
+	scroll-behavior: smooth;
+	height: 100%;
+	max-height: 100%;
+	/* Ultra smooth scrolling with GPU acceleration */
+	will-change: scroll-position;
+	-webkit-overflow-scrolling: touch;
+}
+
+.lyrics-lyricsContainer-UnsyncedLyricsPage.auto-scrolling {
+	/* Enhanced smooth scrolling during auto-scroll */
+	scroll-behavior: smooth;
+	/* Optimize for smooth scrolling performance */
+	will-change: scroll-position;
 }
 
 .lyrics-lyricsContainer-LyricsUnsyncedPadding {
@@ -105,6 +128,8 @@
 	overflow: hidden;
 	text-align: var(--lyrics-align-text);
 	user-select: text;
+	height: 100%;
+	max-height: 100%;
 }
 
 .lyrics-lyricsContainer-LyricsBackground {
@@ -134,21 +159,33 @@
 }
 
 .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine {
-	transform: translateY(calc(var(--position-index) * var(--lyrics-line-height) + var(--offset)));
+	transform: translateY(calc(var(--position-index) * var(--lyrics-line-height) + var(--offset))) translateZ(0) scale(0.98);
 	transform-origin: var(--lyrics-align-text);
 	color: var(--lyrics-color-inactive);
-	/* Smooth easing with gentle bounce */
+	/* Ultra smooth easing curve - như nước */
 	transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-	transition-duration: calc(var(--animation-index) * var(--animation-tempo) + 0.3s);
-	transition-property: transform, color, opacity, filter;
-	/* Ensure lyrics are visible */
-	opacity: 1;
-	/* GPU acceleration for smooth performance */
+	transition-duration: calc(var(--animation-index) * var(--animation-tempo) + 0.6s);
+	transition-property: transform, color, opacity, filter, text-shadow, letter-spacing;
+	/* Fade effect for non-active lines */
+	opacity: 0.65;
+	/* Subtle blur for depth */
+	filter: blur(0.5px);
+	/* GPU acceleration */
 	will-change: transform, opacity;
+	position: relative;
+	/* Smooth text rendering */
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	letter-spacing: -0.02em;
+	/* Smooth interpolation */
+	backface-visibility: hidden;
+	perspective: 1000px;
 }
 
 .lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine {
 	filter: blur(calc(var(--blur-index) * 1.5px));
+	/* Only hint will-change when blur is actually enabled */
+	will-change: filter, transform, opacity;
 }
 
 .lyrics-lyricsContainer-UnsyncedLyricsPage .lyrics-lyricsContainer-LyricsLine a {
@@ -175,13 +212,30 @@
 }
 
 .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active {
-	color: var(--lyrics-color-active);
-	opacity: 1;
-	transform: translateY(calc(var(--position-index) * var(--lyrics-line-height) + var(--offset))) scale(1.08);
+	color: var(--lyrics-color-active) !important;
+	opacity: 1 !important;
+	transform: translateY(calc(var(--position-index) * var(--lyrics-line-height) + var(--offset))) scale(1.08) translateZ(0) !important;
 	filter: none !important;
-	/* Enhanced glow effect for active line */
-	text-shadow: 0 0 20px rgba(255, 255, 255, 0.4), 0 2px 8px rgba(0, 0, 0, 0.8);
-	transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+	letter-spacing: 0em !important;
+	/* Beautiful multi-layer glow effect */
+	text-shadow: 
+		0 0 40px rgba(255, 255, 255, 0.6),
+		0 0 80px rgba(255, 255, 255, 0.4),
+		0 0 120px rgba(255, 255, 255, 0.2),
+		0 3px 15px rgba(0, 0, 0, 0.9),
+		0 6px 25px rgba(0, 0, 0, 0.7) !important;
+	/* Silky smooth transitions - mượt như nước */
+	transition: 
+		transform 650ms cubic-bezier(0.23, 1, 0.32, 1) !important,
+		color 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94) !important,
+		text-shadow 650ms cubic-bezier(0.23, 1, 0.32, 1) !important,
+		opacity 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94) !important,
+		letter-spacing 500ms cubic-bezier(0.23, 1, 0.32, 1) !important,
+		filter 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+	/* Emphasize with z-index */
+	position: relative;
+	z-index: 2;
+	backface-visibility: hidden;
 }
 
 .lyrics-lyricsContainer-SyncedLyrics > .lyrics-lyricsContainer-LyricsLine-paddingLine {
@@ -323,6 +377,7 @@ div.lyrics-tabBar-headerItemLink {
 		var(--lyrics-color-inactive)
 	);
 	-webkit-background-clip: text;
+	background-clip: text;
 	-webkit-text-fill-color: transparent;
 	background-size: 225% 100%;
 	background-position: top left 100%;
@@ -560,6 +615,9 @@ div.lyrics-tabBar-headerItemLink {
 #lyrics-plus-config-container .col.action .main-dropDown-dropDown,
 #lyrics-plus-config-container .col.action input {
 	width: 150px;
+	height: 42px;
+	line-height: 42px;
+	padding: 0 12px;
 }
 
 #lyrics-fullscreen-container {
@@ -686,6 +744,15 @@ div.lyrics-tabBar-headerItemLink {
 	}
 }
 
+@keyframes spin {
+	0% {
+		transform: rotate(0deg);
+	}
+	100% {
+		transform: rotate(360deg);
+	}
+}
+
 .lyrics-config-button {
 	align-items: center;
 	background-color: rgba(0, 0, 0, 0.5);
@@ -767,11 +834,45 @@ div.lyrics-tabBar-headerItemLink {
 }
 
 #lyrics-plus-gradient-background {
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     width: 100%;
-    height: 100%;
+    height: 100vh;
     z-index: -1;
     transition: background-color 0.5s ease, filter 0.5s ease;
+}
+
+/* Reduce animations for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+	.lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine {
+		transition-duration: 0.1s;
+		transition-timing-function: linear;
+	}
+	
+	.lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active {
+		transform: translateY(calc(var(--position-index) * var(--lyrics-line-height) + var(--offset))) scale(1);
+		text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55), 0 0 14px rgba(0, 0, 0, 0.45);
+		transition: transform 0.1s linear, color 0.1s linear, opacity 0.1s linear;
+	}
+	
+	.lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine {
+		filter: none;
+	}
+	
+	.lyrics-lyricsContainer-Karaoke-Word {
+		transition-duration: 0s;
+	}
+	
+	.lyrics-lyricsContainer-UnsyncedLyricsPage .lyrics-lyricsContainer-LyricsLine {
+		transition: none;
+	}
+	
+	.lyrics-idling-indicator__circle {
+		transition: none;
+	}
+	
+	#lyrics-plus-gradient-background {
+		transition: none;
+	}
 }

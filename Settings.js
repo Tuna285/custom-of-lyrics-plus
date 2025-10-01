@@ -658,6 +658,12 @@ function openConfig() {
 					type: ConfigSlider,
 				},
 				{
+					desc: "Unsynced: Smart auto-scroll",
+					info: "Automatically scroll unsynced lyrics based on song progress. Pauses for 5 seconds when you manually scroll.",
+					key: "unsynced-auto-scroll",
+					type: ConfigSlider,
+				},
+				{
 					desc: "Noise overlay",
 					key: "noise",
 					type: ConfigSlider,

@@ -57,15 +57,28 @@ const emptyLine = {
 
 const useTrackPosition = (callback) => {
 	const callbackRef = useRef();
+	const rafIdRef = useRef();
 	callbackRef.current = callback;
 
 	useEffect(() => {
-		const interval = setInterval(callbackRef.current, 50);
+		let lastTime = 0;
+		const updatePosition = (currentTime) => {
+			// Throttle to ~60fps (16ms) instead of running every frame
+			if (currentTime - lastTime >= 16) {
+				callbackRef.current();
+				lastTime = currentTime;
+			}
+			rafIdRef.current = requestAnimationFrame(updatePosition);
+		};
+
+		rafIdRef.current = requestAnimationFrame(updatePosition);
 
 		return () => {
-			clearInterval(interval);
+			if (rafIdRef.current) {
+				cancelAnimationFrame(rafIdRef.current);
+			}
 		};
-	}, [callbackRef]);
+	}, []);
 };
 
 const KaraokeLine = ({ text, isActive, position, startTime }) => {
@@ -591,15 +604,154 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
 });
 
 const UnsyncedLyricsPage = react.memo(({ lyrics, provider, copyright }) => {
+	// For very long lyrics (>100 lines), use lighter rendering
+	const isLongLyrics = lyrics.length > 100;
+	const [renderRange, setRenderRange] = useState({ start: 0, end: isLongLyrics ? 50 : lyrics.length });
+	const containerRef = useRef();
+	const lyricsRefs = useRef([]);
+	const [isAutoScrolling, setIsAutoScrolling] = useState(false);
+	const autoScrollTimeoutRef = useRef();
+	const lastManualScrollTime = useRef(0);
+	const lastScrolledIndex = useRef(-1);
+	const lastAutoScrollTime = useRef(0);
+	
+	// Smart auto-scroll based on track progress
+	useTrackPosition(() => {
+		// Check if auto-scroll is enabled
+		if (!CONFIG.visual["unsynced-auto-scroll"]) return;
+		if (!containerRef.current || lyrics.length === 0) return;
+		
+		const currentTime = Spicetify.Player.getProgress();
+		const duration = Spicetify.Player.getDuration();
+		
+		if (!duration || duration === 0) return;
+		
+		// Check if user manually scrolled recently (within last 5 seconds)
+		const now = Date.now();
+		if (now - lastManualScrollTime.current < 5000) return;
+		
+		// Throttle auto-scroll updates (only every 2 seconds)
+		if (now - lastAutoScrollTime.current < 2000) return;
+		
+		// Calculate which line should be visible based on progress
+		const progress = currentTime / duration;
+		const estimatedLineIndex = Math.floor(progress * lyrics.length);
+		const targetIndex = Math.min(Math.max(0, estimatedLineIndex), lyrics.length - 1);
+		
+		// Only scroll if target changed significantly (at least 3 lines difference)
+		if (Math.abs(targetIndex - lastScrolledIndex.current) < 3) return;
+		
+		// Scroll to estimated line with ultra-smooth animation
+		const targetLine = lyricsRefs.current[targetIndex];
+		if (targetLine && !Spicetify.Player.data.is_paused) {
+			lastScrolledIndex.current = targetIndex;
+			lastAutoScrollTime.current = now;
+			setIsAutoScrolling(true);
+			
+			// Use custom smooth scroll with better easing
+			const container = containerRef.current;
+			const targetTop = targetLine.offsetTop;
+			const containerHeight = container.clientHeight;
+			const targetScrollTop = targetTop - (containerHeight / 2) + (targetLine.clientHeight / 2);
+			
+			// Smooth scroll with custom easing
+			const startScrollTop = container.scrollTop;
+			const distance = targetScrollTop - startScrollTop;
+			const duration = 800; // ms - longer for smoother feel
+			const startTime = performance.now();
+			
+			const easeInOutCubic = (t) => {
+				return t < 0.5 
+					? 4 * t * t * t 
+					: 1 - Math.pow(-2 * t + 2, 3) / 2;
+			};
+			
+			const animateScroll = (currentTime) => {
+				const elapsed = currentTime - startTime;
+				const progress = Math.min(elapsed / duration, 1);
+				const eased = easeInOutCubic(progress);
+				
+				container.scrollTop = startScrollTop + (distance * eased);
+				
+				if (progress < 1) {
+					requestAnimationFrame(animateScroll);
+				}
+			};
+			
+			requestAnimationFrame(animateScroll);
+			
+			// Reset auto-scroll flag after animation
+			clearTimeout(autoScrollTimeoutRef.current);
+			autoScrollTimeoutRef.current = setTimeout(() => {
+				setIsAutoScrolling(false);
+			}, duration + 100);
+		}
+	});
+	
+	// Detect manual scroll/wheel to pause auto-scroll temporarily
+	useEffect(() => {
+		const container = containerRef.current;
+		if (!container) return;
+		
+		const handleUserInteraction = () => {
+			if (!isAutoScrolling) {
+				lastManualScrollTime.current = Date.now();
+			}
+		};
+		
+		const handleWheel = () => {
+			// Immediately pause on wheel event (more responsive)
+			lastManualScrollTime.current = Date.now();
+		};
+		
+		container.addEventListener("scroll", handleUserInteraction, { passive: true });
+		container.addEventListener("wheel", handleWheel, { passive: true });
+		container.addEventListener("touchmove", handleUserInteraction, { passive: true });
+		
+		return () => {
+			container.removeEventListener("scroll", handleUserInteraction);
+			container.removeEventListener("wheel", handleWheel);
+			container.removeEventListener("touchmove", handleUserInteraction);
+		};
+	}, [isAutoScrolling]);
+	
+	useEffect(() => {
+		if (!isLongLyrics || !containerRef.current) return;
+		
+		const observer = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting) {
+						// Expand render range when scrolling near edges
+						setRenderRange((prev) => ({
+							start: Math.max(0, prev.start - 20),
+							end: Math.min(lyrics.length, prev.end + 20),
+						}));
+					}
+				});
+			},
+			{ rootMargin: "400px" }
+		);
+		
+		const sentinel = containerRef.current.lastElementChild;
+		if (sentinel) observer.observe(sentinel);
+		
+		return () => observer.disconnect();
+	}, [isLongLyrics, lyrics.length]);
+	
+	const visibleLyrics = isLongLyrics ? lyrics.slice(renderRange.start, renderRange.end) : lyrics;
+	
 	return react.createElement(
 		"div",
 		{
-			className: "lyrics-lyricsContainer-UnsyncedLyricsPage",
+			className: `lyrics-lyricsContainer-UnsyncedLyricsPage${isAutoScrolling ? " auto-scrolling" : ""}`,
+			ref: containerRef,
 		},
 		react.createElement("p", {
 			className: "lyrics-lyricsContainer-LyricsUnsyncedPadding",
 		}),
-		lyrics.map(({ text, originalText, text2 }, index) => {
+		visibleLyrics.map(({ text, originalText, text2 }, index) => {
+			const actualIndex = isLongLyrics ? index + renderRange.start : index;
 			const displayMode = CONFIG.visual["translate:display-mode"];
 			const showTranslatedBelow = displayMode === "below";
 			const replaceOriginal = displayMode === "replace";
@@ -626,8 +778,11 @@ const UnsyncedLyricsPage = react.memo(({ lyrics, provider, copyright }) => {
 				"div",
 				{
 					className: "lyrics-lyricsContainer-LyricsLine lyrics-lyricsContainer-LyricsLine-active",
-					key: index,
+					key: actualIndex,
 					dir: "auto",
+					ref: (el) => {
+						if (el) lyricsRefs.current[actualIndex] = el;
+					},
 				},
 				react.createElement(
 					"p",
