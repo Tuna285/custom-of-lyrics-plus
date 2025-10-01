@@ -112,6 +112,7 @@ const CONFIG = {
 		"hans-detect-threshold": localStorage.getItem("lyrics-plus:visual:hans-detect-threshold") || "40",
 		"musixmatch-translation-language": localStorage.getItem("lyrics-plus:visual:musixmatch-translation-language") || "none",
 		"fade-blur": ConfigUtils.get("lyrics-plus:visual:fade-blur"),
+		"unsynced-auto-scroll": ConfigUtils.get("lyrics-plus:visual:unsynced-auto-scroll", true),
 		"fullscreen-key": localStorage.getItem("lyrics-plus:visual:fullscreen-key") || "f12",
 			"synced-compact": ConfigUtils.get("lyrics-plus:visual:synced-compact"),
 	"dual-genius": ConfigUtils.get("lyrics-plus:visual:dual-genius"),
@@ -1232,10 +1233,12 @@ class LyricsContainer extends react.Component {
 		const currentMode = this.getCurrentMode();
 		this.lyricsSource(this.state, currentMode);
 		
-		if (hasTranslations) {
-			Spicetify.showNotification(`✓ Reset ${clearedCount} translation cache entries`, false, 2000);
+		if (clearedCount > 0) {
+			Spicetify.showNotification(`✓ Cleared ${clearedCount} translation cache entries`, false, 2000);
+		} else if (hasTranslations) {
+			Spicetify.showNotification("✓ Translation state reset", false, 2000);
 		} else {
-			Spicetify.showNotification("✓ Translation cache cleared (no translations found)", false, 2000);
+			Spicetify.showNotification("✓ Translation cache cleared (no entries found)", false, 2000);
 		}
 	}
 

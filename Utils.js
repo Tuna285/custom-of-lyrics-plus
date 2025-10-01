@@ -277,8 +277,15 @@ const Utils = {
 		}
 		return react.createElement("p1", null, reactChildren);
 	},
+	_rubyHTMLCache: new Map(),
 	rubyTextToHTML(s) {
 		if (!s || typeof s !== "string") return "";
+		
+		// Check cache first
+		if (this._rubyHTMLCache.has(s)) {
+			return this._rubyHTMLCache.get(s);
+		}
+		
 		// Allow only ruby-related tags we generate; escape others
 		let out = s
 			.replace(/</g, "&lt;")
@@ -291,6 +298,14 @@ const Utils = {
 			.replace(/&lt;\/rt&gt;/g, "</rt>")
 			.replace(/&lt;rp&gt;/g, "<rp>")
 			.replace(/&lt;\/rp&gt;/g, "</rp>");
+		
+		// Cache result (limit cache size to prevent memory bloat)
+		if (this._rubyHTMLCache.size > 500) {
+			const firstKey = this._rubyHTMLCache.keys().next().value;
+			this._rubyHTMLCache.delete(firstKey);
+		}
+		this._rubyHTMLCache.set(s, out);
+		
 		return out;
 	},
 	formatTime(timestamp) {
