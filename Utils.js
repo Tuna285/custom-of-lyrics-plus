@@ -19,7 +19,6 @@ const Utils = {
 			return this._colorCache.get(cacheKey);
 		}
 		
-		// Use bit operations for faster calculations
 		const r = Math.round(((colorInt >>> 16) & 0xff) / div);
 		const g = Math.round(((colorInt >>> 8) & 0xff) / div); 
 		const b = Math.round((colorInt & 0xff) / div);

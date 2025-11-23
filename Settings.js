@@ -705,15 +705,15 @@ function openConfig() {
 					max: thresholdSizeLimit.max,
 					step: thresholdSizeLimit.step,
 				},
-			{
-				desc: "Musixmatch Translation Language.",
-				info: "Choose the language you want to translate the lyrics to. When the language is changed, the lyrics reloads.",
-				key: "musixmatch-translation-language",
-				type: ConfigSelection,
-				options: languageOptions,
-			},
-			{
-				desc: "Clear Memory Cache",
+				{
+					desc: "Musixmatch Translation Language.",
+					info: "Choose the language you want to translate the lyrics to. When the language is changed, the lyrics reloads.",
+					key: "musixmatch-translation-language",
+					type: ConfigSelection,
+					options: languageOptions,
+				},
+				{
+					desc: "Clear Memory Cache",
 					info: "Loaded lyrics are cached in memory for faster reloading. Press this button to clear the cached lyrics from memory without restarting Spotify.",
 					key: "clear-memore-cache",
 					text: "Clear memory cache",
@@ -728,14 +728,14 @@ function openConfig() {
 					type: ConfigInput,
 					info: "Gemini API for Display Mode 1.",
 				},
-			{
-				desc: "Gemini API Key (Display Mode 2)",
-				key: "gemini-api-key-romaji",
-				type: ConfigInput,
-				info: "Gemini API for Display Mode 2 (Romaji, Romaja, Pinyin modes), leave blank if you only use 1 API.",
-			},
-		],
-		onChange: (name, value) => {
+				{
+					desc: "Gemini API Key (Display Mode 2)",
+					key: "gemini-api-key-romaji",
+					type: ConfigInput,
+					info: "Gemini API for Display Mode 2 (Romaji, Romaja, Pinyin modes), leave blank if you only use 1 API.",
+				},
+			],
+			onChange: (name, value) => {
 				CONFIG.visual[name] = value;
 				if (name === "musixmatch-translation-language") {
 					// handled below

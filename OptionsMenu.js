@@ -277,7 +277,7 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 					options: {
 						"default": "Auto (Theo phong cách)",
 						"anh_em": "Anh - Em",
-						"chi_em": "Chị - Em",
+						"em_anh": "Em - Anh",
 						"to_cau": "Tớ - Cậu",
 						"minh_ban": "Mình - Bạn",
 						"toi_ban": "Tôi - Bạn",

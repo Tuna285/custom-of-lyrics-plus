@@ -9,13 +9,10 @@ const { useState, useEffect, useCallback, useMemo, useRef } = react;
 const reactDOM = Spicetify.ReactDOM;
 const spotifyVersion = Spicetify.Platform.version;
 
-// Define a function called "render" to specify app entry point
-// This function will be used to mount app to main view.
 function render() {
 	return react.createElement(LyricsContainer, null);
 }
 
-// Optimized utility functions with better error handling and performance
 const ConfigUtils = {
 	get(name, defaultVal = true) {
 		try {
@@ -28,7 +25,6 @@ const ConfigUtils = {
 	},
 
 	getPersisted(key) {
-		// Try Spicetify LocalStorage first (more reliable)
 		try {
 			const value = Spicetify?.LocalStorage?.get(key);
 			if (typeof value === "string") return value;
@@ -36,7 +32,6 @@ const ConfigUtils = {
 			console.warn(`Failed to read from Spicetify LocalStorage '${key}':`, error);
 		}
 		
-		// Fallback to regular localStorage
 		try {
 			return localStorage.getItem(key);
 		} catch (error) {
@@ -79,6 +74,9 @@ const SYNCED = 1;
 const UNSYNCED = 2;
 const GENIUS = 3;
 
+// ============================================
+// CONFIGURATION & SETTINGS
+// ============================================
 const CONFIG = {
 	visual: {
 			"playbar-button": ConfigUtils.get("lyrics-plus:visual:playbar-button", false),
@@ -278,6 +276,9 @@ const fontSizeLimit = { min: 16, max: 256, step: 4 };
 
 const thresholdSizeLimit = { min: 0, max: 100, step: 5 };
 
+// ============================================
+// MAIN LYRICS CONTAINER COMPONENT
+// ============================================
 class LyricsContainer extends react.Component {
 	constructor() {
 		super();
