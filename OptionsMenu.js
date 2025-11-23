@@ -253,6 +253,43 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 			},
 		];
 
+		// Add Translation Style and Pronoun Mode for Gemini Vi
+		if (provider === "geminiVi") {
+			baseItems.push(
+				{
+					desc: react.createElement(SettingRowDescription, { icon: ICONS.mode, text: "Translation Style" }),
+					key: "translate:translation-style",
+					type: ConfigSelection,
+					options: {
+						"smart_adaptive": "Tự Động Thông Minh (Khuyên dùng)",
+						"poetic_standard": "Trữ tình & Lãng mạn",
+						"youth_story": "Thanh xuân & Tự sự (Anime/Indie)",
+						"street_bold": "Cá tính & Mạnh mẽ (Rap/Rock)",
+						"vintage_classic": "Cổ điển & Suy tư (Nhạc xưa)",
+						"literal_study": "Sát nghĩa (Học tập)"
+					},
+					renderInline: true,
+				},
+				{
+					desc: react.createElement(SettingRowDescription, { icon: ICONS.mode, text: "Pronoun Mode" }),
+					key: "translate:pronoun-mode",
+					type: ConfigSelection,
+					options: {
+						"default": "Auto (Theo phong cách)",
+						"anh_em": "Anh - Em",
+						"chi_em": "Chị - Em",
+						"to_cau": "Tớ - Cậu",
+						"minh_ban": "Mình - Bạn",
+						"toi_ban": "Tôi - Bạn",
+						"toi_em": "Tôi - Em",
+						"ta_nguoi": "Ta - Người",
+						"tao_may": "Tao - Mày"
+					},
+					renderInline: true,
+				}
+			);
+		}
+
 		// Show Language Override option only for Kuromoji mode
 		if (provider !== "geminiVi") {
 			baseItems.push({
@@ -377,6 +414,15 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 			}
 
 			if (name.startsWith("translation-mode")) {
+				if (window.lyricContainer) {
+					window.lyricContainer.lastProcessedUri = null;
+					window.lyricContainer.lastProcessedMode = null;
+					window.lyricContainer.forceUpdate();
+				}
+			}
+
+			// Reload lyrics when translation style or pronoun mode changes
+			if (name === "translate:translation-style" || name === "translate:pronoun-mode") {
 				if (window.lyricContainer) {
 					window.lyricContainer.lastProcessedUri = null;
 					window.lyricContainer.lastProcessedMode = null;
