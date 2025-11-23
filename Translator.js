@@ -7,30 +7,19 @@ const tinyPinyinPath = "https://cdn.jsdelivr.net/npm/tiny-pinyin/dist/tiny-pinyi
 
 const dictPath = "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict";
 
-// Cấu hình giới hạn dựa trên ảnh chụp màn hình AI Studio của bạn
-// Model: gemini-2.5-flash
+// ============================================
+// GEMINI API RATE LIMITER
+// ============================================
 const RATE_LIMITS = {
-	RPM: 10,    // Giới hạn 10 requests/phút
-	RPD: 250,   // Giới hạn 250 requests/ngày
-	RESET_TIME: 60000 // 1 phút tính bằng ms
+	RPM: 10,
+	RESET_TIME: 60000
 };
 
 class GeminiRateLimiter {
 	static getStats() {
 		const now = Date.now();
-		const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+		let stats = JSON.parse(localStorage.getItem('gemini_rate_stats') || '{"minuteWindowStart": 0, "minuteCount": 0}');
 		
-		let stats = JSON.parse(localStorage.getItem('gemini_rate_stats') || '{"date": "", "dayCount": 0, "minuteWindowStart": 0, "minuteCount": 0}');
-		
-		// Reset bộ đếm ngày nếu sang ngày mới
-		if (stats.date !== today) {
-			stats.date = today;
-			stats.dayCount = 0;
-			stats.minuteCount = 0;
-			stats.minuteWindowStart = now;
-		}
-		
-		// Reset bộ đếm phút (Cửa sổ trượt đơn giản)
 		if (now - stats.minuteWindowStart > RATE_LIMITS.RESET_TIME) {
 			stats.minuteWindowStart = now;
 			stats.minuteCount = 0;
@@ -39,38 +28,30 @@ class GeminiRateLimiter {
 		return stats;
 	}
 
-	static increment() {
+	static incrementAndCheck() {
 		const stats = this.getStats();
-		stats.minuteCount++;
-		stats.dayCount++;
-		localStorage.setItem('gemini_rate_stats', JSON.stringify(stats));
-		return stats;
-	}
-
-	static checkAndThrow() {
-		const stats = this.getStats();
-		
-		// Log để debug (F12)
-		console.log(`[Gemini Limit] RPM: ${stats.minuteCount}/${RATE_LIMITS.RPM} | RPD: ${stats.dayCount}/${RATE_LIMITS.RPD}`);
 		
 		if (stats.minuteCount >= RATE_LIMITS.RPM) {
-			const waitTime = Math.ceil((60000 - (Date.now() - stats.minuteWindowStart)) / 1000);
+			const waitTime = Math.ceil((RATE_LIMITS.RESET_TIME - (Date.now() - stats.minuteWindowStart)) / 1000);
 			throw new Error(`Quá tốc độ (RPM). Vui lòng đợi ${waitTime}s. (${stats.minuteCount}/${RATE_LIMITS.RPM})`);
 		}
 		
-		if (stats.dayCount >= RATE_LIMITS.RPD) {
-			throw new Error(`Hết lượt dùng trong ngày (RPD). Mai quay lại nhé! (${stats.dayCount}/${RATE_LIMITS.RPD})`);
-		}
+		stats.minuteCount++;
+		localStorage.setItem('gemini_rate_stats', JSON.stringify(stats));
+		
+		console.log(`[Gemini RPM] ${stats.minuteCount}/${RATE_LIMITS.RPM}`);
+		return stats;
 	}
 	
-	// Hàm này để hiển thị lên UI Spicetify nếu cần
 	static getDisplayString() {
 		const stats = this.getStats();
-		return `RPM: ${stats.minuteCount}/${RATE_LIMITS.RPM} • RPD: ${stats.dayCount}/${RATE_LIMITS.RPD}`;
+		return `RPM: ${stats.minuteCount}/${RATE_LIMITS.RPM}`;
 	}
 }
 
-// Translation Style Instructions (Detailed prompts for each style)
+// ============================================
+// TRANSLATION STYLE PROMPTS
+// ============================================
 const STYLE_INSTRUCTIONS = {
 	"smart_adaptive": `**VAI TRÒ:** Bạn là một AI âm nhạc tinh tế. Nhiệm vụ của bạn là **TỰ ĐỘNG PHÂN TÍCH** lời bài hát để chọn giọng văn "chuẩn gu" nhất.
 
@@ -166,7 +147,7 @@ const STYLE_INSTRUCTIONS = {
 4. **Mục đích:** Giúp người dùng hiểu chính xác ca sĩ đang nói gì, từng từ một.`
 };
 
-// Translation Style Metadata (for UI display)
+// UI metadata for translation styles dropdown
 const TRANSLATION_STYLES = {
 	"smart_adaptive": {
 		name: "Tự Động Thông Minh (Khuyên dùng)",
@@ -194,7 +175,7 @@ const TRANSLATION_STYLES = {
 	}
 };
 
-// Pronoun Modes (for Mix & Match with styles)
+// Pronoun override options (Mix & Match with styles)
 const PRONOUN_MODES = {
 	"default": {
 		value: null,
@@ -206,10 +187,10 @@ const PRONOUN_MODES = {
 		name: "Anh - Em",
 		description: "Trữ tình, tình yêu đôi lứa (phổ biến nhất)"
 	},
-	"chi_em": {
-		value: "Chị - Em",
-		name: "Chị - Em",
-		description: "Góc nhìn nữ giới, hoặc quan hệ chị-em"
+	"em_anh": {
+		value: "Em - Anh",
+		name: "Em - Anh",
+		description: "Góc nhìn nữ giới, trẻ trung, tình cảm"
 	},
 	"to_cau": {
 		value: "Tớ - Cậu",
@@ -243,6 +224,9 @@ const PRONOUN_MODES = {
 	}
 };
 
+// ============================================
+// TRANSLATOR CLASS - MAIN LOGIC
+// ============================================
 class Translator {
 	constructor(lang, isUsingNetease = false) {
 		this.finished = {
@@ -254,7 +238,6 @@ class Translator {
 		this.initializationPromise = null;
 
 		this.applyKuromojiFix();
-		// Start initialization asynchronously but don't await in constructor
 		this.initializationPromise = this.initializeAsync(lang);
 	}
 
@@ -272,6 +255,10 @@ class Translator {
 			throw error;
 		}
 	}
+
+	// ============================================
+	// GEMINI API METHODS
+	// ============================================
 
 	static buildGeminiPrompt({ artist, title, text, styleKey = 'smart_adaptive', pronounKey = 'default', wantSmartPhonetic = false }) {
 		const lineCount = text.split('\n').length;
@@ -312,11 +299,9 @@ Return JSON with "phonetic" (transcribed lyrics) and "detected_language" (ja|ko|
 ${text}
 ----`;
 		}
-		// Default to Vietnamese translation
 		const styleInstruction = STYLE_INSTRUCTIONS[styleKey] || STYLE_INSTRUCTIONS['smart_adaptive'];
 		const styleName = TRANSLATION_STYLES[styleKey]?.name || "Tự Động Thông Minh (Khuyên dùng)";
 		
-		// Pronoun Override Logic
 		let pronounInstruction = "";
 		if (pronounKey && pronounKey !== 'default' && PRONOUN_MODES[pronounKey]?.value) {
 			pronounInstruction = `
@@ -373,18 +358,12 @@ ${text}`
 			}
 		}
 		
-		// With JSON mode enabled, response should be clean JSON
 		let raw = String(text || "").trim();
-
-		// First attempt: direct JSON parse (should work with responseMimeType: "application/json")
 		let parsed = safeParse(raw);
 		
 		if (!parsed) {
-			// Fallback: clean up potential markdown artifacts (though should be rare with JSON mode)
 			raw = raw.replace(/```[a-z]*\n?/gim, "").replace(/```/g, "");
 			raw = raw.replace(/^\s*json\s*$/gim, "");
-			
-			// Second attempt: direct parse after cleanup
 			parsed = safeParse(raw);
 		}
 		
@@ -406,7 +385,6 @@ ${text}`
 			};
 		}
 		
-		// Final fallback: treat entire text as Vietnamese
 		console.warn("Could not parse Gemini JSON response, using fallback");
 		const fallback = raw.replace(/\\n/g, "\n");
 		return { vi: fallback };
@@ -434,7 +412,6 @@ ${text}`;
 		const startTime = Date.now();
 		const lineCount = text.split('\n').length;
 		
-		// Log request info
 		console.group(`[Gemini] ${wantSmartPhonetic ? 'Phonetic Transcription' : 'Translation'} Request`);
 		console.log(`Song: ${artist} - ${title}`);
 		console.log(`Lines: ${lineCount}`);
@@ -444,21 +421,17 @@ ${text}`;
 		}
 		console.log(`Retry: ${_isRetry ? 'Yes (Safety Fallback)' : 'No'}`);
 		
-		// 1. KIỂM TRA LIMIT TRƯỚC KHI GỌI
-		GeminiRateLimiter.checkAndThrow();
+		GeminiRateLimiter.incrementAndCheck();
 		
-		// Enhanced validation
 		if (!apiKey?.trim()) throw new Error("Missing or invalid Gemini API key");
 		if (!text?.trim()) throw new Error("No text provided for translation");
 
 		const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
 		
-		// Use minimal fallback prompt if this is a retry after safety block
 		const prompt = _isRetry 
 			? Translator.buildMinimalFallbackPrompt({ artist, title, text })
 			: Translator.buildGeminiPrompt({ artist, title, text, styleKey, pronounKey, wantSmartPhonetic });
 
-		// Define response schema for JSON mode
 		const responseSchema = wantSmartPhonetic ? {
 			type: "object",
 			properties: {
@@ -515,9 +488,8 @@ ${text}`;
 		};
 
 		try {
-			// Add timeout support
 			const controller = new AbortController();
-			const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+			const timeoutId = setTimeout(() => controller.abort(), 30000);
 
 			const res = await fetch(endpoint, {
 				method: "POST",
@@ -531,7 +503,6 @@ ${text}`;
 
 			clearTimeout(timeoutId);
 
-			// Enhanced error handling
 			if (!res.ok) {
 				const errorText = await res.text().catch(() => 'Unknown error');
 				switch (res.status) {
@@ -551,35 +522,27 @@ ${text}`;
 			}
 
 			const data = await res.json();
-
-			// Validate response structure
+			
 			if (!data?.candidates?.length) {
 				console.error("Gemini API response:", JSON.stringify(data, null, 2));
 				throw new Error("No translation candidates returned from API");
 			}
 
-			// 2. NẾU GỌI THÀNH CÔNG, TĂNG BỘ ĐẾM
-			GeminiRateLimiter.increment();
-
 			const candidate = data.candidates[0];
 			const responseTime = Date.now() - startTime;
 
-			// Log response time
 			console.log(`Response Time: ${responseTime}ms`);
 
-			// Check for safety filter blocks
 			if (candidate?.finishReason === "SAFETY" || candidate?.finishReason === "BLOCKED_REASON_UNSPECIFIED") {
 				const safetyRatings = candidate?.safetyRatings?.map(r => `${r.category}: ${r.probability}`).join(", ") || "Unknown";
 				console.error("Safety filter block:", safetyRatings);
 				console.groupEnd();
 				
-				// Create a special error type to signal that we need fallback
 				const error = new Error(`SAFETY_BLOCKED:${safetyRatings}`);
 				error.isSafetyBlock = true;
 				throw error;
 			}
 
-			// Check for other non-STOP finish reasons
 			if (candidate?.finishReason && candidate.finishReason !== "STOP" && candidate.finishReason !== "MAX_TOKENS") {
 				console.error("Unexpected finish reason:", candidate.finishReason);
 				console.groupEnd();
@@ -592,29 +555,25 @@ ${text}`;
 				console.error("Full API response:", JSON.stringify(data, null, 2));
 				console.groupEnd();
 
-				// Try to get more info
 				const promptFeedback = data?.promptFeedback;
 				if (promptFeedback?.blockReason) {
 					throw new Error(`Prompt bị chặn: ${promptFeedback.blockReason}. Có thể lời bài hát chứa nội dung nhạy cảm.`);
 				}
 
-				throw new Error("API trả về response trống. Hãy kiểm tra Console (F12) để xem log chi tiết, hoặc thử bài hát khác.");
+				throw new Error("API trả về response trống. Hãy kiểm tra Console (Ctrl+Shift+I) để xem log chi tiết, hoặc thử bài hát khác.");
 			}
 
-			// Log full raw response
 			console.log(`Gemini Raw Response (${raw.length} chars):`);
 			console.log(raw);
 
 			const result = Translator.extractGeminiJson(raw);
 			
-			// Verify line count
 			const translatedLines = wantSmartPhonetic 
 				? (result.phonetic ? result.phonetic.split('\n').length : 0)
 				: (Array.isArray(result.vi) ? result.vi.length : 0);
 			
 			const lineIntegrity = translatedLines === lineCount;
 			
-			// Log line integrity check
 			console.log(`Lines: ${translatedLines}/${lineCount} ${lineIntegrity ? 'OK' : 'MISMATCH!'}`);
 			console.log(`Success: ${wantSmartPhonetic ? 'Phonetic transcription' : 'Translation'} completed`);
 			console.groupEnd();
@@ -629,7 +588,6 @@ ${text}`;
 				throw new Error("Translation request timed out. Please try again.");
 			}
 			
-			// Fallback mechanism: If safety blocked and not already retrying, try minimal prompt
 			if (error.isSafetyBlock && !_isRetry) {
 				console.warn("Safety block detected. Retrying with minimal/neutral prompt...");
 				console.groupEnd();
@@ -645,11 +603,9 @@ ${text}`;
 				});
 			}
 			
-			// Log error details
 			console.error(`Error after ${responseTime}ms:`, error.message);
 			console.groupEnd();
 			
-			// Re-throw with more context
 			const errorMsg = error.message?.replace('SAFETY_BLOCKED:', 'Nội dung bị chặn bởi bộ lọc an toàn: ');
 			throw new Error(`Gemini translation failed: ${errorMsg}`);
 		}
@@ -659,7 +615,6 @@ ${text}`;
 		return new Promise((resolve, reject) => {
 			const existingScript = document.querySelector(`script[src="${url}"]`);
 			if (existingScript) {
-				// If script already exists, resolve immediately; readiness is ensured by waitForGlobals when needed
 				if (existingScript.dataset) existingScript.dataset.loaded = existingScript.dataset.loaded || 'true';
 				return resolve();
 			}
@@ -695,9 +650,7 @@ ${text}`;
 					await this.includeExternal(aromanize);
 					break;
 				case "zh":
-					// OpenCC is required
 					await this.includeExternal(openCCPath);
-					// Prefer pinyin-pro (tones). Preload non-blockingly; tiny-pinyin as backup.
 					this.includeExternal(pinyinProPath).catch(() => { });
 					this.includeExternal(tinyPinyinPath).catch(() => { });
 					break;
@@ -710,11 +663,9 @@ ${text}`;
 
 	async awaitFinished(language) {
 		const langCode = language?.slice(0, 2);
-		// Wait for any in-flight initial initialization
 		if (this.initializationPromise) {
 			await this.initializationPromise;
 		}
-		// If the requested language is not yet initialized, initialize it now
 		if (langCode && !this.finished[langCode]) {
 			await this.injectExternals(language);
 			await this.createTranslator(language);
@@ -744,7 +695,6 @@ ${text}`;
 			case "ja":
 				if (this.kuroshiro) return;
 
-				// Wait for libraries to be available with timeout
 				await this.waitForGlobals(['Kuroshiro', 'KuromojiAnalyzer'], 10000);
 
 				this.kuroshiro = new Kuroshiro.default();
@@ -805,14 +755,15 @@ ${text}`;
 	static normalizeRomajiString(s) {
 		if (typeof s !== "string") return "";
 		return s
-			// Keep macrons (ō, ū, ā, ī, ē) for beautiful and standard Hepburn Romaji
-			// Normalize multiple spaces
 			.replace(/\s{2,}/g, " ")
 			.trim();
 	}
 
+	// ============================================
+	// CJK LANGUAGE CONVERSION METHODS
+	// ============================================
+
 	async romajifyText(text, target = "romaji", mode = "spaced") {
-		// Ensure initialization is complete
 		await this.awaitFinished("ja");
 
 		const out = await this.kuroshiro.convert(text, {
@@ -824,7 +775,6 @@ ${text}`;
 	}
 
 	async convertToRomaja(text, target) {
-		// Ensure initialization is complete
 		await this.awaitFinished("ko");
 
 		if (target === "hangul") return text;
@@ -835,7 +785,6 @@ ${text}`;
 	}
 
 	async convertChinese(text, from, target) {
-		// Ensure initialization is complete
 		await this.awaitFinished("zh");
 
 		const converter = this.OpenCC.Converter({
@@ -885,21 +834,17 @@ ${text}`;
 
 	async convertToPinyin(text, options = {}) {
 		try {
-			// Try tiny-pinyin first (highest availability, no tones)
 			if (await this.loadTinyPinyin()) {
 				return TinyPinyin.convertToPinyin(text || "");
 			}
-			// Then try pinyin-pro (tones)
 			if (await this.loadPinyinPro()) {
-				const toneType = options.toneType || "mark"; // mark | num | none
-				const type = options.type || "string"; // string | array
-				const nonZh = options.nonZh || "consecutive"; // keep non-Chinese intact
+				const toneType = options.toneType || "mark";
+				const type = options.type || "string";
+				const nonZh = options.nonZh || "consecutive";
 				return pinyinPro.pinyin(text || "", { toneType, type, nonZh });
 			}
-			// As a last resort, return original text
 			return text || "";
 		} catch {
-			// Graceful fallback: never break conversion pipeline
 			return text || "";
 		}
 	}

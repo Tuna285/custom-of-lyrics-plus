@@ -21,9 +21,9 @@ const CreditFooter = react.memo(({ provider, copyright }) => {
 });
 
 // Optimized IdlingIndicator with memoization and performance improvements
-const IdlingIndicator = react.memo(react.forwardRef(({ 
-	isActive = false, 
-	progress = 0, 
+const IdlingIndicator = react.memo(react.forwardRef(({
+	isActive = false,
+	progress = 0,
 	delay = 0,
 	positionIndex = 0,
 	animationIndex = 1,
@@ -651,7 +651,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
 	);
 });
 
-const UnsyncedLyricsPage = react.memo(({ lyrics, provider, copyright }) => {
+const UnsyncedLyricsPage = react.memo(({ lyrics, provider, copyright, trackUri }) => {
 	// For very long lyrics (>100 lines), use lighter rendering
 	const isLongLyrics = lyrics.length > 100;
 	const [renderRange, setRenderRange] = useState({ start: 0, end: isLongLyrics ? 50 : lyrics.length });
@@ -664,6 +664,13 @@ const UnsyncedLyricsPage = react.memo(({ lyrics, provider, copyright }) => {
 	const lastAutoScrollTime = useRef(0);
 
 	// Smart auto-scroll based on track progress
+	const [anchors, setAnchors] = useState({});
+
+	// Reset anchors when track changes
+	useEffect(() => {
+		setAnchors({});
+	}, [trackUri]);
+
 	useTrackPosition(() => {
 		// Check if auto-scroll is enabled
 		if (!CONFIG.visual["unsynced-auto-scroll"]) return;
@@ -681,10 +688,47 @@ const UnsyncedLyricsPage = react.memo(({ lyrics, provider, copyright }) => {
 		// Throttle auto-scroll updates (only every 2 seconds)
 		if (now - lastAutoScrollTime.current < 2000) return;
 
-		// Calculate which line should be visible based on progress
-		const progress = currentTime / duration;
-		const estimatedLineIndex = Math.floor(progress * lyrics.length);
-		const targetIndex = Math.min(Math.max(0, estimatedLineIndex), lyrics.length - 1);
+		// --- Smart Scroll Algorithm ---
+		let targetIndex = 0;
+		const sortedAnchors = [
+			{ index: 0, time: 0 },
+			...Object.entries(anchors).map(([i, t]) => ({ index: Number(i), time: t })).sort((a, b) => a.time - b.time),
+			{ index: lyrics.length - 1, time: duration }
+		];
+
+		// Find the segment we are currently in
+		let prevAnchor = sortedAnchors[0];
+		let nextAnchor = sortedAnchors[sortedAnchors.length - 1];
+
+		for (let i = 0; i < sortedAnchors.length - 1; i++) {
+			if (currentTime >= sortedAnchors[i].time && currentTime < sortedAnchors[i + 1].time) {
+				prevAnchor = sortedAnchors[i];
+				nextAnchor = sortedAnchors[i + 1];
+				break;
+			}
+		}
+
+		// Interpolate
+		const timeRange = nextAnchor.time - prevAnchor.time;
+		const indexRange = nextAnchor.index - prevAnchor.index;
+
+		if (timeRange > 0) {
+			const progressInSegment = (currentTime - prevAnchor.time) / timeRange;
+			// Apply a slight curve to default distribution (slower at start/end of song if no anchors)
+			let adjustedProgress = progressInSegment;
+			if (Object.keys(anchors).length === 0) {
+				// Simple S-curve for better natural feel
+				adjustedProgress = progressInSegment < 0.5
+					? 2 * progressInSegment * progressInSegment
+					: 1 - Math.pow(-2 * progressInSegment + 2, 2) / 2;
+			}
+			targetIndex = prevAnchor.index + (indexRange * adjustedProgress);
+		} else {
+			targetIndex = prevAnchor.index;
+		}
+
+		targetIndex = Math.min(Math.max(0, Math.floor(targetIndex)), lyrics.length - 1);
+		// -----------------------------
 
 		// Only scroll if target changed significantly (at least 3 lines difference)
 		if (Math.abs(targetIndex - lastScrolledIndex.current) < 3) return;
@@ -821,15 +865,24 @@ const UnsyncedLyricsPage = react.memo(({ lyrics, provider, copyright }) => {
 			// Show sub-lines in "below" mode or when we have Mode 2 translation in either mode
 			const belowMode = showTranslatedBelow && originalText && belowOrigin !== belowTxt;
 			const showMode2 = !!text2 && (showTranslatedBelow || replaceOriginal);
+			const isAnchor = anchors[actualIndex] !== undefined;
 
 			return react.createElement(
 				"div",
 				{
-					className: "lyrics-lyricsContainer-LyricsLine lyrics-lyricsContainer-LyricsLine-active",
+					className: `lyrics-lyricsContainer-LyricsLine lyrics-lyricsContainer-LyricsLine-active${isAnchor ? " lyrics-anchor" : ""}`,
 					key: actualIndex,
 					dir: "auto",
 					ref: (el) => {
 						if (el) lyricsRefs.current[actualIndex] = el;
+					},
+					onClick: (event) => {
+						// Prevent context menu from triggering
+						if (event.button === 2) return;
+
+						const currentPos = Spicetify.Player.getProgress();
+						setAnchors(prev => ({ ...prev, [actualIndex]: currentPos }));
+						Spicetify.showNotification("Line synced to current time");
 					},
 				},
 				react.createElement(
