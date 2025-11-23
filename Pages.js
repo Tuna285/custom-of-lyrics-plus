@@ -1,7 +1,7 @@
 // Optimized CreditFooter with better memoization
 const CreditFooter = react.memo(({ provider, copyright }) => {
 	if (provider === "local" || !provider) return null;
-	
+
 	const credit = useMemo(() => {
 		const credits = [Spicetify.Locale.get("web-player.lyrics.providedBy", provider)];
 		if (copyright) {
@@ -21,17 +21,26 @@ const CreditFooter = react.memo(({ provider, copyright }) => {
 });
 
 // Optimized IdlingIndicator with memoization and performance improvements
-const IdlingIndicator = react.memo(({ isActive = false, progress = 0, delay = 0 }) => {
-	const className = useMemo(() => 
-		`lyrics-idling-indicator ${!isActive ? "lyrics-idling-indicator-hidden" : ""} lyrics-lyricsContainer-LyricsLine lyrics-lyricsContainer-LyricsLine-active`,
+const IdlingIndicator = react.memo(react.forwardRef(({ 
+	isActive = false, 
+	progress = 0, 
+	delay = 0,
+	positionIndex = 0,
+	animationIndex = 1,
+	blurIndex = 0
+}, ref) => {
+	// Always show indicator, just change active state
+	const className = useMemo(() =>
+		`lyrics-idling-indicator lyrics-lyricsContainer-LyricsLine ${isActive ? "lyrics-lyricsContainer-LyricsLine-active" : ""}`,
 		[isActive]
 	);
 
 	const style = useMemo(() => ({
-		"--position-index": 0,
-		"--animation-index": 1,
+		"--position-index": positionIndex,
+		"--animation-index": animationIndex,
+		"--blur-index": blurIndex,
 		"--indicator-delay": `${delay}ms`,
-	}), [delay]);
+	}), [delay, positionIndex, animationIndex, blurIndex]);
 
 	// Memoize circle states to avoid unnecessary re-renders
 	const circleStates = useMemo(() => [
@@ -42,12 +51,12 @@ const IdlingIndicator = react.memo(({ isActive = false, progress = 0, delay = 0 
 
 	return react.createElement(
 		"div",
-		{ className, style },
+		{ className, style, ref },
 		react.createElement("div", { className: `lyrics-idling-indicator__circle ${circleStates[0]}` }),
 		react.createElement("div", { className: `lyrics-idling-indicator__circle ${circleStates[1]}` }),
 		react.createElement("div", { className: `lyrics-idling-indicator__circle ${circleStates[2]}` })
 	);
-});
+}));
 
 const emptyLine = {
 	startTime: 0,
@@ -102,6 +111,13 @@ const KaraokeLine = ({ text, isActive, position, startTime }) => {
 			word
 		);
 	});
+};
+
+// Helper: note/placeholder-only line (e.g., ♪, …)
+const isNoteLine = (text) => {
+	const t = String(text || "").trim();
+	if (!t) return false; // Empty lines are NOT note lines
+	return /^[\s♪♩♫♬·•・。.、…~\-]+$/.test(t);
 };
 
 const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara }) => {
@@ -167,15 +183,6 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
 				key: lyricsId,
 			},
 			activeLines.map(({ text, lineNumber, startTime, originalText, text2 }, i) => {
-				if (i === 1 && activeLineIndex === 1) {
-					const nextLine = activeLines[2];
-					const nextStartTime = nextLine?.startTime || 1;
-					return react.createElement(IdlingIndicator, {
-						progress: position / nextStartTime,
-						delay: nextStartTime / 3,
-					});
-				}
-
 				let className = "lyrics-lyricsContainer-LyricsLine";
 				const activeElementIndex = Math.min(activeLineIndex, CONFIG.visual["lines-before"] + 1);
 				let ref;
@@ -200,7 +207,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
 				const displayMode = CONFIG.visual["translate:display-mode"];
 				const showTranslatedBelow = displayMode === "below";
 				const replaceOriginal = displayMode === "replace";
-				
+
 				let mainText = text;
 				let subText = null;
 				let subText2 = null;
@@ -218,6 +225,33 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
 
 				if (isActive) {
 					ref = activeLineEle;
+				}
+
+				// Check if this is a note line
+				if (isNoteLine(mainText)) {
+					// Find next line's start time to calculate progress
+					let nextStartTime = startTime + 5000; // Default fallback
+
+					// Find the next line index in the full array
+					const currentFullIndex = lineNumber;
+					if (currentFullIndex < lyricWithEmptyLines.length - 1) {
+						nextStartTime = lyricWithEmptyLines[currentFullIndex + 1].startTime;
+					}
+
+					const duration = nextStartTime - startTime;
+					const elapsed = position - startTime;
+					const progress = Math.min(Math.max(elapsed / duration, 0), 1);
+
+					return react.createElement(IdlingIndicator, {
+						isActive: isActive,
+						progress: progress,
+						delay: duration / 3,
+						positionIndex: animationIndex,
+						animationIndex: (animationIndex < 0 ? 0 : animationIndex) + 1,
+						blurIndex: Math.abs(animationIndex),
+						key: lineNumber,
+						ref: ref
+					});
 				}
 
 				return react.createElement(
@@ -287,7 +321,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
 	);
 });
 
-class SearchBar extends react.Component {
+const SearchBar = class SearchBar extends react.Component {
 	constructor() {
 		super();
 		this.state = {
@@ -432,7 +466,7 @@ class SearchBar extends react.Component {
 			})
 		);
 	}
-}
+};
 
 function isInViewport(element) {
 	const rect = element.getBoundingClientRect();
@@ -494,21 +528,11 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
 			className: "lyrics-lyricsContainer-LyricsUnsyncedPadding",
 		}),
 		padded.map(({ text, startTime, originalText, text2 }, i) => {
-			if (i === 0) {
-				const nextLine = padded[1];
-				const nextStartTime = nextLine?.startTime || 1;
-				return react.createElement(IdlingIndicator, {
-					isActive: activeLineIndex === 0,
-					progress: position / nextStartTime,
-					delay: nextStartTime / 3,
-				});
-			}
-
 			const isActive = i === activeLineIndex;
 			const displayMode = CONFIG.visual["translate:display-mode"];
 			const showTranslatedBelow = displayMode === "below";
 			const replaceOriginal = displayMode === "replace";
-			
+
 			let mainText = text;
 			let subText = null;
 			let subText2 = null;
@@ -539,6 +563,30 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
 			const paddingLine = (animationIndex < 0 && -animationIndex > CONFIG.visual["lines-before"]) || animationIndex > CONFIG.visual["lines-after"];
 			if (paddingLine) {
 				className += " lyrics-lyricsContainer-LyricsLine-paddingLine";
+			}
+
+			// Check if this is a note line
+			if (isNoteLine(mainText)) {
+				// Find next line's start time
+				let nextStartTime = startTime + 5000; // Default fallback
+				if (i < padded.length - 1) {
+					nextStartTime = padded[i + 1].startTime;
+				}
+
+				const duration = nextStartTime - startTime;
+				const elapsed = position - startTime;
+				const progress = Math.min(Math.max(elapsed / duration, 0), 1);
+
+				return react.createElement(IdlingIndicator, {
+					isActive: isActive,
+					progress: progress,
+					delay: duration / 3,
+					positionIndex: animationIndex,
+					animationIndex: (animationIndex < 0 ? 0 : animationIndex) + 1,
+					blurIndex: Math.abs(animationIndex),
+					key: i,
+					ref: ref
+				});
 			}
 
 			return react.createElement(
@@ -614,72 +662,72 @@ const UnsyncedLyricsPage = react.memo(({ lyrics, provider, copyright }) => {
 	const lastManualScrollTime = useRef(0);
 	const lastScrolledIndex = useRef(-1);
 	const lastAutoScrollTime = useRef(0);
-	
+
 	// Smart auto-scroll based on track progress
 	useTrackPosition(() => {
 		// Check if auto-scroll is enabled
 		if (!CONFIG.visual["unsynced-auto-scroll"]) return;
 		if (!containerRef.current || lyrics.length === 0) return;
-		
+
 		const currentTime = Spicetify.Player.getProgress();
 		const duration = Spicetify.Player.getDuration();
-		
+
 		if (!duration || duration === 0) return;
-		
+
 		// Check if user manually scrolled recently (within last 5 seconds)
 		const now = Date.now();
 		if (now - lastManualScrollTime.current < 5000) return;
-		
+
 		// Throttle auto-scroll updates (only every 2 seconds)
 		if (now - lastAutoScrollTime.current < 2000) return;
-		
+
 		// Calculate which line should be visible based on progress
 		const progress = currentTime / duration;
 		const estimatedLineIndex = Math.floor(progress * lyrics.length);
 		const targetIndex = Math.min(Math.max(0, estimatedLineIndex), lyrics.length - 1);
-		
+
 		// Only scroll if target changed significantly (at least 3 lines difference)
 		if (Math.abs(targetIndex - lastScrolledIndex.current) < 3) return;
-		
+
 		// Scroll to estimated line with ultra-smooth animation
 		const targetLine = lyricsRefs.current[targetIndex];
 		if (targetLine && !Spicetify.Player.data.is_paused) {
 			lastScrolledIndex.current = targetIndex;
 			lastAutoScrollTime.current = now;
 			setIsAutoScrolling(true);
-			
+
 			// Use custom smooth scroll with better easing
 			const container = containerRef.current;
 			const targetTop = targetLine.offsetTop;
 			const containerHeight = container.clientHeight;
 			const targetScrollTop = targetTop - (containerHeight / 2) + (targetLine.clientHeight / 2);
-			
+
 			// Smooth scroll with custom easing
 			const startScrollTop = container.scrollTop;
 			const distance = targetScrollTop - startScrollTop;
 			const duration = 800; // ms - longer for smoother feel
 			const startTime = performance.now();
-			
+
 			const easeInOutCubic = (t) => {
-				return t < 0.5 
-					? 4 * t * t * t 
+				return t < 0.5
+					? 4 * t * t * t
 					: 1 - Math.pow(-2 * t + 2, 3) / 2;
 			};
-			
+
 			const animateScroll = (currentTime) => {
 				const elapsed = currentTime - startTime;
 				const progress = Math.min(elapsed / duration, 1);
 				const eased = easeInOutCubic(progress);
-				
+
 				container.scrollTop = startScrollTop + (distance * eased);
-				
+
 				if (progress < 1) {
 					requestAnimationFrame(animateScroll);
 				}
 			};
-			
+
 			requestAnimationFrame(animateScroll);
-			
+
 			// Reset auto-scroll flag after animation
 			clearTimeout(autoScrollTimeoutRef.current);
 			autoScrollTimeoutRef.current = setTimeout(() => {
@@ -687,37 +735,37 @@ const UnsyncedLyricsPage = react.memo(({ lyrics, provider, copyright }) => {
 			}, duration + 100);
 		}
 	});
-	
+
 	// Detect manual scroll/wheel to pause auto-scroll temporarily
 	useEffect(() => {
 		const container = containerRef.current;
 		if (!container) return;
-		
+
 		const handleUserInteraction = () => {
 			if (!isAutoScrolling) {
 				lastManualScrollTime.current = Date.now();
 			}
 		};
-		
+
 		const handleWheel = () => {
 			// Immediately pause on wheel event (more responsive)
 			lastManualScrollTime.current = Date.now();
 		};
-		
+
 		container.addEventListener("scroll", handleUserInteraction, { passive: true });
 		container.addEventListener("wheel", handleWheel, { passive: true });
 		container.addEventListener("touchmove", handleUserInteraction, { passive: true });
-		
+
 		return () => {
 			container.removeEventListener("scroll", handleUserInteraction);
 			container.removeEventListener("wheel", handleWheel);
 			container.removeEventListener("touchmove", handleUserInteraction);
 		};
 	}, [isAutoScrolling]);
-	
+
 	useEffect(() => {
 		if (!isLongLyrics || !containerRef.current) return;
-		
+
 		const observer = new IntersectionObserver(
 			(entries) => {
 				entries.forEach((entry) => {
@@ -732,15 +780,15 @@ const UnsyncedLyricsPage = react.memo(({ lyrics, provider, copyright }) => {
 			},
 			{ rootMargin: "400px" }
 		);
-		
+
 		const sentinel = containerRef.current.lastElementChild;
 		if (sentinel) observer.observe(sentinel);
-		
+
 		return () => observer.disconnect();
 	}, [isLongLyrics, lyrics.length]);
-	
+
 	const visibleLyrics = isLongLyrics ? lyrics.slice(renderRange.start, renderRange.end) : lyrics;
-	
+
 	return react.createElement(
 		"div",
 		{
@@ -755,7 +803,7 @@ const UnsyncedLyricsPage = react.memo(({ lyrics, provider, copyright }) => {
 			const displayMode = CONFIG.visual["translate:display-mode"];
 			const showTranslatedBelow = displayMode === "below";
 			const replaceOriginal = displayMode === "replace";
-			
+
 			// Determine what to show as main text
 			let lineText;
 			if (showTranslatedBelow && originalText) {
@@ -801,39 +849,39 @@ const UnsyncedLyricsPage = react.memo(({ lyrics, provider, copyright }) => {
 					typeof lineText === "string" ? null : lineText
 				),
 				belowMode &&
-					react.createElement(
-						"p",
-						{
-							style: { opacity: 0.5 },
-							onContextMenu: (event) => {
-								event.preventDefault();
-								Spicetify.Platform.ClipboardAPI.copy(Utils.convertParsedToUnsynced(lyrics, belowMode).conver)
-									.then(() => Spicetify.showNotification("✓ Translation copied to clipboard", false, 2000))
-									.catch(() => Spicetify.showNotification("Failed to copy translation to clipboard", true, 2000));
-							},
-							...(typeof text === "string"
-								? { dangerouslySetInnerHTML: { __html: Utils.rubyTextToHTML(text) } }
-								: {}),
+				react.createElement(
+					"p",
+					{
+						style: { opacity: 0.5 },
+						onContextMenu: (event) => {
+							event.preventDefault();
+							Spicetify.Platform.ClipboardAPI.copy(Utils.convertParsedToUnsynced(lyrics, belowMode).conver)
+								.then(() => Spicetify.showNotification("✓ Translation copied to clipboard", false, 2000))
+								.catch(() => Spicetify.showNotification("Failed to copy translation to clipboard", true, 2000));
 						},
-						typeof text === "string" ? null : text
-					),
+						...(typeof text === "string"
+							? { dangerouslySetInnerHTML: { __html: Utils.rubyTextToHTML(text) } }
+							: {}),
+					},
+					typeof text === "string" ? null : text
+				),
 				showMode2 &&
-					react.createElement(
-						"p",
-						{
-							style: { opacity: 0.5 },
-							onContextMenu: (event) => {
-								event.preventDefault();
-								Spicetify.Platform.ClipboardAPI.copy(text2)
-									.then(() => Spicetify.showNotification("✓ Second translation copied to clipboard", false, 2000))
-									.catch(() => Spicetify.showNotification("Failed to copy second translation to clipboard", true, 2000));
-							},
-							...(typeof text2 === "string"
-								? { dangerouslySetInnerHTML: { __html: Utils.rubyTextToHTML(text2) } }
-								: {}),
+				react.createElement(
+					"p",
+					{
+						style: { opacity: 0.5 },
+						onContextMenu: (event) => {
+							event.preventDefault();
+							Spicetify.Platform.ClipboardAPI.copy(text2)
+								.then(() => Spicetify.showNotification("✓ Second translation copied to clipboard", false, 2000))
+								.catch(() => Spicetify.showNotification("Failed to copy second translation to clipboard", true, 2000));
 						},
-						typeof text2 === "string" ? null : text2
-					)
+						...(typeof text2 === "string"
+							? { dangerouslySetInnerHTML: { __html: Utils.rubyTextToHTML(text2) } }
+							: {}),
+					},
+					typeof text2 === "string" ? null : text2
+				)
 			);
 		}),
 		react.createElement("p", {

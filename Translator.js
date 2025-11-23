@@ -7,6 +7,242 @@ const tinyPinyinPath = "https://cdn.jsdelivr.net/npm/tiny-pinyin/dist/tiny-pinyi
 
 const dictPath = "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict";
 
+// Cấu hình giới hạn dựa trên ảnh chụp màn hình AI Studio của bạn
+// Model: gemini-2.5-flash
+const RATE_LIMITS = {
+	RPM: 10,    // Giới hạn 10 requests/phút
+	RPD: 250,   // Giới hạn 250 requests/ngày
+	RESET_TIME: 60000 // 1 phút tính bằng ms
+};
+
+class GeminiRateLimiter {
+	static getStats() {
+		const now = Date.now();
+		const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+		
+		let stats = JSON.parse(localStorage.getItem('gemini_rate_stats') || '{"date": "", "dayCount": 0, "minuteWindowStart": 0, "minuteCount": 0}');
+		
+		// Reset bộ đếm ngày nếu sang ngày mới
+		if (stats.date !== today) {
+			stats.date = today;
+			stats.dayCount = 0;
+			stats.minuteCount = 0;
+			stats.minuteWindowStart = now;
+		}
+		
+		// Reset bộ đếm phút (Cửa sổ trượt đơn giản)
+		if (now - stats.minuteWindowStart > RATE_LIMITS.RESET_TIME) {
+			stats.minuteWindowStart = now;
+			stats.minuteCount = 0;
+		}
+		
+		return stats;
+	}
+
+	static increment() {
+		const stats = this.getStats();
+		stats.minuteCount++;
+		stats.dayCount++;
+		localStorage.setItem('gemini_rate_stats', JSON.stringify(stats));
+		return stats;
+	}
+
+	static checkAndThrow() {
+		const stats = this.getStats();
+		
+		// Log để debug (F12)
+		console.log(`[Gemini Limit] RPM: ${stats.minuteCount}/${RATE_LIMITS.RPM} | RPD: ${stats.dayCount}/${RATE_LIMITS.RPD}`);
+		
+		if (stats.minuteCount >= RATE_LIMITS.RPM) {
+			const waitTime = Math.ceil((60000 - (Date.now() - stats.minuteWindowStart)) / 1000);
+			throw new Error(`Quá tốc độ (RPM). Vui lòng đợi ${waitTime}s. (${stats.minuteCount}/${RATE_LIMITS.RPM})`);
+		}
+		
+		if (stats.dayCount >= RATE_LIMITS.RPD) {
+			throw new Error(`Hết lượt dùng trong ngày (RPD). Mai quay lại nhé! (${stats.dayCount}/${RATE_LIMITS.RPD})`);
+		}
+	}
+	
+	// Hàm này để hiển thị lên UI Spicetify nếu cần
+	static getDisplayString() {
+		const stats = this.getStats();
+		return `RPM: ${stats.minuteCount}/${RATE_LIMITS.RPM} • RPD: ${stats.dayCount}/${RATE_LIMITS.RPD}`;
+	}
+}
+
+// Translation Style Instructions (Detailed prompts for each style)
+const STYLE_INSTRUCTIONS = {
+	"smart_adaptive": `**VAI TRÒ:** Bạn là một AI âm nhạc tinh tế. Nhiệm vụ của bạn là **TỰ ĐỘNG PHÂN TÍCH** lời bài hát để chọn giọng văn "chuẩn gu" nhất.
+
+**QUY TRÌNH XỬ LÝ (AUTO-DETECT):**
+
+1. **Phân tích Vibe:**
+   - Hùng hổ, gai góc (Rap/Rock) → Tone "Bụi bặm" (Tôi-Ông/Tao-Mày).
+   - Ngọt ngào, da diết (Ballad/Pop) → Tone "Thơ mộng" (Anh-Em).
+   - Trong sáng, hoài niệm (J-Pop/Indie) → Tone "Thanh xuân" (Tớ-Cậu).
+   - Triết lý, cổ kính (Nhạc xưa) → Tone "Hoài cổ" (Ta-Người).
+
+2. **Nguyên tắc cốt lõi:**
+   - **Tự nhiên:** Dịch sao cho người đọc tưởng đây là lời Việt gốc, không phải bản dịch.
+   - **Linh hoạt:** Nếu gặp từ văn hóa (Sensei, Oppa), hãy giữ nguyên hoặc xử lý khéo léo để không mất chất.`,
+
+	"poetic_standard": `**VAI TRÒ:** Bạn là một nhạc sĩ chuyên viết lời Việt (như Phan Mạnh Quỳnh, Khắc Hưng). Bạn không chỉ dịch nghĩa, bạn đang "phổ thơ" cho giai điệu.
+
+**PHONG CÁCH DỊCH:**
+
+1. **Nhân xưng:** Mặc định **"Anh - Em"**. (Linh hoạt đổi chiều tùy ngữ cảnh bài hát).
+
+2. **Kỹ thuật "Nội tâm hóa" (Internalization):**
+   - Đừng chỉ mô tả hành động bên ngoài, hãy mô tả sự lay động bên trong.
+   - *Ví dụ:* Gốc "Anh đợi em" → Dịch: "Lòng anh mòn mỏi ngóng trông".
+   - *Ví dụ:* Gốc "Trời đang mưa" → Dịch: "Mưa tuôn trong lòng" (nếu bài hát buồn).
+
+3. **Từ ngữ:** Ưu tiên từ ngữ có tính nhạc (melodic), giàu hình ảnh và cảm xúc. Tránh dùng từ quá đời thường (như "ăn cơm", "đi bộ") nếu không cần thiết, hãy dùng "dùng bữa", "bước đi".
+
+4. **Lưu ý:** Câu văn phải mượt mà, đọc lên nghe êm tai, có vần điệu ngầm càng tốt.`,
+
+	"youth_story": `**VAI TRÒ:** Bạn là một dịch giả Light Novel/Anime chuyên nghiệp (như dịch giả của Shinkai Makoto).
+
+**PHONG CÁCH DỊCH:**
+
+1. **Nhân xưng:** Ưu tiên **"Tớ - Cậu"** hoặc **"Mình - Cậu"**. Tuyệt đối tránh "Anh-Em" sến súa.
+
+2. **Kỹ thuật "Show, Don't Tell":**
+   - Dịch chi tiết các hành động nhỏ để tạo tính tự sự (Storytelling).
+   - *Ví dụ:* Gốc "Khóc" → Dịch: "Nước mắt khẽ rơi", "Ướt đẫm gối".
+   - *Ví dụ:* Gốc "Ăn kem" → Dịch: "Thả miếng kem lạnh tan trong miệng".
+
+3. **Không khí (Atmosphere):**
+   - Giữ nguyên màu sắc hoài niệm (Nostalgic), trong sáng.
+   - Bảo tồn các hình ảnh văn hóa Nhật (tiếng ve sầu, sân thượng, pháo hoa, tàu điện).
+
+4. **Lưu ý:** Dùng từ ngữ nhẹ nhàng, giống như đang thì thầm kể chuyện.`,
+
+	"street_bold": `**VAI TRÒ:** Bạn là một Rapper/Battle Rapper trong giới Underground. Ngôn từ là vũ khí và phong cách của bạn.
+
+**PHONG CÁCH DỊCH:**
+
+1. **Nhân xưng:** **"Tôi - Bạn"** (Cool ngầu), **"Tao - Mày"** (Aggressive/Diss), hoặc **"Anh - Em"** (Rap Love).
+
+2. **Kỹ thuật "Flow & Impact":**
+   - Ưu tiên sự gãy gọn, dứt khoát. Câu văn phải có "lực" (punchline).
+   - Không được dài dòng văn tự. Cắt bớt các từ đệm vô nghĩa.
+
+3. **Từ ngữ:**
+   - Dùng từ mạnh (Strong words): "Điên cuồng", "Bùng cháy", "Vụt tắt", "Tan nát".
+   - Được phép dùng Slang (tiếng lóng) hợp thời (như "Chất", "Suy", "Gắt").
+   - Giữ nguyên các thuật ngữ Hip-hop (Flow, Beat, Rhyme, Homie) nếu cần.
+
+4. **Lưu ý:** Tuyệt đối KHÔNG dùng từ ngữ sến súa, ủy mị (như "lệ rơi", "vấn vương"). Hãy dùng "nước mắt", "ám ảnh".`,
+
+	"vintage_classic": `**VAI TRÒ:** Bạn là một nhà thơ thời tiền chiến hoặc nhạc sĩ dòng nhạc Trịnh/Bolero. Bạn yêu vẻ đẹp của sự phôi pha và triết lý.
+
+**PHONG CÁCH DỊCH:**
+
+1. **Nhân xưng:** **"Ta - Người"**, **"Tôi - Em"**, hoặc **"Ta - Em"**.
+
+2. **Kỹ thuật "Hán Việt hóa":**
+   - Tận dụng từ Hán Việt để tạo chiều sâu và sự trang trọng.
+   - *Ví dụ:* "Buồn" → "Sầu bi/U hoài"; "Chết" → "Tàn phai/Về với cát bụi"; "Mãi mãi" → "Thiên thu/Vạn kiếp".
+
+3. **Hình ảnh:** Sử dụng các hình ảnh ước lệ của thiên nhiên (mây, gió, trăng, bụi, kiếp người) để diễn tả tâm trạng.
+
+4. **Lưu ý:** Giọng văn phải trầm lắng, suy tư, mang màu sắc triết lý hiện sinh. Tránh từ ngữ hiện đại (như "Crush", "Check-in").`,
+
+	"literal_study": `**VAI TRÒ:** Bạn là Giáo sư ngôn ngữ học. Mục tiêu là sự CHÍNH XÁC và GIÁO DỤC.
+
+**PHONG CÁCH DỊCH:**
+
+1. **Nhân xưng:** Trung lập (**Tôi - Bạn**) hoặc bám sát ngôi gốc của bài hát.
+
+2. **Nguyên tắc "Trung thực" (Faithfulness):**
+   - Dịch sát nghĩa đen (Literal meaning). Không phóng tác, không thêm thắt cảm xúc cá nhân.
+   - Giữ nguyên cấu trúc câu gốc nếu có thể, để người học đối chiếu ngữ pháp.
+
+3. **Xử lý Thành ngữ:**
+   - Nếu gặp thành ngữ khó, hãy dịch nghĩa thực của nó.
+   - *Ví dụ:* "Break a leg" → "Chúc may mắn" (không dịch là "Gãy chân").
+
+4. **Mục đích:** Giúp người dùng hiểu chính xác ca sĩ đang nói gì, từng từ một.`
+};
+
+// Translation Style Metadata (for UI display)
+const TRANSLATION_STYLES = {
+	"smart_adaptive": {
+		name: "Tự Động Thông Minh (Khuyên dùng)",
+		description: "AI tự phân tích thể loại và chọn phong cách phù hợp nhất. Dành cho người 'lười' hoặc muốn kết quả tối ưu."
+	},
+	"poetic_standard": {
+		name: "Trữ tình & Lãng mạn",
+		description: "Phù hợp cho Ballad, Pop, tình ca V-Pop/K-Pop/US-UK."
+	},
+	"youth_story": {
+		name: "Thanh xuân & Tự sự (Anime/Indie)",
+		description: "Phù hợp cho J-Pop, Anime, Light Novel, nhạc Indie."
+	},
+	"street_bold": {
+		name: "Cá tính & Mạnh mẽ (Rap/Hip-hop)",
+		description: "Phù hợp cho Rap, Hip-hop, Rock, R&B sôi động."
+	},
+	"vintage_classic": {
+		name: "Cổ điển & Suy tư (Nhạc xưa/Acoustic)",
+		description: "Phù hợp cho nhạc Trịnh, Bolero, nhạc Hoa, Jazz/Blues."
+	},
+	"literal_study": {
+		name: "Sát nghĩa (Học thuật)",
+		description: "Dành cho người học ngôn ngữ, hiểu chính xác nghĩa đen."
+	}
+};
+
+// Pronoun Modes (for Mix & Match with styles)
+const PRONOUN_MODES = {
+	"default": {
+		value: null,
+		name: "Auto (Theo phong cách)",
+		description: "AI chọn xưng hô phù hợp với Style đã chọn"
+	},
+	"anh_em": {
+		value: "Anh - Em",
+		name: "Anh - Em",
+		description: "Trữ tình, tình yêu đôi lứa (phổ biến nhất)"
+	},
+	"chi_em": {
+		value: "Chị - Em",
+		name: "Chị - Em",
+		description: "Góc nhìn nữ giới, hoặc quan hệ chị-em"
+	},
+	"to_cau": {
+		value: "Tớ - Cậu",
+		name: "Tớ - Cậu",
+		description: "Thanh xuân, vườn trường, Anime/J-Pop"
+	},
+	"minh_ban": {
+		value: "Mình - Bạn",
+		name: "Mình - Bạn",
+		description: "Trung tính, Indie, City Pop (Sakanaction)"
+	},
+	"toi_ban": {
+		value: "Tôi - Bạn",
+		name: "Tôi - Bạn",
+		description: "Lịch sự, chín chắn, Rap nhẹ nhàng"
+	},
+	"toi_em": {
+		value: "Tôi - Em",
+		name: "Tôi - Em",
+		description: "Khoảng cách tuổi tác, người lớn-trẻ"
+	},
+	"ta_nguoi": {
+		value: "Ta - Người",
+		name: "Ta - Người",
+		description: "Cổ điển, văn chương, sâu lắng"
+	},
+	"tao_may": {
+		value: "Tao - Mày",
+		name: "Tao - Mày",
+		description: "Đường phố, Diss tracks, Aggressive Rap"
+	}
+};
+
 class Translator {
 	constructor(lang, isUsingNetease = false) {
 		this.finished = {
@@ -37,9 +273,9 @@ class Translator {
 		}
 	}
 
-	static buildGeminiPrompt({ artist, title, text, wantSmartPhonetic = false }) {
+	static buildGeminiPrompt({ artist, title, text, styleKey = 'smart_adaptive', pronounKey = 'default', wantSmartPhonetic = false }) {
 		const lineCount = text.split('\n').length;
-		
+
 		if (wantSmartPhonetic) {
 			return `You are a linguistics expert specializing in CJK phonetic transcription. Your task is to detect the language of the lyrics and transcribe them to the correct phonetic system.
 
@@ -69,73 +305,64 @@ class Translator {
 - Title: ${title}
 
 **Output Format**:
-- Respond with ONLY a single, raw JSON object.
-- Do NOT use markdown code fences.
-- JSON schema: {"phonetic": "transcribed_lyrics_with_\\n_for_newlines", "detected_language": "ja|ko|zh"}
+Return JSON with "phonetic" (transcribed lyrics) and "detected_language" (ja|ko|zh).
 
 **Input Lyrics**:
 ----
 ${text}
 ----`;
 		}
-// Default to Vietnamese translation
-return `Bạn là một chuyên gia dịch thuật lời bài hát, một người kể chuyện bằng âm nhạc, có kỹ năng bậc thầy trong việc tạo ra các phiên bản tiếng Việt vừa nên thơ, giàu cảm xúc, vừa giữ được nhịp điệu để có thể hát theo. Nhiệm vụ của bạn là dịch lời bài hát được cung cấp, cân bằng giữa biểu đạt nghệ thuật và độ chính xác kỹ thuật cần thiết cho phụ đề đồng bộ.
+		// Default to Vietnamese translation
+		const styleInstruction = STYLE_INSTRUCTIONS[styleKey] || STYLE_INSTRUCTIONS['smart_adaptive'];
+		const styleName = TRANSLATION_STYLES[styleKey]?.name || "Tự Động Thông Minh (Khuyên dùng)";
+		
+		// Pronoun Override Logic
+		let pronounInstruction = "";
+		if (pronounKey && pronounKey !== 'default' && PRONOUN_MODES[pronounKey]?.value) {
+			pronounInstruction = `
 
-**--- QUY TẮC VÀNG (BẤT DI BẤT DỊCH) ---**
+**⚠️ YÊU CẦU ĐẶC BIỆT VỀ XƯNG HÔ (GHI ĐÈ PHONG CÁCH):**
+Bất kể phong cách trên quy định thế nào, bạn BẮT BUỘC phải sử dụng cặp đại từ nhân xưng: **"${PRONOUN_MODES[pronounKey].value}"** cho toàn bộ bài hát.
+- Nếu bài hát là độc thoại (không có đối tượng thứ 2), hãy chỉ dùng ngôi thứ nhất trong cặp trên.
+- Duy trì nhất quán xưng hô này cho toàn bộ ${lineCount} dòng.`;
+		}
+		
+		return `${styleInstruction}
+${pronounInstruction}
 
-**TOÀN VẸN SỐ DÒNG TUYỆT ĐỐI:**
-- Output của bạn BẮT BUỘC phải có số dòng chính xác bằng với input: **${lineCount} dòng**.
-- Đây là quy tắc quan trọng nhất. Một bản dịch sáng tạo sẽ trở nên vô dụng nếu nó phá vỡ đồng bộ hóa thời gian của phụ đề.
-- **TUYỆT ĐỐI KHÔNG GỘP, TÁCH, hay BỎ QUA DÒNG VÌ BẤT KỲ LÝ DO NÀO.**
-- Một dòng trống trong input phải là một dòng trống trong output.
-- Một dòng chỉ có một từ phải được dịch thành một dòng.
+**━━━ QUY TẮC VÀNG (BẤT DI BẤT DỊCH) ━━━**
 
-**--- MỤC TIÊU NGHỆ THUẬT & DỊCH THUẬT ---**
+**⚠️ TOÀN VẸN SỐ DÒNG (QUAN TRỌNG NHẤT!):**
+• Output BẮT BUỘC là mảng có CHÍNH XÁC **${lineCount} phần tử** (1 dòng gốc = 1 dòng dịch).
+• ❌ TUYỆT ĐỐI KHÔNG được tách dòng, gộp dòng, thêm hoặc bớt dòng.
+• Dòng trống → giữ nguyên là chuỗi rỗng "".
+• Các nhãn [Intro], [Chorus], (Instrumental) → giữ nguyên 100%.
 
-**1. KỂ LẠI CÂU CHUYỆN (RETELL THE STORY):**
-   - **Quan trọng nhất:** Trước khi dịch từng dòng, hãy đọc lướt toàn bộ lời bài hát để nắm bắt CÂU CHUYỆN TỔNG THỂ, thông điệp và hành trình cảm xúc của nhân vật.
-   - Bản dịch của bạn phải tạo ra một dòng chảy liền mạch, mỗi câu hát phải là sự tiếp nối tự nhiên của câu trước đó, cùng nhau dệt nên một câu chuyện hoàn chỉnh.
+**VÍ DỤ:**
+Input (3 dòng):
+  "I love you"
+  "Can't live without you"
+  "Forever"
 
-**2. ƯU TIÊN CẢM XÚC VÀ CHẤT THƠ (PRIORITIZE EMOTION & POETRY):**
-   - Vượt ra ngoài giới hạn của dịch nghĩa đen. Hãy nắm bắt linh hồn, tâm trạng và sắc thái tinh tế của bản gốc.
-   - Sử dụng từ ngữ tiếng Việt giàu hình ảnh, trau chuốt và gần gũi với văn phong thơ ca, âm nhạc Việt Nam. Lời dịch phải đẹp khi đọc và tự nhiên khi cất lên thành tiếng hát.
+❌ SAI (4 dòng): ["Anh yêu em", "Yêu em nhiều", "Không thể thiếu em", "Mãi mãi"]
+✅ ĐÚNG (3 dòng): ["Anh yêu em", "Không thể sống thiếu em", "Mãi mãi"]
 
-**3. ĐẢM BẢO TÍNH NHẠC ĐIỆU (ENSURE SINGABILITY & RHYTHM):**
-   - Dù không bắt buộc phải có vần điệu, lời dịch phải có nhịp điệu và dòng chảy mượt mà.
-   - Tránh sử dụng những từ ngữ trúc trắc, gượng ép. Hãy đọc thầm lại câu dịch để chắc chắn rằng nó trôi chảy một cách tự nhiên.
+**━━━ CHECKLIST CUỐI CÙNG ━━━**
+☐ Mảng có CHÍNH XÁC ${lineCount} phần tử?
+☐ Không có dòng nào bị tách/gộp?
+☐ Bản dịch phù hợp với phong cách đã chọn?
+☐ Nghĩa rõ ràng, tự nhiên trong tiếng Việt?
 
-**4. TÔN TRỌNG SẮC THÁI GỐC (RESPECT THE ORIGINAL NUANCE):**
-   - Xử lý các thành ngữ, ẩn dụ và yếu tố văn hóa một cách khéo léo. Tìm những cách diễn đạt tương đương trong tiếng Việt nếu có thể.
-   - Đảm bảo giọng điệu (ví dụ: vui, buồn, giận dữ) của bản dịch khớp với bản gốc.
+**━━━ THÔNG TIN BÀI HÁT ━━━**
+🎤 Nghệ sĩ: ${artist}
+🎵 Tên bài: ${title}
 
-**--- VÍ DỤ VỀ CẤU TRÚC ĐÚNG ---**
+**━━━ ĐỊNH DẠNG OUTPUT ━━━**
+Trả về JSON object với mảng "vi" chứa CHÍNH XÁC ${lineCount} phần tử (mỗi dòng gốc = 1 phần tử mảng).
 
-**INPUT (5 dòng):**
-Hello world
-
-How are you?
-Oh...
-(Yeah)
-
-**OUTPUT ĐÚNG (5 dòng, bảo toàn cấu trúc):**
-["Xin chào thế giới", "", "Bạn có khoẻ không?", "Ôi...", "(Yeah)"]
-
-**--- BƯỚC TỰ KIỂM TRA CUỐI CÙNG ---**
-Trước khi đưa ra output cuối cùng, bạn BẮT BUỘC phải tự hỏi: "Output của mình đã có chính xác ${lineCount} phần tử trong mảng chưa?" Nếu chưa, bạn phải sửa lại.
-
-**THÔNG TIN BÀI HÁT:**
-- Nghệ sĩ: ${artist}
-- Tên bài hát: ${title}
-
-**ĐỊNH DẠNG OUTPUT:**
-- Chỉ trả lời bằng một đối tượng JSON thô duy nhất.
-- KHÔNG sử dụng ký tự markdown.
-- Cấu trúc JSON: {"vi": ["dòng dịch 1", "dòng dịch 2", ...]}
-
-**LỜI BÀI HÁT CẦN DỊCH:**
-----
-${text}
-----`}
+**━━━ LỜI BÀI HÁT CẦN DỊCH ━━━**
+${text}`
+	}
 
 	static extractGeminiJson(text) {
 		function safeParse(s) {
@@ -145,81 +372,146 @@ ${text}
 				return null;
 			}
 		}
-		function decodeJsonString(s) {
-			if (typeof s !== "string") return "";
-			return s
-				.replace(/\\n/g, "\n")
-				.replace(/\\t/g, "\t")
-				.replace(/\\"/g, '"')
-				.replace(/\\\\/g, "\\");
-		}
-		// Normalize and strip common artefacts (code fences, language tags, stray 'json' lines)
+		
+		// With JSON mode enabled, response should be clean JSON
 		let raw = String(text || "").trim();
-		// Remove any ```json / ``` fences anywhere, not only at edges
-		raw = raw.replace(/```[a-z]*\n?/gim, "").replace(/```/g, "");
-		// Drop standalone 'json' lines
-		raw = raw.replace(/^\s*json\s*$/gim, "");
-		// First attempt: direct JSON
+
+		// First attempt: direct JSON parse (should work with responseMimeType: "application/json")
 		let parsed = safeParse(raw);
+		
 		if (!parsed) {
-			// Second attempt: extract the largest {...} block
+			// Fallback: clean up potential markdown artifacts (though should be rare with JSON mode)
+			raw = raw.replace(/```[a-z]*\n?/gim, "").replace(/```/g, "");
+			raw = raw.replace(/^\s*json\s*$/gim, "");
+			
+			// Second attempt: direct parse after cleanup
+			parsed = safeParse(raw);
+		}
+		
+		if (!parsed) {
+			// Third attempt: extract the largest {...} block
 			const start = raw.indexOf("{");
 			const end = raw.lastIndexOf("}");
 			if (start !== -1 && end !== -1 && end > start) {
 				parsed = safeParse(raw.slice(start, end + 1));
 			}
 		}
-		if (!parsed) {
-			// Third attempt: regex pull of JSON string values (handle both string and array formats)
-			const mVi = raw.match(/"vi"\s*:\s*"([\s\S]*?)"\s*[},]/);
-			const mViArray = raw.match(/"vi"\s*:\s*(\[[\s\S]*?\])\s*[},]/);
-			const mPhonetic = raw.match(/"phonetic"\s*:\s*"([\s\S]*?)"\s*[},]/);
-			const mPhoneticArray = raw.match(/"phonetic"\s*:\s*(\[[\s\S]*?\])\s*[},]/);
-			
-			if (mVi || mPhonetic || mViArray || mPhoneticArray) {
-				return { 
-					vi: mViArray ? JSON.parse(mViArray[1]) : decodeJsonString(mVi?.[1] || ""),
-					phonetic: mPhoneticArray ? JSON.parse(mPhoneticArray[1]) : decodeJsonString(mPhonetic?.[1] || "")
-				};
-			}
-		}
+		
+		// If we successfully parsed and have expected fields, return them
 		if (parsed && (parsed.vi !== undefined || parsed.phonetic !== undefined)) {
-			// Handle both string and array formats
-			const normalizeField = (field) => {
-				if (Array.isArray(field)) {
-					return field; // Keep arrays as-is
-				}
-				if (typeof field === 'string') {
-					return decodeJsonString(field); // Decode strings
-				}
-				return field;
-			};
-
-			return { 
-				vi: normalizeField(parsed.vi),
-				phonetic: normalizeField(parsed.phonetic)
+			return {
+				vi: parsed.vi,
+				phonetic: parsed.phonetic,
+				detected_language: parsed.detected_language
 			};
 		}
-		// Fallback: treat entire text as Vietnamese and unescape \n
-		const fallback = String(text || "").replace(/\\n/g, "\n");
+		
+		// Final fallback: treat entire text as Vietnamese
+		console.warn("Could not parse Gemini JSON response, using fallback");
+		const fallback = raw.replace(/\\n/g, "\n");
 		return { vi: fallback };
 	}
 
-	static async callGemini({ apiKey, artist, title, text, wantSmartPhonetic = false }) {
+	static buildMinimalFallbackPrompt({ artist, title, text }) {
+		const lineCount = text.split('\n').length;
+		return `
+Translate the following song lyrics to Vietnamese.
+
+**CRITICAL RULES:**
+• Output MUST be a JSON array named "vi" with EXACTLY ${lineCount} elements.
+• 1 source line = 1 translated line. DO NOT split or merge lines.
+• Keep translations neutral and accurate.
+
+**SONG INFO:**
+Artist: ${artist}
+Title: ${title}
+
+**LYRICS:**
+${text}`;
+	}
+
+	static async callGemini({ apiKey, artist, title, text, styleKey = 'smart_adaptive', pronounKey = 'default', wantSmartPhonetic = false, _isRetry = false }) {
+		const startTime = Date.now();
+		const lineCount = text.split('\n').length;
+		
+		// Log request info
+		console.group(`[Gemini] ${wantSmartPhonetic ? 'Phonetic Transcription' : 'Translation'} Request`);
+		console.log(`Song: ${artist} - ${title}`);
+		console.log(`Lines: ${lineCount}`);
+		if (!wantSmartPhonetic) {
+			console.log(`Style: ${TRANSLATION_STYLES[styleKey]?.name || styleKey}`);
+			console.log(`Pronoun: ${PRONOUN_MODES[pronounKey]?.name || pronounKey}`);
+		}
+		console.log(`Retry: ${_isRetry ? 'Yes (Safety Fallback)' : 'No'}`);
+		
+		// 1. KIỂM TRA LIMIT TRƯỚC KHI GỌI
+		GeminiRateLimiter.checkAndThrow();
+		
 		// Enhanced validation
 		if (!apiKey?.trim()) throw new Error("Missing or invalid Gemini API key");
 		if (!text?.trim()) throw new Error("No text provided for translation");
 
-		const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-		const prompt = Translator.buildGeminiPrompt({ artist, title, text, wantSmartPhonetic });
+		const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
 		
+		// Use minimal fallback prompt if this is a retry after safety block
+		const prompt = _isRetry 
+			? Translator.buildMinimalFallbackPrompt({ artist, title, text })
+			: Translator.buildGeminiPrompt({ artist, title, text, styleKey, pronounKey, wantSmartPhonetic });
+
+		// Define response schema for JSON mode
+		const responseSchema = wantSmartPhonetic ? {
+			type: "object",
+			properties: {
+				phonetic: {
+					type: "string",
+					description: "Transcribed lyrics with newlines"
+				},
+				detected_language: {
+					type: "string",
+					enum: ["ja", "ko", "zh"],
+					description: "Detected language code"
+				}
+			},
+			required: ["phonetic", "detected_language"]
+		} : {
+			type: "object",
+			properties: {
+				vi: {
+					type: "array",
+					items: { type: "string" },
+					description: "Array of translated Vietnamese lyrics lines"
+				}
+			},
+			required: ["vi"]
+		};
+
 		const body = {
 			contents: [{ role: "user", parts: [{ text: prompt }] }],
-			generationConfig: { 
+			generationConfig: {
 				temperature: 0.1, // Lower temperature for more consistent results
-				maxOutputTokens: 4096,
-				candidateCount: 1
+				maxOutputTokens: 8192,
+				candidateCount: 1,
+				responseMimeType: "application/json", // Native JSON mode
+				responseSchema: responseSchema // Schema validation
 			},
+			safetySettings: [
+				{
+					category: "HARM_CATEGORY_HARASSMENT",
+					threshold: "BLOCK_ONLY_HIGH"
+				},
+				{
+					category: "HARM_CATEGORY_HATE_SPEECH",
+					threshold: "BLOCK_ONLY_HIGH"
+				},
+				{
+					category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+					threshold: "BLOCK_ONLY_HIGH"
+				},
+				{
+					category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+					threshold: "BLOCK_ONLY_HIGH"
+				}
+			]
 		};
 
 		try {
@@ -229,7 +521,7 @@ ${text}
 
 			const res = await fetch(endpoint, {
 				method: "POST",
-				headers: { 
+				headers: {
 					"Content-Type": "application/json",
 					"User-Agent": "Spicetify-LyricsPlus/1.0"
 				},
@@ -259,24 +551,107 @@ ${text}
 			}
 
 			const data = await res.json();
-			
+
 			// Validate response structure
 			if (!data?.candidates?.length) {
+				console.error("Gemini API response:", JSON.stringify(data, null, 2));
 				throw new Error("No translation candidates returned from API");
 			}
 
-			const raw = data.candidates[0]?.content?.parts?.[0]?.text;
-			if (!raw) {
-				throw new Error("Empty response from translation API");
+			// 2. NẾU GỌI THÀNH CÔNG, TĂNG BỘ ĐẾM
+			GeminiRateLimiter.increment();
+
+			const candidate = data.candidates[0];
+			const responseTime = Date.now() - startTime;
+
+			// Log response time
+			console.log(`Response Time: ${responseTime}ms`);
+
+			// Check for safety filter blocks
+			if (candidate?.finishReason === "SAFETY" || candidate?.finishReason === "BLOCKED_REASON_UNSPECIFIED") {
+				const safetyRatings = candidate?.safetyRatings?.map(r => `${r.category}: ${r.probability}`).join(", ") || "Unknown";
+				console.error("Safety filter block:", safetyRatings);
+				console.groupEnd();
+				
+				// Create a special error type to signal that we need fallback
+				const error = new Error(`SAFETY_BLOCKED:${safetyRatings}`);
+				error.isSafetyBlock = true;
+				throw error;
 			}
 
-			return Translator.extractGeminiJson(raw);
+			// Check for other non-STOP finish reasons
+			if (candidate?.finishReason && candidate.finishReason !== "STOP" && candidate.finishReason !== "MAX_TOKENS") {
+				console.error("Unexpected finish reason:", candidate.finishReason);
+				console.groupEnd();
+				throw new Error(`Dịch thuật dừng bất ngờ (lý do: ${candidate.finishReason}). Có thể do lời bài hát quá dài hoặc có vấn đề với API.`);
+			}
+
+			const raw = candidate?.content?.parts?.[0]?.text;
+			if (!raw) {
+				console.error("Empty text content. Full candidate structure:", JSON.stringify(candidate, null, 2));
+				console.error("Full API response:", JSON.stringify(data, null, 2));
+				console.groupEnd();
+
+				// Try to get more info
+				const promptFeedback = data?.promptFeedback;
+				if (promptFeedback?.blockReason) {
+					throw new Error(`Prompt bị chặn: ${promptFeedback.blockReason}. Có thể lời bài hát chứa nội dung nhạy cảm.`);
+				}
+
+				throw new Error("API trả về response trống. Hãy kiểm tra Console (F12) để xem log chi tiết, hoặc thử bài hát khác.");
+			}
+
+			// Log full raw response
+			console.log(`Gemini Raw Response (${raw.length} chars):`);
+			console.log(raw);
+
+			const result = Translator.extractGeminiJson(raw);
+			
+			// Verify line count
+			const translatedLines = wantSmartPhonetic 
+				? (result.phonetic ? result.phonetic.split('\n').length : 0)
+				: (Array.isArray(result.vi) ? result.vi.length : 0);
+			
+			const lineIntegrity = translatedLines === lineCount;
+			
+			// Log line integrity check
+			console.log(`Lines: ${translatedLines}/${lineCount} ${lineIntegrity ? 'OK' : 'MISMATCH!'}`);
+			console.log(`Success: ${wantSmartPhonetic ? 'Phonetic transcription' : 'Translation'} completed`);
+			console.groupEnd();
+			
+			return result;
 		} catch (error) {
+			const responseTime = Date.now() - startTime;
+			
 			if (error.name === 'AbortError') {
+				console.error(`Timeout after ${responseTime}ms`);
+				console.groupEnd();
 				throw new Error("Translation request timed out. Please try again.");
 			}
+			
+			// Fallback mechanism: If safety blocked and not already retrying, try minimal prompt
+			if (error.isSafetyBlock && !_isRetry) {
+				console.warn("Safety block detected. Retrying with minimal/neutral prompt...");
+				console.groupEnd();
+				return Translator.callGemini({ 
+					apiKey, 
+					artist, 
+					title, 
+					text, 
+					styleKey: 'literal_study', // Force literal style
+					pronounKey: 'default', // Reset to default pronouns for safety
+					wantSmartPhonetic, 
+					_isRetry: true 
+				});
+			}
+			
+			// Log error details
+			console.error(`Error after ${responseTime}ms:`, error.message);
+			console.groupEnd();
+			
 			// Re-throw with more context
-			throw new Error(`Gemini translation failed: ${error.message}`);
+			const errorMsg = error.message?.replace('SAFETY_BLOCKED:', 'Nội dung bị chặn bởi bộ lọc an toàn: ');
+			throw new Error(`Gemini translation failed: ${errorMsg}`);
 		}
 	}
 
@@ -292,16 +667,16 @@ ${text}
 			const script = document.createElement("script");
 			script.setAttribute("type", "text/javascript");
 			script.setAttribute("src", url);
-			
+
 			script.addEventListener('load', () => {
 				script.dataset.loaded = 'true';
 				resolve();
 			});
-			
+
 			script.addEventListener('error', () => {
 				reject(new Error(`Failed to load script: ${url}`));
 			});
-			
+
 			document.head.appendChild(script);
 		});
 	}
@@ -323,8 +698,8 @@ ${text}
 					// OpenCC is required
 					await this.includeExternal(openCCPath);
 					// Prefer pinyin-pro (tones). Preload non-blockingly; tiny-pinyin as backup.
-					this.includeExternal(pinyinProPath).catch(() => {});
-					this.includeExternal(tinyPinyinPath).catch(() => {});
+					this.includeExternal(pinyinProPath).catch(() => { });
+					this.includeExternal(tinyPinyinPath).catch(() => { });
 					break;
 			}
 		} catch (error) {
@@ -364,11 +739,11 @@ ${text}
 
 	async createTranslator(lang) {
 		const langCode = lang.slice(0, 2);
-		
+
 		switch (langCode) {
 			case "ja":
 				if (this.kuroshiro) return;
-				
+
 				// Wait for libraries to be available with timeout
 				await this.waitForGlobals(['Kuroshiro', 'KuromojiAnalyzer'], 10000);
 
@@ -376,21 +751,21 @@ ${text}
 				await this.kuroshiro.init(new KuromojiAnalyzer({ dictPath }));
 				this.finished.ja = true;
 				break;
-				
+
 			case "ko":
 				if (this.Aromanize) return;
-				
+
 				await this.waitForGlobals(['Aromanize'], 5000);
-				
+
 				this.Aromanize = Aromanize;
 				this.finished.ko = true;
 				break;
-				
+
 			case "zh":
 				if (this.OpenCC) return;
-				
+
 				await this.waitForGlobals(['OpenCC'], 5000);
-				
+
 				this.OpenCC = OpenCC;
 				this.finished.zh = true;
 				break;
@@ -405,24 +780,24 @@ ${text}
 	 */
 	async waitForGlobals(globalNames, timeoutMs = 5000) {
 		const startTime = Date.now();
-		
+
 		return new Promise((resolve, reject) => {
 			const checkGlobals = () => {
 				const allAvailable = globalNames.every(name => typeof window[name] !== 'undefined');
-				
+
 				if (allAvailable) {
 					resolve();
 					return;
 				}
-				
+
 				if (Date.now() - startTime > timeoutMs) {
 					reject(new Error(`Timeout waiting for globals: ${globalNames.join(', ')}`));
 					return;
 				}
-				
+
 				setTimeout(checkGlobals, 50);
 			};
-			
+
 			checkGlobals();
 		});
 	}
@@ -430,12 +805,7 @@ ${text}
 	static normalizeRomajiString(s) {
 		if (typeof s !== "string") return "";
 		return s
-			// Replace macrons with ASCII-only long vowels
-			.replace(/ō/g, "ou")
-			.replace(/ū/g, "uu")
-			.replace(/ā/g, "aa")
-			.replace(/ī/g, "ii")
-			.replace(/ē/g, "ee")
+			// Keep macrons (ō, ū, ā, ī, ē) for beautiful and standard Hepburn Romaji
 			// Normalize multiple spaces
 			.replace(/\s{2,}/g, " ")
 			.trim();
@@ -491,7 +861,7 @@ ${text}
 				await this.includeExternal(url);
 				await this.waitForGlobals(["pinyinPro"], 8000);
 				return true;
-			} catch {}
+			} catch { }
 		}
 		return false;
 	}
@@ -508,7 +878,7 @@ ${text}
 				await this.includeExternal(url);
 				await this.waitForGlobals(["TinyPinyin"], 8000);
 				return true;
-			} catch {}
+			} catch { }
 		}
 		return false;
 	}

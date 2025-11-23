@@ -97,6 +97,8 @@ const CONFIG = {
 		"translate:translated-lyrics-source": localStorage.getItem("lyrics-plus:visual:translate:translated-lyrics-source") || "geminiVi",
 		"translate:display-mode": localStorage.getItem("lyrics-plus:visual:translate:display-mode") || "replace",
 		"translate:detect-language-override": localStorage.getItem("lyrics-plus:visual:translate:detect-language-override") || "off",
+		"translate:translation-style": localStorage.getItem("lyrics-plus:visual:translate:translation-style") || "smart_adaptive",
+		"translate:pronoun-mode": localStorage.getItem("lyrics-plus:visual:translate:pronoun-mode") || "default",
 		"translation-mode:japanese": localStorage.getItem("lyrics-plus:visual:translation-mode:japanese") || "none",
 		"translation-mode:korean": localStorage.getItem("lyrics-plus:visual:translation-mode:korean") || "none",
 		"translation-mode:chinese": localStorage.getItem("lyrics-plus:visual:translation-mode:chinese") || "none",
@@ -861,6 +863,8 @@ class LyricsContainer extends react.Component {
 				artist: this.state.artist || lyricsState.artist, 
 				title: this.state.title || lyricsState.title, 
 				text, 
+				styleKey: CONFIG.visual["translate:translation-style"],
+				pronounKey: CONFIG.visual["translate:pronoun-mode"],
 				wantSmartPhonetic 
 			})
 				.then(({ vi, phonetic }) => {
