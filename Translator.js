@@ -496,7 +496,7 @@ ${text}`;
 		const body = {
 			contents: [{ role: "user", parts: [{ text: prompt }] }],
 			generationConfig: {
-				temperature: 0.1, // Lower temperature for more consistent results
+				temperature: 0.3, // 0.1 if  more consistent results, 0.3 is good for creativity
 				maxOutputTokens: 8192,
 				candidateCount: 1,
 				responseMimeType: "application/json", // Native JSON mode
@@ -524,7 +524,7 @@ ${text}`;
 
 		try {
 			const controller = new AbortController();
-			const timeoutId = setTimeout(() => controller.abort(), 30000);
+			const timeoutId = setTimeout(() => controller.abort(), 60000);
 
 			const res = await fetch(endpoint, {
 				method: "POST",
