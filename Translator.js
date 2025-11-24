@@ -19,30 +19,30 @@ class GeminiRateLimiter {
 	static getStats() {
 		const now = Date.now();
 		let stats = JSON.parse(localStorage.getItem('gemini_rate_stats') || '{"minuteWindowStart": 0, "minuteCount": 0}');
-		
+
 		if (now - stats.minuteWindowStart > RATE_LIMITS.RESET_TIME) {
 			stats.minuteWindowStart = now;
 			stats.minuteCount = 0;
 		}
-		
+
 		return stats;
 	}
 
 	static incrementAndCheck() {
 		const stats = this.getStats();
-		
+
 		if (stats.minuteCount >= RATE_LIMITS.RPM) {
 			const waitTime = Math.ceil((RATE_LIMITS.RESET_TIME - (Date.now() - stats.minuteWindowStart)) / 1000);
 			throw new Error(`Quá tốc độ (RPM). Vui lòng đợi ${waitTime}s. (${stats.minuteCount}/${RATE_LIMITS.RPM})`);
 		}
-		
+
 		stats.minuteCount++;
 		localStorage.setItem('gemini_rate_stats', JSON.stringify(stats));
-		
+
 		console.log(`[Gemini RPM] ${stats.minuteCount}/${RATE_LIMITS.RPM}`);
 		return stats;
 	}
-	
+
 	static getDisplayString() {
 		const stats = this.getStats();
 		return `RPM: ${stats.minuteCount}/${RATE_LIMITS.RPM}`;
@@ -71,7 +71,7 @@ const STYLE_INSTRUCTIONS = {
 
 **PHONG CÁCH DỊCH:**
 
-1. **Nhân xưng:** Mặc định **"Anh - Em"**. (Linh hoạt đổi chiều tùy ngữ cảnh bài hát).
+1. **Nhân xưng:** Gợi ý **"Anh - Em"** (nếu không có yêu cầu cụ thể khác). Linh hoạt đổi chiều tùy ngữ cảnh bài hát.
 
 2. **Kỹ thuật "Nội tâm hóa" (Internalization):**
    - Đừng chỉ mô tả hành động bên ngoài, hãy mô tả sự lay động bên trong.
@@ -86,7 +86,7 @@ const STYLE_INSTRUCTIONS = {
 
 **PHONG CÁCH DỊCH:**
 
-1. **Nhân xưng:** Ưu tiên **"Tớ - Cậu"** hoặc **"Mình - Cậu"**. Tuyệt đối tránh "Anh-Em" sến súa.
+1. **Nhân xưng:** Gợi ý **"Tớ - Cậu"** hoặc **"Mình - Cậu"** (nếu không có yêu cầu cụ thể khác). Tránh "Anh-Em" nếu không phù hợp với vibe thanh xuân.
 
 2. **Kỹ thuật "Show, Don't Tell":**
    - Dịch chi tiết các hành động nhỏ để tạo tính tự sự (Storytelling).
@@ -103,7 +103,7 @@ const STYLE_INSTRUCTIONS = {
 
 **PHONG CÁCH DỊCH:**
 
-1. **Nhân xưng:** **"Tôi - Bạn"** (Cool ngầu), **"Tao - Mày"** (Aggressive/Diss), hoặc **"Anh - Em"** (Rap Love).
+1. **Nhân xưng:** Gợi ý **"Tôi - Bạn"** (Cool ngầu), **"Tao - Mày"** (Aggressive/Diss), hoặc **"Anh - Em"** (Rap Love) - nếu không có yêu cầu cụ thể khác.
 
 2. **Kỹ thuật "Flow & Impact":**
    - Ưu tiên sự gãy gọn, dứt khoát. Câu văn phải có "lực" (punchline).
@@ -120,7 +120,7 @@ const STYLE_INSTRUCTIONS = {
 
 **PHONG CÁCH DỊCH:**
 
-1. **Nhân xưng:** **"Ta - Người"**, **"Tôi - Em"**, hoặc **"Ta - Em"**.
+1. **Nhân xưng:** Gợi ý **"Ta - Người"**, **"Tôi - Em"**, hoặc **"Ta - Em"** (nếu không có yêu cầu cụ thể khác).
 
 2. **Kỹ thuật "Hán Việt hóa":**
    - Tận dụng từ Hán Việt để tạo chiều sâu và sự trang trọng.
@@ -134,7 +134,7 @@ const STYLE_INSTRUCTIONS = {
 
 **PHONG CÁCH DỊCH:**
 
-1. **Nhân xưng:** Trung lập (**Tôi - Bạn**) hoặc bám sát ngôi gốc của bài hát.
+1. **Nhân xưng:** Gợi ý trung lập (**Tôi - Bạn**) hoặc bám sát ngôi gốc của bài hát (nếu không có yêu cầu cụ thể khác).
 
 2. **Nguyên tắc "Trung thực" (Faithfulness):**
    - Dịch sát nghĩa đen (Literal meaning). Không phóng tác, không thêm thắt cảm xúc cá nhân.
@@ -179,8 +179,8 @@ const TRANSLATION_STYLES = {
 const PRONOUN_MODES = {
 	"default": {
 		value: null,
-		name: "Auto (Theo phong cách)",
-		description: "AI chọn xưng hô phù hợp với Style đã chọn"
+		name: "Auto (Theo nội dung)",
+		description: "AI tự do sáng tạo, không giới hạn - chọn xưng hô dựa hoàn toàn vào nội dung và cảm xúc bài hát"
 	},
 	"anh_em": {
 		value: "Anh - Em",
@@ -198,8 +198,8 @@ const PRONOUN_MODES = {
 		description: "Thanh xuân, vườn trường, Anime/J-Pop"
 	},
 	"minh_ban": {
-		value: "Mình - Bạn",
-		name: "Mình - Bạn",
+		value: "Tôi - Cậu",
+		name: "Tôi - Cậu",
 		description: "Trung tính, Indie, City Pop (Sakanaction)"
 	},
 	"toi_ban": {
@@ -301,9 +301,43 @@ ${text}
 		}
 		const styleInstruction = STYLE_INSTRUCTIONS[styleKey] || STYLE_INSTRUCTIONS['smart_adaptive'];
 		const styleName = TRANSLATION_STYLES[styleKey]?.name || "Tự Động Thông Minh (Khuyên dùng)";
-		
+
 		let pronounInstruction = "";
-		if (pronounKey && pronounKey !== 'default' && PRONOUN_MODES[pronounKey]?.value) {
+		if (pronounKey === 'default') {
+			pronounInstruction = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 YÊU CẦU TỐI QUAN TRỌNG VỀ XƯNG HÔ (TỰ DO HOÀN TOÀN) 🚨
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**BẮT BUỘC PHẢI ĐỌC VÀ TUÂN THEO:**
+
+❌ **BỎ QUA HOÀN TOÀN** mọi quy định về nhân xưng trong phong cách dịch (nếu có).
+✅ **TỰ DO SÁNG TẠO** - Bạn được quyền sử dụng BẤT KỲ đại từ nhân xưng nào trong tiếng Việt mà bạn cho là phù hợp nhất.
+
+**NGUYÊN TẮC CHỌN XƯNG HÔ:**
+
+1. **Phân tích sâu nội dung bài hát:**
+   • Chủ đề: Tình yêu? Tự sự? Phẫn nộ? Hoài niệm? Triết lý?
+   • Giọng điệu: Ngọt ngào? Mạnh mẽ? Buồn bã? Trong sáng? Gai góc?
+   • Mối quan hệ (nếu có): Đôi lứa? Bạn bè? Kẻ thù? Người xa lạ?
+   • Độ tuổi/thế hệ: Trẻ trung? Trưởng thành? Già nua?
+
+2. **Tự do lựa chọn đại từ phù hợp:**
+   • KHÔNG bị giới hạn bởi bất kỳ danh sách nào
+   • Có thể dùng: Tôi, Anh, Em, Tớ, Cậu, Mình, Ta, Người, Tao, Mày, Chúng ta, Bạn, Ông, Bà, Cô, Chú, v.v.
+   • Có thể dùng 1 đại từ (độc thoại) hoặc nhiều đại từ (đối thoại) tùy nội dung
+   • Ưu tiên sự TỰ NHIÊN như người Việt viết lời gốc
+
+3. **Tiêu chí quyết định:**
+   ✅ Phù hợp với nội dung và cảm xúc của bài hát
+   ✅ Nghe tự nhiên, không gượng ép
+   ✅ Nhất quán xuyên suốt ${lineCount} dòng
+   ❌ KHÔNG quan tâm đến phong cách dịch đã chọn
+   ❌ KHÔNG bị ràng buộc bởi bất kỳ quy tắc nào khác
+
+**⚠️ LƯU Ý:** Yêu cầu này có ưu tiên TUYỆT ĐỐI, ghi đè MỌI quy định khác về nhân xưng.
+`;
+		} else if (pronounKey && PRONOUN_MODES[pronounKey]?.value) {
 			pronounInstruction = `
 
 **⚠️ YÊU CẦU ĐẶC BIỆT VỀ XƯNG HÔ (GHI ĐÈ PHONG CÁCH):**
@@ -311,9 +345,10 @@ Bất kể phong cách trên quy định thế nào, bạn BẮT BUỘC phải s
 - Nếu bài hát là độc thoại (không có đối tượng thứ 2), hãy chỉ dùng ngôi thứ nhất trong cặp trên.
 - Duy trì nhất quán xưng hô này cho toàn bộ ${lineCount} dòng.`;
 		}
-		
-		return `${styleInstruction}
-${pronounInstruction}
+
+		return `${pronounInstruction}
+
+${styleInstruction}
 
 **━━━ QUY TẮC VÀNG (BẤT DI BẤT DỊCH) ━━━**
 
@@ -357,16 +392,16 @@ ${text}`
 				return null;
 			}
 		}
-		
+
 		let raw = String(text || "").trim();
 		let parsed = safeParse(raw);
-		
+
 		if (!parsed) {
 			raw = raw.replace(/```[a-z]*\n?/gim, "").replace(/```/g, "");
 			raw = raw.replace(/^\s*json\s*$/gim, "");
 			parsed = safeParse(raw);
 		}
-		
+
 		if (!parsed) {
 			// Third attempt: extract the largest {...} block
 			const start = raw.indexOf("{");
@@ -375,7 +410,7 @@ ${text}`
 				parsed = safeParse(raw.slice(start, end + 1));
 			}
 		}
-		
+
 		// If we successfully parsed and have expected fields, return them
 		if (parsed && (parsed.vi !== undefined || parsed.phonetic !== undefined)) {
 			return {
@@ -384,7 +419,7 @@ ${text}`
 				detected_language: parsed.detected_language
 			};
 		}
-		
+
 		console.warn("Could not parse Gemini JSON response, using fallback");
 		const fallback = raw.replace(/\\n/g, "\n");
 		return { vi: fallback };
@@ -411,7 +446,7 @@ ${text}`;
 	static async callGemini({ apiKey, artist, title, text, styleKey = 'smart_adaptive', pronounKey = 'default', wantSmartPhonetic = false, _isRetry = false }) {
 		const startTime = Date.now();
 		const lineCount = text.split('\n').length;
-		
+
 		console.group(`[Gemini] ${wantSmartPhonetic ? 'Phonetic Transcription' : 'Translation'} Request`);
 		console.log(`Song: ${artist} - ${title}`);
 		console.log(`Lines: ${lineCount}`);
@@ -420,15 +455,15 @@ ${text}`;
 			console.log(`Pronoun: ${PRONOUN_MODES[pronounKey]?.name || pronounKey}`);
 		}
 		console.log(`Retry: ${_isRetry ? 'Yes (Safety Fallback)' : 'No'}`);
-		
+
 		GeminiRateLimiter.incrementAndCheck();
-		
+
 		if (!apiKey?.trim()) throw new Error("Missing or invalid Gemini API key");
 		if (!text?.trim()) throw new Error("No text provided for translation");
 
 		const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-		
-		const prompt = _isRetry 
+
+		const prompt = _isRetry
 			? Translator.buildMinimalFallbackPrompt({ artist, title, text })
 			: Translator.buildGeminiPrompt({ artist, title, text, styleKey, pronounKey, wantSmartPhonetic });
 
@@ -522,7 +557,7 @@ ${text}`;
 			}
 
 			const data = await res.json();
-			
+
 			if (!data?.candidates?.length) {
 				console.error("Gemini API response:", JSON.stringify(data, null, 2));
 				throw new Error("No translation candidates returned from API");
@@ -537,7 +572,7 @@ ${text}`;
 				const safetyRatings = candidate?.safetyRatings?.map(r => `${r.category}: ${r.probability}`).join(", ") || "Unknown";
 				console.error("Safety filter block:", safetyRatings);
 				console.groupEnd();
-				
+
 				const error = new Error(`SAFETY_BLOCKED:${safetyRatings}`);
 				error.isSafetyBlock = true;
 				throw error;
@@ -567,45 +602,45 @@ ${text}`;
 			console.log(raw);
 
 			const result = Translator.extractGeminiJson(raw);
-			
-			const translatedLines = wantSmartPhonetic 
+
+			const translatedLines = wantSmartPhonetic
 				? (result.phonetic ? result.phonetic.split('\n').length : 0)
 				: (Array.isArray(result.vi) ? result.vi.length : 0);
-			
+
 			const lineIntegrity = translatedLines === lineCount;
-			
+
 			console.log(`Lines: ${translatedLines}/${lineCount} ${lineIntegrity ? 'OK' : 'MISMATCH!'}`);
 			console.log(`Success: ${wantSmartPhonetic ? 'Phonetic transcription' : 'Translation'} completed`);
 			console.groupEnd();
-			
+
 			return result;
 		} catch (error) {
 			const responseTime = Date.now() - startTime;
-			
+
 			if (error.name === 'AbortError') {
 				console.error(`Timeout after ${responseTime}ms`);
 				console.groupEnd();
 				throw new Error("Translation request timed out. Please try again.");
 			}
-			
+
 			if (error.isSafetyBlock && !_isRetry) {
 				console.warn("Safety block detected. Retrying with minimal/neutral prompt...");
 				console.groupEnd();
-				return Translator.callGemini({ 
-					apiKey, 
-					artist, 
-					title, 
-					text, 
+				return Translator.callGemini({
+					apiKey,
+					artist,
+					title,
+					text,
 					styleKey: 'literal_study', // Force literal style
 					pronounKey: 'default', // Reset to default pronouns for safety
-					wantSmartPhonetic, 
-					_isRetry: true 
+					wantSmartPhonetic,
+					_isRetry: true
 				});
 			}
-			
+
 			console.error(`Error after ${responseTime}ms:`, error.message);
 			console.groupEnd();
-			
+
 			const errorMsg = error.message?.replace('SAFETY_BLOCKED:', 'Nội dung bị chặn bởi bộ lọc an toàn: ');
 			throw new Error(`Gemini translation failed: ${errorMsg}`);
 		}

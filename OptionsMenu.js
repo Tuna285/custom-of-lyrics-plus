@@ -203,7 +203,7 @@ const STATIC_OPTIONS = {
 	languageModes: {
 		japanese: {
 			furigana: "Furigana",
-			romaji: "Romaji", 
+			romaji: "Romaji",
 			hiragana: "Hiragana",
 			katakana: "Katakana",
 		},
@@ -212,7 +212,7 @@ const STATIC_OPTIONS = {
 		},
 		chinese: {
 			cn: "Simplified Chinese",
-			hk: "Traditional Chinese (Hong Kong)", 
+			hk: "Traditional Chinese (Hong Kong)",
 			tw: "Traditional Chinese (Taiwan)",
 			pinyin: "Pinyin",
 		}
@@ -224,7 +224,7 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 		const sourceOptions = STATIC_OPTIONS.source;
 		const translationDisplayOptions = STATIC_OPTIONS.translationDisplay;
 		const languageOptions = STATIC_OPTIONS.language;
-		
+
 		let modeOptions = { ...STATIC_OPTIONS.modeBase };
 
 		const provider = CONFIG.visual["translate:translated-lyrics-source"];
@@ -275,11 +275,11 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 					key: "translate:pronoun-mode",
 					type: ConfigSelection,
 					options: {
-						"default": "Auto (Theo phong cách)",
+						"default": "Auto (Theo nội dung)",
 						"anh_em": "Anh - Em",
 						"em_anh": "Em - Anh",
 						"to_cau": "Tớ - Cậu",
-						"minh_ban": "Mình - Bạn",
+						"minh_ban": "Tôi - Cậu",
 						"toi_ban": "Tôi - Bạn",
 						"toi_em": "Tôi - Em",
 						"ta_nguoi": "Ta - Người",
@@ -345,7 +345,7 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 				key: "language-info",
 				type: ConfigButton,
 				text: "Language not detected",
-				onChange: () => {}, // No-op button
+				onChange: () => { }, // No-op button
 				info: "Display Mode options will appear when CJK languages (Japanese, Korean, Chinese) are detected in the lyrics. You can use Language Override above to force a specific language.",
 			});
 		}
@@ -362,12 +362,12 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 	}, [items, friendlyLanguage, CONFIG.visual["translate:translated-lyrics-source"]]);
 
 	// Open modal on click instead of ContextMenu to avoid xpui hook errors
-			const open = () => {
-			openOptionsModal("Conversions", items, (name, value) => {
-				// Skip processing for info-only items
-				if (name === "language-info") {
-					return;
-				}
+	const open = () => {
+		openOptionsModal("Conversions", items, (name, value) => {
+			// Skip processing for info-only items
+			if (name === "language-info") {
+				return;
+			}
 
 			if (name === "translate:translated-lyrics-source") {
 				// Only reset display modes when actually changing provider (not when loading new songs)
@@ -382,7 +382,7 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 						CONFIG.visual[modeKey2] = "none";
 						localStorage.setItem(`${APP_NAME}:visual:${modeKey2}`, "none");
 					}
-					
+
 					// Reset generic Gemini display modes
 					const geminiModeKey = "translation-mode:gemini";
 					const geminiModeKey2 = "translation-mode-2:gemini";
@@ -390,7 +390,7 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 					localStorage.setItem(`${APP_NAME}:visual:${geminiModeKey}`, "none");
 					CONFIG.visual[geminiModeKey2] = "none";
 					localStorage.setItem(`${APP_NAME}:visual:${geminiModeKey2}`, "none");
-					
+
 					// When switching to Gemini, reset language override to "off" since it's not needed
 					if (value === "geminiVi" && CONFIG.visual["translate:detect-language-override"] !== "off") {
 						CONFIG.visual["translate:detect-language-override"] = "off";
@@ -459,13 +459,13 @@ const AdjustmentsMenu = react.memo(({ mode }) => {
 			try {
 				Spicetify.Config.visual = Spicetify.Config.visual || {};
 				Spicetify.Config.visual[name] = value;
-			} catch {}
+			} catch { }
 			localStorage.setItem(`${APP_NAME}:visual:${name}`, value);
 			// Persist per-track delay as used by resetDelay()
 			if (name === "delay") {
 				const uri = Spicetify?.Player?.data?.item?.uri;
 				if (uri) {
-					try { localStorage.setItem(`lyrics-delay:${uri}`, String(value)); } catch {}
+					try { localStorage.setItem(`lyrics-delay:${uri}`, String(value)); } catch { }
 				}
 			}
 			if (name.startsWith("translation-mode:") && window.lyricContainer) {
