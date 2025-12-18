@@ -180,7 +180,7 @@ let adjustmentsDebounceTimeout = null;
 const STATIC_OPTIONS = {
 	source: {
 		traditional: "Traditional",
-		geminiVi: "Gemini",
+		geminiVi: "Gemma 3",
 	},
 	translationDisplay: {
 		replace: "Replace original",
@@ -197,8 +197,8 @@ const STATIC_OPTIONS = {
 		none: "None",
 	},
 	geminiModes: {
-		gemini_romaji: "Romaji, Romaja, Pinyin (Gemini)",
-		gemini_vi: "Vietnamese (Gemini)",
+		gemini_romaji: "Romaji, Romaja, Pinyin (Gemma 3)",
+		gemini_vi: "Vietnamese (Gemma 3)",
 	},
 	languageModes: {
 		japanese: {
@@ -395,7 +395,7 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 					if (value === "geminiVi" && CONFIG.visual["translate:detect-language-override"] !== "off") {
 						CONFIG.visual["translate:detect-language-override"] = "off";
 						localStorage.setItem(`${APP_NAME}:visual:translate:detect-language-override`, "off");
-						Spicetify.showNotification("Language Override reset to 'Off' for Gemini mode", false, 3000);
+						Spicetify.showNotification("Language Override reset to 'Off' for Gemma 3 mode", false, 3000);
 					}
 				}
 			}
@@ -447,8 +447,15 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 
 const AdjustmentsMenu = react.memo(({ mode }) => {
 	const items = [
+		// General Display
 		{ desc: "Font size", key: "font-size", type: ConfigAdjust, min: fontSizeLimit.min, max: fontSizeLimit.max, step: fontSizeLimit.step },
+
+		// Playback & Features
 		{ desc: "Track delay", key: "delay", type: ConfigAdjust, min: Number.NEGATIVE_INFINITY, max: Number.POSITIVE_INFINITY, step: 250, when: () => mode === SYNCED },
+		{ desc: "Pre-translation", key: "pre-translation", type: ConfigSlider },
+
+		// Mode Specific
+		{ desc: "Unsynced: Auto-scroll", key: "unsynced-auto-scroll", type: ConfigSlider, when: () => mode === UNSYNCED },
 		{ desc: "Dual panel", key: "dual-genius", type: ConfigSlider, when: () => mode === GENIUS },
 	];
 
