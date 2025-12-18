@@ -106,7 +106,7 @@ const RefreshTokenButton = ({ setTokenCallback }) => {
 	);
 };
 
-const ConfigButton = ({ name, text, onChange = () => {} }) => {
+const ConfigButton = ({ name, text, onChange = () => { } }) => {
 	return react.createElement(
 		"div",
 		{
@@ -136,7 +136,7 @@ const ConfigButton = ({ name, text, onChange = () => {} }) => {
 	);
 };
 
-const ConfigSlider = ({ name, defaultValue, onChange = () => {} }) => {
+const ConfigSlider = ({ name, defaultValue, onChange = () => { } }) => {
 	const [active, setActive] = useState(defaultValue);
 
 	useEffect(() => {
@@ -175,7 +175,7 @@ const ConfigSlider = ({ name, defaultValue, onChange = () => {} }) => {
 	);
 };
 
-const ConfigSelection = ({ name, defaultValue, options, onChange = () => {} }) => {
+const ConfigSelection = ({ name, defaultValue, options, onChange = () => { } }) => {
 	const [value, setValue] = useState(defaultValue);
 
 	const setValueCallback = useCallback(
@@ -234,7 +234,7 @@ const ConfigSelection = ({ name, defaultValue, options, onChange = () => {} }) =
 	);
 };
 
-const ConfigInput = ({ name, defaultValue, onChange = () => {} }) => {
+const ConfigInput = ({ name, defaultValue, onChange = () => { } }) => {
 	const [value, setValue] = useState(defaultValue);
 
 	const setValueCallback = useCallback(
@@ -271,7 +271,7 @@ const ConfigInput = ({ name, defaultValue, onChange = () => {} }) => {
 	);
 };
 
-const ConfigAdjust = ({ name, defaultValue, step, min, max, onChange = () => {} }) => {
+const ConfigAdjust = ({ name, defaultValue, step, min, max, onChange = () => { } }) => {
 	const [value, setValue] = useState(defaultValue);
 
 	function adjust(dir) {
@@ -322,7 +322,7 @@ const ConfigAdjust = ({ name, defaultValue, step, min, max, onChange = () => {} 
 	);
 };
 
-const ConfigHotkey = ({ name, defaultValue, onChange = () => {} }) => {
+const ConfigHotkey = ({ name, defaultValue, onChange = () => { } }) => {
 	const [value, setValue] = useState(defaultValue);
 	const [trap] = useState(new Spicetify.Mousetrap());
 
@@ -341,7 +341,7 @@ const ConfigHotkey = ({ name, defaultValue, onChange = () => {} }) => {
 	}
 
 	function finishRecord() {
-		trap.handleKey = () => {};
+		trap.handleKey = () => { };
 		onChange(value);
 	}
 
@@ -448,15 +448,15 @@ const ServiceOption = ({ item, onToggle, onSwap, isFirst = false, isLast = false
 			},
 		}),
 		item.token !== undefined &&
-			react.createElement("input", {
-				placeholder: `Place your ${item.name} token here`,
-				value: token,
-				onChange: (event) => setTokenCallback(event.target.value),
-			})
+		react.createElement("input", {
+			placeholder: `Place your ${item.name} token here`,
+			value: token,
+			onChange: (event) => setTokenCallback(event.target.value),
+		})
 	);
 };
 
-const ServiceList = ({ itemsList, onListChange = () => {}, onToggle = () => {}, onTokenChange = () => {} }) => {
+const ServiceList = ({ itemsList, onListChange = () => { }, onToggle = () => { }, onTokenChange = () => { } }) => {
 	const [items, setItems] = useState(itemsList);
 	const maxIndex = items.length - 1;
 
@@ -538,11 +538,11 @@ const OptionList = ({ type, items, onChange }) => {
 				},
 			}),
 			item.info &&
-				react.createElement("span", {
-					dangerouslySetInnerHTML: {
-						__html: item.info,
-					},
-				})
+			react.createElement("span", {
+				dangerouslySetInnerHTML: {
+					__html: item.info,
+				},
+			})
 		);
 	});
 };
@@ -723,16 +723,16 @@ function openConfig() {
 					},
 				},
 				{
-					desc: "Gemini API Key (Display Mode 1)",
+					desc: "Gemma 3 API Key (Display Mode 1)",
 					key: "gemini-api-key",
 					type: ConfigInput,
-					info: "Gemini API for Display Mode 1.",
+					info: "Gemma 3 API for Display Mode 1.",
 				},
 				{
-					desc: "Gemini API Key (Display Mode 2)",
+					desc: "Gemma 3 API Key (Display Mode 2)",
 					key: "gemini-api-key-romaji",
 					type: ConfigInput,
-					info: "Gemini API for Display Mode 2 (Romaji, Romaja, Pinyin modes), leave blank if you only use 1 API.",
+					info: "Gemma 3 API for Display Mode 2 (Romaji, Romaja, Pinyin modes), leave blank if you only use 1 API.",
 				},
 			],
 			onChange: (name, value) => {
@@ -741,13 +741,13 @@ function openConfig() {
 					// handled below
 				} else if (name === "gemini-api-key" || name === "gemini-api-key-romaji") {
 					// Save to both Spicetify LocalStorage and regular localStorage for persistence
-					try { 
-						Spicetify?.LocalStorage?.set(`${APP_NAME}:visual:${name}`, value); 
+					try {
+						Spicetify?.LocalStorage?.set(`${APP_NAME}:visual:${name}`, value);
 					} catch (error) {
 						console.warn(`Failed to save to Spicetify LocalStorage '${name}':`, error);
 					}
-					try { 
-						localStorage.setItem(`${APP_NAME}:visual:${name}`, value); 
+					try {
+						localStorage.setItem(`${APP_NAME}:visual:${name}`, value);
 					} catch (error) {
 						console.warn(`Failed to save to localStorage '${name}':`, error);
 					}
