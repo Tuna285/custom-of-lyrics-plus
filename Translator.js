@@ -145,7 +145,7 @@ class Translator {
 		}
 	}
 
-	//Gemini (Gemma 3) API Methods
+//Gemini (Gemma 3) API Methods
 	static buildGeminiPrompt({ artist, title, text, styleKey = 'smart_adaptive', pronounKey = 'default', wantSmartPhonetic = false }) {
 		const lines = text.split('\n');
 		const lineCount = lines.length;
@@ -209,92 +209,30 @@ Pronoun: ${pronoun}
 CORE TRANSLATION RULES (THE "GOLDEN RATIO" PROTOCOL):
 
 1. **RULE OF EXPANSION: Syntactic YES, Semantic NO**.
-   - **ALLOWED (Syntactic Expansion):** You MAY add "Functional Particles" to fix grammar/flow.
-     - *Examples:* "đang", "đã", "sẽ", "vẫn", "cứ", "lại", "mà", "thì", "là", "những", "cái", "nỗi".
-     - *Why:* These words make the sentence complete without changing the story.
-     - *Case:* "Look at me" -> "Hãy nhìn vào anh" (Added "Hãy", "vào" -> OK).
-
-   - **FORBIDDEN (Semantic Expansion):** You MUST NOT add "Descriptive Adjectives/Adverbs" that are not in the source.
-     - *Examples:* "buồn bã", "vội vàng", "thật chậm", "xinh đẹp", "trống trải".
-     - *Why:* These words invent new facts/emotions.
-     - *Case:* "Look at me" -> "Hãy nhìn vào anh thật đắm đuối" (Added "thật đắm đuối" -> HALLUCINATION -> STOP).
+   - **ALLOWED (Syntactic Expansion):** You MAY add "Functional Particles" to fix grammar/flow (e.g., "đang", "đã", "sẽ", "vẫn", "cứ", "lại", "mà", "thì", "là").
+   - **FORBIDDEN (Semantic Expansion):** You MUST NOT add "Descriptive Adjectives" not in source (e.g., do NOT add "buồn bã", "vội vàng" if source doesn't have them).
 
 2. **Grammar & Flow**:
-   - Aim for full, spoken-style Vietnamese sentences (Chủ ngữ + Vị ngữ).
-   - Avoid "Robot speak" (Word-for-word mapping). Reorder words if necessary for natural Vietnamese syntax.
+   - Aim for full, spoken-style Vietnamese sentences. Reorder words if necessary for natural syntax.
 
 3. **Accuracy Check**:
-   - If the source is "Kicking off the covers" (Đá chăn), translated output must imply "Kick" + "Cover". Do not add "vội vàng" (hurriedly) unless the lyrics say "hurriedly".
+   - Translate meaning accurately. Do not hallucinate new lyrics.
 
-CRITICAL FORMATTING RULES:
-1. **LINE COUNT MUST BE EXACTLY ${lineCount}**.
-   - Check your output array length BEFORE finishing.
-2. **ONE-TO-ONE MAPPING**: 
-   - Never merge or split lines.
-3. OUTPUT: Return ONLY a valid JSON String Array.
+CRITICAL FORMATTING RULES (FATAL ERROR PREVENTION):
+1. **LINE COUNT LOCK (${lineCount} lines)**:
+   - You received ${lineCount} lines. You MUST return exactly ${lineCount} items.
+   - **Double-check** your count. Mismatch = Failure.
+
+2. **NO SPLITTING / NO MERGING (CRITICAL)**:
+   - **NEVER SPLIT A LINE**: Even if the source line is very long, translate it into **ONE single string** in the array. Do not break it into two sentences.
+   - **NEVER MERGE**: Keep short lines separate exactly as in input.
+   - **Preserve "♪"**: If a line is just "♪", output "♪".
+
+3. **OUTPUT FORMAT**:
+   - Return ONLY the valid JSON String Array.
 
 Input JSON:
 ${linesJson}`;
-	}
-
-	static extractGeminiJson(text) {
-		let raw = String(text || "").trim();
-		raw = raw.replace(/```[a-z]*\n?/gim, "").replace(/```/g, "").trim();
-
-		function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
-
-		//JSON Parse
-		let parsed = safeParse(raw);
-		if (!parsed || !Array.isArray(parsed)) {
-			const start = raw.indexOf("[");
-			const end = raw.lastIndexOf("]");
-			if (start !== -1 && end > start) {
-				parsed = safeParse(raw.slice(start, end + 1));
-			}
-		}
-
-		if (Array.isArray(parsed)) {
-			console.log(`[Gemma 3] Parsed ${parsed.length} lines via JSON`);
-			return { vi: parsed, phonetic: parsed.join('\n') };
-		}
-
-		//Fallback to Delimiter/Numbered List
-		console.warn("[Gemma 3] JSON parse failed, trying fallback...");
-		const hasDelimiter = raw.includes("|||");
-		const hasNumberedLines = /^\d+\.\s+/m.test(raw);
-
-		if (hasDelimiter || hasNumberedLines) {
-			let normalized = raw.replace(/\n+(\d+\.)/g, '|||$1');
-			const parts = normalized.split("|||").map(p => p.trim()).filter(Boolean);
-			const result = [];
-
-			parts.forEach(part => {
-				const match = part.match(/^(\d+)\.\s*(.*)/s);
-				if (match) {
-					result[parseInt(match[1], 10) - 1] = match[2].trim();
-				} else if (result.length === 0) {
-					result.push(part);
-				}
-			});
-
-			const cleaned = result.filter(item => item !== undefined && item !== null);
-			if (cleaned.length > 0) {
-				console.log(`[Gemma 3] Parsed ${cleaned.length} lines via Fallback`);
-				return { vi: cleaned, phonetic: cleaned.join('\n') };
-			}
-		}
-
-		//Raw split
-		const rawLines = raw.split('\n').filter(l => l.trim());
-		return { vi: rawLines, phonetic: rawLines.join('\n') };
-	}
-
-	static buildMinimalFallbackPrompt({ artist, title, text }) {
-		const lines = text.split('\n');
-		const linesJson = JSON.stringify(lines);
-		return `Translate to Vietnamese. Output valid JSON Array of ${lines.length} strings. 1:1 mapping. No merging.
-Input: ${linesJson}
-Output JSON:`;
 	}
 
 	static promote(key) {
@@ -319,7 +257,7 @@ Output JSON:`;
 		const body = {
 			contents: [{ parts: [{ text: prompt }] }],
 			generationConfig: {
-				temperature: 0.3,
+				temperature: 0.5,
 				topP: 0.95,
 				topK: 40,
 				maxOutputTokens: 3000
