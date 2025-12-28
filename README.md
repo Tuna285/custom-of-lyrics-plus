@@ -1,19 +1,21 @@
 # Custom-of-lyrics-plus-CustomApps
 # Lyrics Plus (Phiên bản Custom)
 
-> Phiên bản cá nhân hóa cho **Lyrics Plus** của Spicetify, được xây dựng lại để tập trung vào trải nghiệm dịch thuật lời bài hát chất lượng cao, phù hợp cho người Việt Nam, bao gồm tích hợp API cá nhân (Google) và qua [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) hoặc [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal)
+> Phiên bản cá nhân hóa của custom app **Lyrics Plus** cho Spicetify, được xây dựng lại để tập trung vào trải nghiệm dịch thuật lời bài hát chất lượng cao và giao diện người dùng hiện đại.
+
+Phiên bản này đã được thay thế bằng sức mạnh của **Google Gemma 3 API** để mang lại các bản dịch chính xác, tức thì.
 
 ---
 
 ## Dưới đây là những tính năng bổ sung của phiên bản này:
 ### 1. Dịch lời bài hát với Gemma API
-Dùng mô hình LLM của Google (thông qua API và Proxy) để dịch lời bài hát một cách tự nhiên và chính xác.
+Dùng mô hình LLM của Google để dịch lời bài hát một cách tự nhiên và chính xác.
 -   **Hỗ trợ 2 chế độ hiển thị cùng lúc**: Chuyển ngữ các bài hát sang Romaji (Tiếng Nhật), Romaja (Tiếng Hàn), Pinyin (Tiếng Trung Phồn-Giản Thể) và dịch lời bài hát sang **Tiếng Việt**, lý tưởng cho việc học ngôn ngữ.
 -   **Chất lượng cao**: Bản dịch được tối ưu cho ngữ cảnh âm nhạc, giữ lại ý nghĩa và cảm xúc của bài hát.
 <img width="1919" height="1020" alt="image" src="https://github.com/user-attachments/assets/6b49032b-704e-4f35-8aec-cad9f42083f3" />
 <img width="1919" height="1022" alt="image" src="https://github.com/user-attachments/assets/aadf0f62-2c67-4396-89cd-15da4ed6882d" />
 <img width="1919" height="1021" alt="image" src="https://github.com/user-attachments/assets/90c26e06-d7f0-441f-a766-393e3a9ece72" />
-<img width="1919" height="1021" alt="image" src="https://github.com/user-attachments/assets/0c0d6497-5e43-4cb8-9581-218540a38e3f" />
+<img width="1919" height="1023" alt="image" src="https://github.com/user-attachments/assets/2a1d4b24-97e4-4c8b-9374-931dfaded08a" />
 
 ### 2. Giao diện hiện đại & Tối ưu trải nghiệm
 Giao diện được tinh chỉnh để đẹp mắt, gọn gàng và không gây xao nhãng.
@@ -21,14 +23,20 @@ Giao diện được tinh chỉnh để đẹp mắt, gọn gàng và không gâ
 -   **Nút điều khiển tự ẩn**: Các nút cài đặt chỉ xuất hiện khi bạn di chuột vào khu vực lời bài hát, trả lại không gian hiển thị tối đa.
 -   **Hiệu ứng chuyển dòng mượt mà**: Animation được tối ưu để tạo cảm giác chuyển tiếp uyển chuyển giữa các dòng lyric.
 
-### 3. Tối ưu bản dịch thông minh
-Prompt được tinh chỉnh và tự động xử lý để kết quả hiển thị luôn gọn gàng và hợp lý.
+### 3. Quản lý API Key thông minh
+-   **Hỗ trợ 2 API Key riêng biệt**: Bạn có thể sử dụng một key cho Display Mode 1 và một key cho Display Mode 2 để quản lý giới hạn request hiệu quả, nếu bạn chỉ cung cấp một API key, cả hai chế độ dịch sẽ tự động sử dụng chung key đó.
+<img width="1920" height="1021" alt="image" src="https://github.com/user-attachments/assets/9bfe5f3f-9836-4583-8759-7e75ba438147" />
+
+### 4. Tối ưu bản dịch thông minh
+Hệ thống sẽ tự động xử lý để kết quả hiển thị luôn gọn gàng và hợp lý.
+-   **Chống trùng lặp**: Tự động ẩn các bản dịch giống hệt với lời gốc
 
 ---
 
 ## Cài đặt
 
-0.  **(Yêu cầu Spotify cài đặt từ web, không từ Microsoft Store)** Cài đặt [Spicetify và CustomApps (lyrics-plus)](https://spicetify.app/docs/getting-started)
+0.  **(Yêu cầu Spotify cài đặt từ web, không từ Microsoft Store)** Cài đặt Spicetify và CustomApps (lyrics-plus): https://spicetify.app/docs/getting-started
+
 1.  Tải và giải nén file chứa custom của lyric-plus
 <img width="578" height="455" alt="image" src="https://github.com/user-attachments/assets/5f190f70-3185-4e2d-990f-90068d3bcf8d" />
   
@@ -40,22 +48,18 @@ Prompt được tinh chỉnh và tự động xử lý để kết quả hiển 
     ```
     spicetify apply
     ```
-* Cách lấy API Gemma qua [AiStudio](https://www.youtube.com/watch?v=JomWSwhwThg)
+3. Cách lấy API của Gemma(free):
+- https://www.youtube.com/watch?v=RVGbLSVFtIk
 
-* Chi tiết cách cài đặt [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) hoặc [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal)
 
 ---
 
 ## Thiết lập ban đầu
 
 1.  Mở Spotify, vào lyrics plus và nhấn vào avatar chọn **Lyrics Plus config** từ thanh menu bên trái.
-2.  Đến phần Translation chọn API Mode
-<img width="600" height="711" alt="image" src="https://github.com/user-attachments/assets/5b819cb2-b800-456d-a8b3-f9f39c61cc5e" />
-
-4.  Mở một bài hát bất kỳ, di chuột vào vùng hiển thị lời bài hát và nhấp vào biểu tượng chuyển ngữ (⇄) để bắt đầu tùy chỉnh chế độ dịch của bạn.
+2.  Tìm đến `Gemma API Key (Display Mode 1)` và `Gemma API Key (Display Mode 2)` và dán API key của bạn vào.
+3.  Mở một bài hát bất kỳ, di chuột vào vùng hiển thị lời bài hát và nhấp vào biểu tượng chuyển ngữ (⇄) để bắt đầu tùy chỉnh chế độ dịch của bạn.
 
 ---
 **(Dự án đang phát triển, nếu có lỗi vui lòng góp ý)**
-
-
 

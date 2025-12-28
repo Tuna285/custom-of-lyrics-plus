@@ -3,35 +3,35 @@ const Utils = {
 	// Cache for frequently used operations
 	_colorCache: new Map(),
 	_normalizeCache: new Map(),
-	
+
 	addQueueListener(callback) {
 		Spicetify.Player.origin._events.addListener("queue_update", callback);
 	},
-	
+
 	removeQueueListener(callback) {
 		Spicetify.Player.origin._events.removeListener("queue_update", callback);
 	},
-	
+
 	convertIntToRGB(colorInt, div = 1) {
 		const cacheKey = `${colorInt}_${div}`;
-		
+
 		if (this._colorCache.has(cacheKey)) {
 			return this._colorCache.get(cacheKey);
 		}
-		
+
 		const r = Math.round(((colorInt >>> 16) & 0xff) / div);
-		const g = Math.round(((colorInt >>> 8) & 0xff) / div); 
+		const g = Math.round(((colorInt >>> 8) & 0xff) / div);
 		const b = Math.round((colorInt & 0xff) / div);
-		
+
 		const result = `rgb(${r},${g},${b})`;
-		
+
 		// Cache result (limit cache size)
 		if (this._colorCache.size > 100) {
 			const firstKey = this._colorCache.keys().next().value;
 			this._colorCache.delete(firstKey);
 		}
 		this._colorCache.set(cacheKey, result);
-		
+
 		return result;
 	},
 	/**
@@ -41,11 +41,11 @@ const Utils = {
 	 */
 	normalize(s, emptySymbol = true) {
 		const cacheKey = `${s}_${emptySymbol}`;
-		
+
 		if (this._normalizeCache.has(cacheKey)) {
 			return this._normalizeCache.get(cacheKey);
 		}
-		
+
 		// Optimized: use a single pass with compiled regex
 		const replacements = [
 			[/（/g, "("],
@@ -63,25 +63,25 @@ const Utils = {
 			[/〜/g, "~"],
 			[/·|・/g, "•"]
 		];
-		
+
 		let result = s;
 		for (const [regex, replacement] of replacements) {
 			result = result.replace(regex, replacement);
 		}
-		
+
 		if (emptySymbol) {
 			result = result.replace(/[-/]/g, " ");
 		}
-		
+
 		result = result.replace(/\s+/g, " ").trim();
-		
+
 		// Cache result (limit cache size to prevent memory leaks)
 		if (this._normalizeCache.size > 200) {
 			const firstKey = this._normalizeCache.keys().next().value;
 			this._normalizeCache.delete(firstKey);
 		}
 		this._normalizeCache.set(cacheKey, result);
-		
+
 		return result;
 	},
 	/**
@@ -156,12 +156,12 @@ const Utils = {
 		}
 
 		// Create cache key from lyrics text
-		const rawLyrics = lyrics[0]?.originalText ? 
-			lyrics.map((line) => line?.originalText || "").join(" ") : 
+		const rawLyrics = lyrics[0]?.originalText ?
+			lyrics.map((line) => line?.originalText || "").join(" ") :
 			lyrics.map((line) => line?.text || "").join(" ");
-			
+
 		const cacheKey = rawLyrics.substring(0, 200); // Use first 200 chars as cache key
-		
+
 		if (this._langDetectCache.has(cacheKey)) {
 			return this._langDetectCache.get(cacheKey);
 		}
@@ -181,9 +181,9 @@ const Utils = {
 		if (!cjkMatch) {
 			// Debug logging for non-CJK languages
 			if (window.lyricsPlusDebug) {
-				console.log("detectLanguage: No CJK characters found", { 
+				console.log("detectLanguage: No CJK characters found", {
 					rawLyrics: rawLyrics.substring(0, 100),
-					lyricsLength: lyrics.length 
+					lyricsLength: lyrics.length
 				});
 			}
 			// Return null instead of undefined for non-CJK languages
@@ -225,7 +225,7 @@ const Utils = {
 			originalText: lyric?.text || "",
 		}));
 	},
-	/** It seems that this function is not being used, but I'll keep it just in case it's needed in the future.*/
+	/** Unused, kept for future reference. */
 	processTranslatedOriginalLyrics(lyrics, synced) {
 		const data = [];
 		const dataSouce = {};
@@ -279,12 +279,12 @@ const Utils = {
 	_rubyHTMLCache: new Map(),
 	rubyTextToHTML(s) {
 		if (!s || typeof s !== "string") return "";
-		
+
 		// Check cache first
 		if (this._rubyHTMLCache.has(s)) {
 			return this._rubyHTMLCache.get(s);
 		}
-		
+
 		// Allow only ruby-related tags we generate; escape others
 		let out = s
 			.replace(/</g, "&lt;")
@@ -297,14 +297,14 @@ const Utils = {
 			.replace(/&lt;\/rt&gt;/g, "</rt>")
 			.replace(/&lt;rp&gt;/g, "<rp>")
 			.replace(/&lt;\/rp&gt;/g, "</rp>");
-		
+
 		// Cache result (limit cache size to prevent memory bloat)
 		if (this._rubyHTMLCache.size > 500) {
 			const firstKey = this._rubyHTMLCache.keys().next().value;
 			this._rubyHTMLCache.delete(firstKey);
 		}
 		this._rubyHTMLCache.set(s, out);
-		
+
 		return out;
 	},
 	formatTime(timestamp) {
@@ -444,7 +444,7 @@ const Utils = {
 			if (line.trim() !== "") {
 				if (isKaraoke) {
 					if (!lyricContent.endsWith(">")) {
-						// For some reason there are a variety of formats for karaoke lyrics, Wikipedia is also inconsisent in their examples
+						// Handle inconsistent karaoke formats
 						const endTime = lines[i + 1]?.match(syncedTimestamp)?.[1] || this.formatTime(Number(Spicetify.Player.data.item.metadata.duration));
 						lyricContent += `<${endTime}>`;
 					}

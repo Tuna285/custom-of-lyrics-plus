@@ -117,10 +117,8 @@
 }
 
 .lyrics-lyricsContainer-LyricsBackground {
-	background-color: transparent;
-	/* was var(--lyrics-color-background) */
-	background-image: none;
-	/* remove noise to be fully transparent */
+	background-color: var(--lyrics-color-background, transparent);
+	background-image: var(--lyrics-background-noise, none);
 	grid-area: 1 / 1 / -1 / -1;
 	transition: background-color 0.25s ease-out;
 }

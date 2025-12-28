@@ -180,7 +180,7 @@ let adjustmentsDebounceTimeout = null;
 const STATIC_OPTIONS = {
 	source: {
 		traditional: "Traditional",
-		geminiVi: "Gemma 3",
+		geminiVi: "Gemini, Gemma",
 	},
 	translationDisplay: {
 		replace: "Replace original",
@@ -197,8 +197,8 @@ const STATIC_OPTIONS = {
 		none: "None",
 	},
 	geminiModes: {
-		gemini_romaji: "Romaji, Romaja, Pinyin (Gemma 3)",
-		gemini_vi: "Vietnamese (Gemma 3)",
+		gemini_romaji: "Romaji, Romaja, Pinyin (Gemini, Gemma)",
+		gemini_vi: "Vietnamese (Gemini, Gemma)",
 	},
 	languageModes: {
 		japanese: {
@@ -261,12 +261,12 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 					key: "translate:translation-style",
 					type: ConfigSelection,
 					options: {
-						"smart_adaptive": "Tự Động Thông Minh (Khuyên dùng)",
-						"poetic_standard": "Trữ tình & Lãng mạn",
-						"youth_story": "Thanh xuân & Tự sự (Anime/Indie)",
-						"street_bold": "Cá tính & Mạnh mẽ (Rap/Rock)",
-						"vintage_classic": "Cổ điển & Suy tư (Nhạc xưa)",
-						"literal_study": "Sát nghĩa (Học tập)"
+						"smart_adaptive": "Smart Adaptive (Recommended)",
+						"poetic_standard": "Poetic & Romantic",
+						"youth_story": "Youthful & Narrative (Anime/Indie)",
+						"street_bold": "Bold & Street (Rap/Rock)",
+						"vintage_classic": "Vintage & Classic (Classic songs)",
+						"literal_study": "Literal (Language learning)"
 					},
 					renderInline: true,
 				},
@@ -275,7 +275,7 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 					key: "translate:pronoun-mode",
 					type: ConfigSelection,
 					options: {
-						"default": "Auto (Theo nội dung)",
+						"default": "Auto (Based on content)",
 						"anh_em": "Anh - Em",
 						"em_anh": "Em - Anh",
 						"to_cau": "Tớ - Cậu",
@@ -303,20 +303,39 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 
 		// Add language-specific display modes
 		if (friendlyLanguage) {
+			// Build combined options: Gemini + Local (if Gemini mode)
+			let combinedOptions = {};
+
+			if (provider === "geminiVi") {
+				// Add Gemini options first
+				combinedOptions = { ...STATIC_OPTIONS.geminiModes };
+				// Then add local options from Traditional mode
+				const localModes = STATIC_OPTIONS.languageModes[friendlyLanguage];
+				if (localModes) {
+					// Add separator-like label and local options
+					Object.keys(localModes).forEach(key => {
+						combinedOptions[key] = `${localModes[key]} (Local)`;
+					});
+				}
+			} else {
+				// Traditional mode - only local options
+				combinedOptions = STATIC_OPTIONS.languageModes[friendlyLanguage] || {};
+			}
+
 			// For detected CJK languages, show specific language modes
 			baseItems.push(
 				{
 					desc: react.createElement(SettingRowDescription, { icon: ICONS.mode, text: "Display Mode" }),
 					key: `translation-mode:${friendlyLanguage}`,
 					type: ConfigSelection,
-					options: { none: "None", ...modeOptions },
+					options: { none: "None", ...combinedOptions },
 					renderInline: true,
 				},
 				{
 					desc: react.createElement(SettingRowDescription, { icon: ICONS.mode, text: "Display Mode 2" }),
 					key: `translation-mode-2:${friendlyLanguage}`,
 					type: ConfigSelection,
-					options: { none: "None", ...modeOptions },
+					options: { none: "None", ...combinedOptions },
 					renderInline: true,
 				}
 			);
@@ -395,7 +414,7 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 					if (value === "geminiVi" && CONFIG.visual["translate:detect-language-override"] !== "off") {
 						CONFIG.visual["translate:detect-language-override"] = "off";
 						localStorage.setItem(`${APP_NAME}:visual:translate:detect-language-override`, "off");
-						Spicetify.showNotification("Language Override reset to 'Off' for Gemma 3 mode", false, 3000);
+						Spicetify.showNotification("Language Override reset to 'Off' for Gemini mode", false, 3000);
 					}
 				}
 			}
