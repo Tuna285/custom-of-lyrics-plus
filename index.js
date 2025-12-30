@@ -497,22 +497,26 @@ class LyricsContainer extends react.Component {
 		const promise2 = processMode(displayMode2, lyrics);
 
 		promise1.then(result => {
+			// Early exit if track changed while translating
+			if (this.state.uri !== uri) return;
 			lyricsMode1 = result;
-			if (this._dmResults[currentUri]) this._dmResults[currentUri].mode1 = result;
+			if (this._dmResults?.[currentUri]) this._dmResults[currentUri].mode1 = result;
 			updateCombinedLyrics();
 		}).catch(error => {
+			if (this.state.uri !== uri) return;
 			console.warn("Display Mode 1 translation failed:", error.message);
-			// Still update UI even if one mode fails
 			updateCombinedLyrics();
 		});
 
 		promise2.then(result => {
+			// Early exit if track changed while translating
+			if (this.state.uri !== uri) return;
 			lyricsMode2 = result;
-			if (this._dmResults[currentUri]) this._dmResults[currentUri].mode2 = result;
+			if (this._dmResults?.[currentUri]) this._dmResults[currentUri].mode2 = result;
 			updateCombinedLyrics();
 		}).catch(error => {
+			if (this.state.uri !== uri) return;
 			console.warn("Display Mode 2 translation failed:", error.message);
-			// Still update UI even if one mode fails
 			updateCombinedLyrics();
 		});
 
@@ -847,7 +851,10 @@ class LyricsContainer extends react.Component {
 			const pendingTimer = setTimeout(() => {
 				try {
 					Spicetify.showNotification("Still converting...", false, 2000);
-				} catch { }
+				} catch (e) {
+					// Notification API may not be available in some contexts
+					if (window.lyricsPlusDebug) console.warn("[Lyrics+] Could not show notification:", e);
+				}
 			}, 3000);
 
 			const inflightPromise = this.translateLyrics(language, lyrics, displayMode)
@@ -1356,7 +1363,10 @@ class LyricsContainer extends react.Component {
 		if (originalLanguage) {
 			try {
 				friendlyLanguage = new Intl.DisplayNames(["en"], { type: "language" }).of(originalLanguage.split("-")[0])?.toLowerCase();
-			} catch { }
+			} catch (e) {
+				// Intl.DisplayNames may not support all language codes
+				if (window.lyricsPlusDebug) console.warn("[Lyrics+] Could not get friendly language name:", e);
+			}
 		}
 
 		const modeKey = !friendlyLanguage ? "gemini" : friendlyLanguage;
@@ -1503,7 +1513,8 @@ class LyricsContainer extends react.Component {
 		this.mousetrap.bind(CONFIG.visual["fullscreen-key"], this.toggleFullscreen);
 		window.addEventListener("fad-request", lyricContainerUpdate);
 
-		// Start pre-translation check interval
+		// Start pre-translation check interval (clear existing to prevent duplicates)
+		if (this.pretranslateInterval) clearInterval(this.pretranslateInterval);
 		this.pretranslateInterval = setInterval(() => {
 			// Optimization: Skip check if music is paused or pre-translation is disabled
 			if (Spicetify.Player.data.is_paused || !CONFIG.visual["pre-translation"]) return;
