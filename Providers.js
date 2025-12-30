@@ -185,7 +185,7 @@ const Providers = {
 			versionIndex2,
 		};
 	},
-	local: (info) => {
+	local: async (info) => {
 		let result = {
 			uri: info.uri,
 			karaoke: null,
@@ -195,17 +195,16 @@ const Providers = {
 		};
 
 		try {
-			const savedLyrics = JSON.parse(localStorage.getItem("lyrics-plus:local-lyrics"));
-			const lyrics = savedLyrics[info.uri];
+			const lyrics = await DBManager.get(info.uri);
 			if (!lyrics) {
-				throw "";
+				throw "No lyrics in DB";
 			}
 
 			result = {
 				...result,
 				...lyrics,
 			};
-		} catch {
+		} catch (e) {
 			result.error = "No lyrics";
 		}
 

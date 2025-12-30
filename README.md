@@ -1,5 +1,28 @@
 # Custom-of-lyrics-plus-CustomApps
 
+> A personalized version of **Lyrics Plus** for Spicetify, rebuilt to focus on high-quality lyric translation, ideal for Vietnamese users. Supports personal API (Google) and via [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) or [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal).
+
+---
+
+## Key Features
+
+### 1. Lyric Translation with Gemini API
+Uses Google's LLM models (via API and Proxy) to translate lyrics naturally and accurately.
+- **Dual display modes**: Convert songs to Romaji (Japanese), Romaja (Korean), Pinyin (Chinese) and translate to **Vietnamese** - ideal for language learning.
+- **High quality**: Translations optimized for musical context, preserving meaning and emotion.
+
+### 2. Modern Interface & Optimized Experience
+- **Transparent background**: Lyrics displayed on transparent overlay, harmonizing with Spicetify themes.
+- **Auto-hiding controls**: Setting buttons only appear on hover, maximizing display space.
+- **Smooth transitions**: Optimized animations for seamless line transitions.
+
+### 3. Smart Translation Optimization
+Prompts are fine-tuned and automatically processed for clean, sensible results.
+
+---
+
+# Phiên bản Tiếng Việt
+
 > Phiên bản cá nhân hóa cho **Lyrics Plus** của Spicetify, được xây dựng lại để tập trung vào trải nghiệm dịch thuật lời bài hát chất lượng cao, phù hợp cho người Việt Nam, bao gồm tích hợp API cá nhân (Google) và qua [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) hoặc [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal)
 
 ---

@@ -401,60 +401,66 @@ const Utils = {
 		};
 	},
 	parseLocalLyrics(lyrics) {
-		// Preprocess lyrics by removing [tags] and empty lines
-		const lines = lyrics
-			.replaceAll(/\[[a-zA-Z]+:.+\]/g, "")
-			.trim()
-			.split("\n");
+		console.log("[Lyrics+] Parsing local lyrics file...");
+		// Xóa các tag metadata [ti:...] [ar:...]
+		const rawLines = lyrics.replaceAll(/\[[a-zA-Z]+:.+\]/g, "").trim();
+		// Xử lý xuống dòng cho cả Windows (\r\n) và Unix (\n), loại bỏ dòng trống
+		const lines = rawLines.replace(/\r\n/g, "\n").split("\n").map(line => line.trim()).filter(line => line !== "");
+
+		console.log(`[Lyrics+] Found ${lines.length} non-empty lines`);
 
 		const syncedTimestamp = /\[([0-9:.]+)\]/;
 		const karaokeTimestamp = /<([0-9:.]+)>/;
-
 		const unsynced = [];
 
-		const isSynced = lines[0].match(syncedTimestamp);
+		const isSynced = lines.some(line => syncedTimestamp.test(line));
 		const synced = isSynced ? [] : null;
-
-		const isKaraoke = lines[0].match(karaokeTimestamp);
+		const isKaraoke = lines.some(line => karaokeTimestamp.test(line));
 		const karaoke = isKaraoke ? [] : null;
 
 		function timestampToMs(timestamp) {
-			const [minutes, seconds] = timestamp.replace(/\[\]<>/, "").split(":");
-			return Number(minutes) * 60 * 1000 + Number(seconds) * 1000;
+			// Chuẩn hóa timestamp bằng cách xóa các ký tự [], <>
+			const parts = timestamp.replace(/[\[\]<>]/g, "").split(":");
+			return parts.length === 2 ? Number(parts[0]) * 60 * 1000 + Number(parts[1]) * 1000 : 0;
 		}
 
 		function parseKaraokeLine(line, startTime) {
 			let wordTime = timestampToMs(startTime);
 			const karaokeLine = [];
-			const karaoke = line.matchAll(/(\S+ ?)<([0-9:.]+)>/g);
-			for (const match of karaoke) {
-				const word = match[1];
-				const time = match[2];
-				karaokeLine.push({ word, time: timestampToMs(time) - wordTime });
-				wordTime = timestampToMs(time);
+			const matches = line.matchAll(/(\S+ ?)<([0-9:.]+)>/g);
+			for (const match of matches) {
+				const msTime = timestampToMs(match[2]);
+				if (!isNaN(msTime)) {
+					karaokeLine.push({ word: match[1], time: msTime - wordTime });
+					wordTime = msTime;
+				}
 			}
 			return karaokeLine;
 		}
 
 		for (const [i, line] of lines.entries()) {
-			const time = line.match(syncedTimestamp)?.[1];
-			let lyricContent = line.replace(syncedTimestamp, "").trim();
+			const timeMatch = line.match(syncedTimestamp);
+			const time = timeMatch?.[1];
+			// Use global regex to remove ALL timestamps from the text content
+			let lyricContent = line.replace(/\[\d{1,3}:\d{1,3}(\.\d+)?\]/g, "").trim();
 			const lyric = lyricContent.replaceAll(/<([0-9:.]+)>/g, "").trim();
 
-			if (line.trim() !== "") {
-				if (isKaraoke) {
-					if (!lyricContent.endsWith(">")) {
-						// Handle inconsistent karaoke formats
-						const endTime = lines[i + 1]?.match(syncedTimestamp)?.[1] || this.formatTime(Number(Spicetify.Player.data.item.metadata.duration));
-						lyricContent += `<${endTime}>`;
-					}
-					const karaokeLine = parseKaraokeLine(lyricContent, time);
-					karaoke.push({ text: karaokeLine, startTime: timestampToMs(time) });
-				}
-				isSynced && time && synced.push({ text: lyric || "♪", startTime: timestampToMs(time) });
-				unsynced.push({ text: lyric || "♪" });
+			if (isSynced && time) {
+				const ms = timestampToMs(time);
+				if (!isNaN(ms)) synced.push({ text: lyric || "♪", startTime: ms });
 			}
+			if (isKaraoke && time) {
+				const nextTime = lines[i + 1]?.match(syncedTimestamp)?.[1];
+				const endTime = nextTime || this.formatTime(Number(Spicetify.Player.getDuration() || 0));
+				if (!lyricContent.endsWith(">")) lyricContent += `<${endTime}>`;
+				const ms = timestampToMs(time);
+				if (!isNaN(ms)) karaoke.push({ text: parseKaraokeLine(lyricContent, time), startTime: ms });
+			}
+			unsynced.push({ text: lyric || "♪" });
 		}
+
+		// Sắp xếp lại lời theo thời gian để tránh lỗi kẹt ở dòng cuối
+		if (synced) synced.sort((a, b) => a.startTime - b.startTime);
 
 		return { synced, unsynced, karaoke };
 	},
@@ -474,4 +480,85 @@ const Utils = {
 		const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
 		return luminance > 128;
 	},
+	getDisplayTexts(text, originalText, text2) {
+		const displayMode = CONFIG.visual["translate:display-mode"];
+		const isBelow = displayMode === "below";
+		const isReplace = displayMode === "replace";
+
+		if (isBelow && originalText) {
+			return { mainText: originalText, subText: text, subText2: text2 };
+		} else if (isReplace) {
+			return { mainText: text || originalText, subText: text2, subText2: null };
+		}
+		return { mainText: text, subText: null, subText2: null };
+	},
+};
+
+const DBManager = {
+	dbName: "lyrics-plus-db",
+	storeName: "lyrics-cache",
+	version: 1,
+	_db: null,
+
+	async getDB() {
+		if (this._db) return this._db;
+		return new Promise((resolve, reject) => {
+			const request = indexedDB.open(this.dbName, this.version);
+			request.onerror = () => reject(request.error);
+			request.onsuccess = () => {
+				this._db = request.result;
+				resolve(request.result);
+			};
+			request.onupgradeneeded = (event) => {
+				const db = event.target.result;
+				if (!db.objectStoreNames.contains(this.storeName)) {
+					db.createObjectStore(this.storeName);
+				}
+			};
+		});
+	},
+
+	async get(key) {
+		const db = await this.getDB();
+		return new Promise((resolve, reject) => {
+			const transaction = db.transaction(this.storeName, "readonly");
+			const store = transaction.objectStore(this.storeName);
+			const request = store.get(key);
+			request.onerror = () => reject(request.error);
+			request.onsuccess = () => resolve(request.result);
+		});
+	},
+
+	async set(key, value) {
+		const db = await this.getDB();
+		return new Promise((resolve, reject) => {
+			const transaction = db.transaction(this.storeName, "readwrite");
+			const store = transaction.objectStore(this.storeName);
+			const request = store.put(value, key);
+			request.onerror = () => reject(request.error);
+			request.onsuccess = () => resolve();
+		});
+	},
+
+	async delete(key) {
+		const db = await this.getDB();
+		return new Promise((resolve, reject) => {
+			const transaction = db.transaction(this.storeName, "readwrite");
+			const store = transaction.objectStore(this.storeName);
+			const request = store.delete(key);
+			request.onerror = () => reject(request.error);
+			request.onsuccess = () => resolve();
+		});
+	},
+
+	async clear() {
+		const db = await this.getDB();
+		return new Promise((resolve, reject) => {
+			const transaction = db.transaction(this.storeName, "readwrite");
+			const store = transaction.objectStore(this.storeName);
+			const request = store.clear();
+			request.onerror = () => reject(request.error);
+			request.onsuccess = () => resolve();
+		});
+	}
 };

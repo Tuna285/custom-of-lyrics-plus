@@ -346,6 +346,7 @@ const ConfigHelper = () => {
 			break;
 		case "Advanced":
 			const advSettings = [
+				{ desc: "Debug Mode", key: "debug-mode", info: "Enable detailed console logging for troubleshooting. Shows lyrics processing, translation requests, and timing info.", type: ConfigSlider },
 				{ desc: "Text convertion: Japanese Detection threshold (Advanced)", info: "Checks if whenever Kana is dominant in lyrics...", key: "ja-detect-threshold", type: ConfigAdjust, min: thresholdSizeLimit.min, max: thresholdSizeLimit.max, step: thresholdSizeLimit.step },
 				{ desc: "Text convertion: Tradition-Simplified Detection threshold (Advanced)", info: "Checks if whenever Traditional or Simplified is dominant...", key: "hans-detect-threshold", type: ConfigAdjust, min: thresholdSizeLimit.min, max: thresholdSizeLimit.max, step: thresholdSizeLimit.step },
 				{ desc: "Musixmatch Translation Language.", info: "Choose the language you want to translate the lyrics to...", key: "musixmatch-translation-language", type: ConfigSelection, options: languageOptions },

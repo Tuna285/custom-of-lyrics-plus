@@ -15,366 +15,8 @@ function render() {
 	return react.createElement(LyricsContainer, null);
 }
 
-const ConfigUtils = {
-	get(name, defaultVal = true) {
-		try {
-			const value = localStorage.getItem(name);
-			return value !== null ? value === "true" : defaultVal;
-		} catch (error) {
-			console.warn(`Failed to read config '${name}':`, error);
-			return defaultVal;
-		}
-	},
+// Config, Cache, and RateLimiter have been moved to their own modules.
 
-	getPersisted(key) {
-		try {
-			const value = Spicetify?.LocalStorage?.get(key);
-			if (typeof value === "string") return value;
-		} catch (error) {
-			console.warn(`Failed to read from Spicetify LocalStorage '${key}':`, error);
-		}
-
-		try {
-			return localStorage.getItem(key);
-		} catch (error) {
-			console.warn(`Failed to read from localStorage '${key}':`, error);
-		}
-
-		return null;
-	},
-
-	setPersisted(key, value) {
-		const stringValue = String(value);
-		let success = false;
-
-		// Try Spicetify LocalStorage first
-		try {
-			Spicetify?.LocalStorage?.set(key, stringValue);
-			success = true;
-		} catch (error) {
-			console.warn(`Failed to write to Spicetify LocalStorage '${key}':`, error);
-		}
-
-		// Fallback to regular localStorage
-		try {
-			localStorage.setItem(key, stringValue);
-			success = true;
-		} catch (error) {
-			console.warn(`Failed to write to localStorage '${key}':`, error);
-		}
-
-		if (!success) {
-			console.error(`Failed to persist data for key '${key}'`);
-		}
-	}
-};
-
-const APP_NAME = "lyrics-plus";
-
-//Auto Update Checker
-const UpdateChecker = {
-	REPO_URL: "https://github.com/Tuna285/custom-of-lyrics-plus",
-	VERSION_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/version.json",
-	CURRENT_VERSION: "1.1.0",
-	CHECK_INTERVAL: 24 * 60 * 60 * 1000, // 24 hours
-
-	async checkForUpdates(silent = false) {
-		try {
-			const lastCheck = localStorage.getItem("lyrics-plus:last-update-check");
-			const now = Date.now();
-
-			if (lastCheck && (now - parseInt(lastCheck)) < this.CHECK_INTERVAL && silent) {
-				return null;
-			}
-
-			const response = await fetch(this.VERSION_URL + "?t=" + now, {
-				cache: "no-cache"
-			});
-
-			if (!response.ok) return null;
-
-			const data = await response.json();
-			localStorage.setItem("lyrics-plus:last-update-check", String(now));
-
-			if (this.compareVersions(data.version, this.CURRENT_VERSION) > 0) {
-				console.log(`[Lyrics+] New version available: ${data.version} (current: ${this.CURRENT_VERSION})`);
-				this.showUpdateNotification(data.version);
-				return data;
-			}
-
-			return null;
-		} catch (error) {
-			console.warn("[Lyrics+] Update check failed:", error.message);
-			return null;
-		}
-	},
-
-	compareVersions(v1, v2) {
-		const parts1 = v1.split('.').map(Number);
-		const parts2 = v2.split('.').map(Number);
-
-		for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
-			const num1 = parts1[i] || 0;
-			const num2 = parts2[i] || 0;
-			if (num1 > num2) return 1;
-			if (num1 < num2) return -1;
-		}
-		return 0;
-	},
-
-	showUpdateNotification(newVersion) {
-		try {
-			Spicetify.showNotification(
-				`Lyrics Plus v${newVersion} available!`,
-				false,
-				5000
-			);
-
-			Spicetify.PopupModal.display({
-				title: "Lyrics Plus Update Available",
-				content: react.createElement("div", { style: { padding: "10px" } },
-					react.createElement("p", null, `A new version (v${newVersion}) is available!`),
-					react.createElement("p", null, `Current version: v${this.CURRENT_VERSION}`),
-					react.createElement("div", { style: { marginTop: "15px", display: "flex", gap: "10px" } },
-						react.createElement("button", {
-							onClick: () => {
-								window.open(this.REPO_URL, "_blank");
-								Spicetify.PopupModal.hide();
-							},
-							style: {
-								padding: "10px 20px",
-								background: "var(--spice-button)",
-								color: "var(--spice-text)",
-								border: "none",
-								borderRadius: "20px",
-								cursor: "pointer",
-								fontWeight: "bold"
-							}
-						}, "Download Update"),
-						react.createElement("button", {
-							onClick: () => Spicetify.PopupModal.hide(),
-							style: {
-								padding: "10px 20px",
-								background: "transparent",
-								color: "var(--spice-subtext)",
-								border: "1px solid var(--spice-subtext)",
-								borderRadius: "20px",
-								cursor: "pointer"
-							}
-						}, "Later")
-					)
-				)
-			});
-		} catch (e) {
-			console.warn("[Lyrics+] Could not show update notification:", e);
-		}
-	}
-};
-
-const KARAOKE = 0; // deprecated (kept for compatibility in values)
-const SYNCED = 1;
-const UNSYNCED = 2;
-const GENIUS = 3;
-
-//Configuration & Settings
-const CONFIG = {
-	visual: {
-		"playbar-button": ConfigUtils.get("lyrics-plus:visual:playbar-button", false),
-		colorful: ConfigUtils.get("lyrics-plus:visual:colorful"),
-		"gradient-background": ConfigUtils.get("lyrics-plus:visual:gradient-background"),
-		"transparent-background": ConfigUtils.get("lyrics-plus:visual:transparent-background", true),
-		"background-brightness": localStorage.getItem("lyrics-plus:visual:background-brightness") || "80",
-		noise: ConfigUtils.get("lyrics-plus:visual:noise"),
-		"background-color": localStorage.getItem("lyrics-plus:visual:background-color") || "#000000",
-		"active-color": localStorage.getItem("lyrics-plus:visual:active-color") || "var(--spice-text)",
-		"inactive-color": localStorage.getItem("lyrics-plus:visual:inactive-color") || "rgba(var(--spice-rgb-subtext),0.5)",
-		"highlight-color": localStorage.getItem("lyrics-plus:visual:highlight-color") || "var(--spice-button)",
-		alignment: localStorage.getItem("lyrics-plus:visual:alignment") || "center",
-		"lines-before": localStorage.getItem("lyrics-plus:visual:lines-before") || "0",
-		"lines-after": localStorage.getItem("lyrics-plus:visual:lines-after") || "2",
-		"font-size": localStorage.getItem("lyrics-plus:visual:font-size") || "32",
-		"translate:translated-lyrics-source": localStorage.getItem("lyrics-plus:visual:translate:translated-lyrics-source") || "geminiVi",
-		"translate:display-mode": localStorage.getItem("lyrics-plus:visual:translate:display-mode") || "replace",
-		"translate:detect-language-override": localStorage.getItem("lyrics-plus:visual:translate:detect-language-override") || "off",
-		"translate:translation-style": localStorage.getItem("lyrics-plus:visual:translate:translation-style") || "smart_adaptive",
-		"translate:pronoun-mode": localStorage.getItem("lyrics-plus:visual:translate:pronoun-mode") || "default",
-		"translation-mode:japanese": localStorage.getItem("lyrics-plus:visual:translation-mode:japanese") || "none",
-		"translation-mode:korean": localStorage.getItem("lyrics-plus:visual:translation-mode:korean") || "none",
-		"translation-mode:chinese": localStorage.getItem("lyrics-plus:visual:translation-mode:chinese") || "none",
-		"translation-mode:gemini": localStorage.getItem("lyrics-plus:visual:translation-mode:gemini") || "none",
-		"translation-mode-2:japanese": localStorage.getItem("lyrics-plus:visual:translation-mode-2:japanese") || "none",
-		"translation-mode-2:korean": localStorage.getItem("lyrics-plus:visual:translation-mode-2:korean") || "none",
-		"translation-mode-2:chinese": localStorage.getItem("lyrics-plus:visual:translation-mode-2:chinese") || "none",
-		"translation-mode-2:gemini": localStorage.getItem("lyrics-plus:visual:translation-mode-2:gemini") || "none",
-		"gemini-api-key": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key") || "",
-		"gemini-api-key-romaji": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key-romaji") || "",
-		"gemini:api-mode": localStorage.getItem("lyrics-plus:visual:gemini:api-mode") || "official",
-		"gemini:proxy-model": localStorage.getItem("lyrics-plus:visual:gemini:proxy-model") || "gemini-2.5-flash",
-		"gemini:proxy-api-key": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:proxy-api-key") || "",
-		"gemini:proxy-endpoint": localStorage.getItem("lyrics-plus:visual:gemini:proxy-endpoint") || "http://localhost:8317/v1/chat/completions",
-		translate: ConfigUtils.get("lyrics-plus:visual:translate", false),
-		"ja-detect-threshold": localStorage.getItem("lyrics-plus:visual:ja-detect-threshold") || "40",
-		"hans-detect-threshold": localStorage.getItem("lyrics-plus:visual:hans-detect-threshold") || "40",
-		"musixmatch-translation-language": localStorage.getItem("lyrics-plus:visual:musixmatch-translation-language") || "none",
-		"fade-blur": ConfigUtils.get("lyrics-plus:visual:fade-blur"),
-		"unsynced-auto-scroll": ConfigUtils.get("lyrics-plus:visual:unsynced-auto-scroll", true),
-		"fullscreen-key": localStorage.getItem("lyrics-plus:visual:fullscreen-key") || "f12",
-		"synced-compact": ConfigUtils.get("lyrics-plus:visual:synced-compact"),
-		"dual-genius": ConfigUtils.get("lyrics-plus:visual:dual-genius"),
-		"pre-translation": ConfigUtils.get("lyrics-plus:visual:pre-translation", true),
-		"global-delay": Number(localStorage.getItem("lyrics-plus:visual:global-delay")) || 0,
-		delay: 0,
-	},
-	providers: {
-		lrclib: {
-			on: ConfigUtils.get("lyrics-plus:provider:lrclib:on"),
-			desc: "Lyrics sourced from lrclib.net. Supports both synced and unsynced lyrics. LRCLIB is a free and open-source lyrics provider.",
-			modes: [SYNCED, UNSYNCED],
-		},
-		musixmatch: {
-			on: ConfigUtils.get("lyrics-plus:provider:musixmatch:on"),
-			desc: "Fully compatible with Spotify. Requires a token that can be retrieved from the official Musixmatch app. If you have problems with retrieving lyrics, try refreshing the token by clicking <code>Refresh Token</code> button. You may need to be forced to use your own CORS Proxy to use this provider.",
-			token: localStorage.getItem("lyrics-plus:provider:musixmatch:token") || "21051986b9886beabe1ce01c3ce94c96319411f8f2c122676365e3",
-			modes: [SYNCED, UNSYNCED],
-		},
-		spotify: {
-			on: ConfigUtils.get("lyrics-plus:provider:spotify:on"),
-			desc: "Lyrics sourced from official Spotify API.",
-			modes: [SYNCED, UNSYNCED],
-		},
-		netease: {
-			on: ConfigUtils.get("lyrics-plus:provider:netease:on", false),
-			desc: "Crowdsourced lyrics provider ran by Chinese developers and users.",
-			modes: [SYNCED, UNSYNCED],
-		},
-		genius: {
-			on: spotifyVersion >= "1.2.31" ? false : ConfigUtils.get("lyrics-plus:provider:genius:on"),
-			desc: "Provide unsynced lyrics with insights from artists themselves. Genius is disabled and cannot be used as a provider on <code>1.2.31</code> and higher.",
-			modes: [GENIUS],
-		},
-		local: {
-			on: ConfigUtils.get("lyrics-plus:provider:local:on"),
-			desc: "Provide lyrics from cache/local files loaded from previous Spotify sessions.",
-			modes: [SYNCED, UNSYNCED],
-		},
-	},
-	providersOrder: localStorage.getItem("lyrics-plus:services-order"),
-	modes: ["synced", "unsynced", "genius"],
-	locked: localStorage.getItem("lyrics-plus:lock-mode") || "-1",
-};
-
-try {
-	CONFIG.providersOrder = JSON.parse(CONFIG.providersOrder);
-	if (!Array.isArray(CONFIG.providersOrder) || Object.keys(CONFIG.providers).length !== CONFIG.providersOrder.length) {
-		throw "";
-	}
-} catch {
-	CONFIG.providersOrder = Object.keys(CONFIG.providers);
-	localStorage.setItem("lyrics-plus:services-order", JSON.stringify(CONFIG.providersOrder));
-}
-
-CONFIG.locked = Number.parseInt(CONFIG.locked);
-CONFIG.visual["lines-before"] = Number.parseInt(CONFIG.visual["lines-before"]);
-CONFIG.visual["lines-after"] = Number.parseInt(CONFIG.visual["lines-after"]);
-CONFIG.visual["font-size"] = Number.parseInt(CONFIG.visual["font-size"]);
-CONFIG.visual["background-brightness"] = Number.parseInt(CONFIG.visual["background-brightness"]);
-CONFIG.visual["ja-detect-threshold"] = Number.parseInt(CONFIG.visual["ja-detect-threshold"]);
-CONFIG.visual["hans-detect-threshold"] = Number.parseInt(CONFIG.visual["hans-detect-threshold"]);
-
-let CACHE = {};
-
-const emptyState = {
-	karaoke: null,
-	synced: null,
-	unsynced: null,
-	genius: null,
-	genius2: null,
-	currentLyrics: null,
-	preTranslated: false,
-};
-
-//Cache System
-const CacheManager = {
-	_cache: new Map(),
-	_maxSize: 200, //Limit cache to 200 songs
-	_ttl: 60 * 60 * 1000, //60 minutes TTL
-
-	get(key) {
-		const item = this._cache.get(key);
-		if (!item) return null;
-
-		//Check if expired
-		if (Date.now() > item.expiry) {
-			this._cache.delete(key);
-			return null;
-		}
-
-		//Update access time for LRU
-		item.lastAccessed = Date.now();
-		return item.data;
-	},
-
-	set(key, data) {
-		//Clean up if cache is getting too large
-		if (this._cache.size >= this._maxSize) {
-			this._cleanupOldEntries();
-		}
-
-		this._cache.set(key, {
-			data,
-			expiry: Date.now() + this._ttl,
-			lastAccessed: Date.now()
-		});
-	},
-
-	_cleanupOldEntries() {
-		//Remove oldest 20% of entries
-		const entries = Array.from(this._cache.entries())
-			.sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
-
-		const toRemove = Math.floor(entries.length * 0.2);
-		for (let i = 0; i < toRemove; i++) {
-			this._cache.delete(entries[i][0]);
-		}
-	},
-
-	clear() {
-		this._cache.clear();
-	},
-
-	//Clear cache entries for a specific URI
-	clearByUri(uri) {
-		const keysToDelete = [];
-		for (const [key] of this._cache) {
-			if (key.includes(uri)) {
-				keysToDelete.push(key);
-			}
-		}
-		keysToDelete.forEach(key => this._cache.delete(key));
-		return keysToDelete.length;
-	}
-};
-
-//Rate limiting utility
-const RateLimiter = {
-	_calls: new Map(),
-
-	canMakeCall(key, maxCalls = 5, windowMs = 60000) {
-		const now = Date.now();
-		const calls = this._calls.get(key) || [];
-
-		// Remove calls outside the window
-		const validCalls = calls.filter(time => now - time < windowMs);
-
-		if (validCalls.length >= maxCalls) {
-			return false;
-		}
-
-		validCalls.push(now);
-		this._calls.set(key, validCalls);
-		return true;
-	}
-};
 
 let lyricContainerUpdate;
 let reloadLyrics;
@@ -422,6 +64,8 @@ class LyricsContainer extends react.Component {
 			isFADMode: false,
 			isCached: false,
 			language: null,
+			isTranslating: false,
+			translationStatus: null, // { type: 'success'|'error', text: string }
 		};
 		this.currentTrackUri = "";
 		this.nextTrackUri = "";
@@ -431,6 +75,7 @@ class LyricsContainer extends react.Component {
 		this.fullscreenContainer.id = "lyrics-fullscreen-container";
 		this.mousetrap = null;
 		this.containerRef = react.createRef(null);
+		this.fileInputRef = react.createRef(null);
 		this.translator = null;
 		this.initMoustrap();
 		//Cache last state
@@ -593,24 +238,39 @@ class LyricsContainer extends react.Component {
 			this.lastModeBeforeLoading = currentMode !== -1 ? currentMode : SYNCED;
 			this.setState({ ...emptyState, isLoading: true, isCached: false });
 
-			const resp = await this.tryServices(info, mode);
-			if (resp.provider) {
-				// Cache lyrics
-				CacheManager.set(resp.uri, resp);
-				//Auto-save to localStorage (persistent)
-				this.saveLocalLyrics(resp.uri, resp);
-			}
+			try {
+				const resp = await this.tryServices(info, mode);
 
-			// Logic for manual cache to localStorage
-			isCached = this.lyricsSaved(resp.uri);
+				// Critical check: Ensure we are still on the same track before updating state
+				if (info.uri !== this.currentTrackUri) return;
 
-			// Handle rapid track skipping to prevent setting wrong lyrics
-			if (resp.uri === this.currentTrackUri) {
-				tempState = { ...resp, isLoading: false, isCached };
-			} else {
+				if (resp.provider) {
+					// Cache lyrics
+					CacheManager.set(resp.uri, resp);
+					//Auto-save to localStorage (persistent)
+					this.saveLocalLyrics(resp.uri, resp);
+				}
+
+				// Logic for manual cache to localStorage
+				isCached = this.lyricsSaved(resp.uri);
+
+				// Handle rapid track skipping to prevent setting wrong lyrics
+				if (resp.uri === this.currentTrackUri) {
+					tempState = { ...resp, isLoading: false, isCached };
+				} else {
+					return;
+				}
+			} catch (e) {
+				console.error("[Lyrics+] Fetch error:", e);
+				this.setState({ error: "Failed to load lyrics", isLoading: false });
 				return;
 			}
 		}
+
+		if (!tempState) return;
+
+		// Final safety check
+		if (info.uri !== this.currentTrackUri) return;
 
 		let finalMode = mode;
 		if (mode === -1) {
@@ -619,7 +279,7 @@ class LyricsContainer extends react.Component {
 			} else if (this.state.lockMode !== -1 && this.state.lockMode !== KARAOKE) {
 				finalMode = this.state.lockMode;
 			} else {
-				//Auto switch (karaoke disabled): prefer synced, then unsynced, then genius
+				// Auto switch (karaoke disabled): prefer synced, then unsynced, then genius
 				if (tempState.synced) {
 					finalMode = SYNCED;
 				} else if (tempState.unsynced) {
@@ -656,6 +316,8 @@ class LyricsContainer extends react.Component {
 			}
 
 			// Reset state and apply, preserving cached translations if any
+			// Set currentLyrics immediately with original lyrics so UI renders while translation runs
+			const initialCurrentLyrics = tempState.currentLyrics || tempState.synced || tempState.unsynced || [];
 			this.setState({
 				furigana: null,
 				romaji: null,
@@ -670,6 +332,7 @@ class LyricsContainer extends react.Component {
 				neteaseTranslation: null,
 				...tempState,
 				language: defaultLanguage,
+				currentLyrics: initialCurrentLyrics,
 				//Preserve cached translations if they exist in tempState
 				...(tempState.romaji && { romaji: tempState.romaji }),
 				...(tempState.furigana && { furigana: tempState.furigana }),
@@ -682,14 +345,15 @@ class LyricsContainer extends react.Component {
 				...(tempState.tw && { tw: tempState.tw }),
 				...(tempState.musixmatchTranslation && { musixmatchTranslation: tempState.musixmatchTranslation }),
 				...(tempState.neteaseTranslation && { neteaseTranslation: tempState.neteaseTranslation }),
-				...(tempState.currentLyrics && { currentLyrics: tempState.currentLyrics }),
 			});
 			return;
 		}
 
 		//Preserve cached translations when not changing songs
+		const initialCurrentLyrics2 = tempState.currentLyrics || tempState.synced || tempState.unsynced || [];
 		this.setState({
 			...tempState,
+			currentLyrics: initialCurrentLyrics2,
 			//Preserve cached translations if they exist in tempState
 			...(tempState.romaji && { romaji: tempState.romaji }),
 			...(tempState.furigana && { furigana: tempState.furigana }),
@@ -702,7 +366,6 @@ class LyricsContainer extends react.Component {
 			...(tempState.tw && { tw: tempState.tw }),
 			...(tempState.musixmatchTranslation && { musixmatchTranslation: tempState.musixmatchTranslation }),
 			...(tempState.neteaseTranslation && { neteaseTranslation: tempState.neteaseTranslation }),
-			...(tempState.currentLyrics && { currentLyrics: tempState.currentLyrics }),
 		});
 	}
 
@@ -823,6 +486,10 @@ class LyricsContainer extends react.Component {
 		// If both modes already have results (e.g., from pre-translation), update UI immediately
 		if (lyricsMode1 || lyricsMode2) {
 			updateCombinedLyrics();
+		} else {
+			// No cache yet - show original lyrics immediately so UI isn't blank while waiting for translation
+			const optimizedOriginal = this.optimizeTranslations(lyrics, null, null);
+			this.setState({ currentLyrics: Array.isArray(optimizedOriginal) ? optimizedOriginal : [] });
 		}
 
 		// Start both requests, but don't wait for both to finish to update UI
@@ -941,6 +608,12 @@ class LyricsContainer extends react.Component {
 			return similarity > 0.85;
 		};
 
+		// If no translations provided, return original lyrics as-is
+		// Don't set originalText so getDisplayTexts returns mainText=text, subText=null (no duplicate)
+		if (!mode1 && !mode2) {
+			return originalLyrics;
+		}
+
 		// Process each line to determine what to display
 		const processedLyrics = originalLyrics.map((line, i) => {
 			const originalText = line?.text || '';
@@ -1013,9 +686,7 @@ class LyricsContainer extends react.Component {
 			const cacheKey2 = `${lyricsState.uri}:${cacheKey}:${styleKey}:${pronounKey}`;
 			const cached = CacheManager.get(cacheKey2);
 
-			console.log(`[Cache] Checking: ${cacheKey2}, hit: ${!!cached}`);
 			if (cached) {
-				console.log(`[Cache] HIT - returning cached result`);
 				return resolve(cached);
 			}
 
@@ -1029,135 +700,131 @@ class LyricsContainer extends react.Component {
 					// Verify cache is for current settings
 					if (persisted.styleKey === styleKey && persisted.pronounKey === pronounKey) {
 						// Load into CacheManager for this session
-						console.log(`[Cache] localStorage HIT - returning persisted result`);
 						CacheManager.set(cacheKey2, persisted.data);
 						return resolve(persisted.data);
-					} else {
-						console.log(`[Cache] localStorage STALE - settings changed`);
 					}
 				}
 			} catch (e) {
 				console.warn("[Lyrics+] Failed to load persisted Gemini cache:", e);
 			}
 
-			// De-duplicate concurrent calls per (uri, type). Share the same promise for callers
-			// Ensure map is initialized
-			if (!this._inflightGemini) {
-				this._inflightGemini = new Map();
-			}
-
-			const inflightKey = cacheKey2; // Use full cache key including style/pronoun for proper dedup
-			console.log(`[Dedup] Checking inflightKey: ${inflightKey}, silent: ${silent}, has: ${this._inflightGemini?.has(inflightKey)}`);
-			if (this._inflightGemini?.has(inflightKey)) {
-				console.log(`[Dedup] REUSING existing request for ${inflightKey}`);
-				// If this is a high priority request (e.g. user skip), promote the existing task
-				if (!silent) {
-					console.log(`[Dedup] Promoting task: ${inflightKey}`);
-					Translator.promote(inflightKey);
-				}
-				return this._inflightGemini.get(inflightKey).then(resolve).catch(reject);
-			}
-
-			// Use optimized rate limiter with separate keys for each translation type
-			const rateLimitKey = mode.replace('gemini_', 'gemini-');
-			if (!RateLimiter.canMakeCall(rateLimitKey, 5, 60000)) {
-				const modeName = mode === "gemini_romaji" ? "Romaji, Romaja, Pinyin" : "Vietnamese";
-				return reject(new Error(`${modeName} translation rate limit reached. Please wait.`));
+			// De-duplicate concurrent requests for the same translation
+			this._inflightGemini = this._inflightGemini || new Map();
+			if (this._inflightGemini.has(cacheKey2)) {
+				// Return existing in-flight promise instead of making a new request
+				return this._inflightGemini.get(cacheKey2).then(resolve).catch(reject);
 			}
 
 			const text = lyrics.map((l) => l?.text || "").filter(Boolean).join("\n");
 
-			// Show pending notification if conversion takes longer than 3s
-			let pendingTimer;
+			// Show translating indicator immediately (not silent = foreground request)
 			if (!silent) {
-				pendingTimer = setTimeout(() => {
-					try {
-						Spicetify.showNotification("Still converting...", false, 2000);
-					} catch { }
-				}, 3000);
+				this.setState({ isTranslating: true });
 			}
 
-			// Create the promise and add to map BEFORE calling API to prevent race conditions
-			const inflightPromise = new Promise((innerResolve, innerReject) => {
-				Translator.callGemini({
-					apiKey,
-					artist: lyricsState.artist || this.state.artist,
-					title: lyricsState.title || this.state.title,
-					text,
-					styleKey: CONFIG.visual["translate:translation-style"],
-					pronounKey: CONFIG.visual["translate:pronoun-mode"],
-					wantSmartPhonetic,
-					priority: !silent, // High priority if not silent (foreground request)
-					taskId: inflightKey // Pass unique ID for queue management
+			// Create the translation promise
+			const inflightPromise = Translator.callGemini({
+				apiKey,
+				artist: lyricsState.artist || this.state.artist,
+				title: lyricsState.title || this.state.title,
+				text,
+				styleKey,
+				pronounKey,
+				wantSmartPhonetic,
+				priority: !silent,
+				taskId: cacheKey2
+			})
+				.then(({ vi, phonetic, duration }) => {
+					// Show success in indicator instead of toast
+					if (duration && !silent) {
+						this.setState({
+							isTranslating: false,
+							translationStatus: { type: 'success', text: `Translated in ${duration}ms` }
+						});
+						// Auto-hide success message after 3 seconds
+						setTimeout(() => {
+							this.setState({ translationStatus: null });
+						}, 3000);
+					}
+
+					let outText = wantSmartPhonetic ? phonetic : vi;
+
+					if (!outText) throw new Error("Empty result from Gemini.");
+
+					// Handle both array and string formats
+					let lines;
+					if (Array.isArray(outText)) {
+						lines = outText;
+					} else if (typeof outText === 'string') {
+						lines = outText.split("\n");
+					} else {
+						throw new Error("Invalid translation format received from Gemini.");
+					}
+
+					const mapped = lyrics.map((line, i) => ({
+						...line,
+						text: lines[i]?.trim() || line?.text || "",
+						originalText: line?.text || "",
+					}));
+
+					CacheManager.set(cacheKey2, mapped);
+
+					// Persist Gemini translations to localStorage for long-term storage
+					try {
+						const persistKey = `${APP_NAME}:gemini-cache`;
+						const persistedCache = JSON.parse(localStorage.getItem(persistKey)) || {};
+						persistedCache[cacheKey2] = {
+							data: mapped,
+							timestamp: Date.now(),
+							styleKey,
+							pronounKey
+						};
+
+						// Limit localStorage cache to 50 entries (prevent overflow)
+						const entries = Object.entries(persistedCache);
+						if (entries.length > 50) {
+							entries
+								.sort((a, b) => a[1].timestamp - b[1].timestamp)
+								.slice(0, 10)
+								.forEach(([key]) => delete persistedCache[key]);
+						}
+
+						localStorage.setItem(persistKey, JSON.stringify(persistedCache));
+					} catch (e) {
+						console.warn("[Lyrics+] Failed to persist Gemini cache:", e);
+					}
+
+					return mapped;
 				})
-					.then(({ vi, phonetic, duration }) => {
-						if (duration) Spicetify.showNotification(`Lyrics+: Translated in ${duration}ms`, false, 2000);
-						let outText;
-						if (wantSmartPhonetic) {
-							outText = phonetic;
-						} else {
-							outText = vi;
-						}
+				.finally(() => {
+					// Clean up in-flight tracking
+					this._inflightGemini.delete(cacheKey2);
+					// Only reset translating if not already set by success/error handlers
+					if (this.state.isTranslating) {
+						this.setState({ isTranslating: false });
+					}
+				});
 
-						if (!outText) throw new Error("Empty result from Gemini.");
+			// Store the in-flight promise
+			this._inflightGemini.set(cacheKey2, inflightPromise);
 
-						// Handle both array and string formats
-						let lines;
-						if (Array.isArray(outText)) {
-							lines = outText;
-						} else if (typeof outText === 'string') {
-							lines = outText.split("\n");
-						} else {
-							throw new Error("Invalid translation format received from Gemini.");
-						}
-
-						const mapped = lyrics.map((line, i) => ({
-							...line,
-							text: lines[i]?.trim() || line?.text || "",
-							originalText: line?.text || "",
-						}));
-						CacheManager.set(cacheKey2, mapped);
-
-						// Persist Gemini translations to localStorage for long-term storage
-						try {
-							const persistKey = `${APP_NAME}:gemini-cache`;
-							const persistedCache = JSON.parse(localStorage.getItem(persistKey)) || {};
-							persistedCache[cacheKey2] = {
-								data: mapped,
-								timestamp: Date.now(),
-								styleKey: CONFIG.visual["translate:translation-style"],
-								pronounKey: CONFIG.visual["translate:pronoun-mode"]
-							};
-
-							// Limit localStorage cache to 50 entries (prevent overflow)
-							const entries = Object.entries(persistedCache);
-							if (entries.length > 50) {
-								// Remove oldest 10 entries
-								entries
-									.sort((a, b) => a[1].timestamp - b[1].timestamp)
-									.slice(0, 10)
-									.forEach(([key]) => delete persistedCache[key]);
-							}
-
-							localStorage.setItem(persistKey, JSON.stringify(persistedCache));
-						} catch (e) {
-							console.warn("[Lyrics+] Failed to persist Gemini cache:", e);
-						}
-
-						return mapped;
-					})
-					.then(innerResolve)
-					.catch(innerReject)
-					.finally(() => {
-						if (pendingTimer) clearTimeout(pendingTimer);
-						this._inflightGemini.delete(inflightKey);
-					});
-			});
-
-			// Add to map IMMEDIATELY to prevent duplicate calls
-			console.log(`[Dedup] CREATING new request for ${inflightKey}, silent: ${silent}`);
-			this._inflightGemini.set(inflightKey, inflightPromise);
-			inflightPromise.then(resolve).catch(reject);
+			// Attach resolve/reject handlers
+			inflightPromise
+				.then(resolve)
+				.catch(err => {
+					// Show error in indicator
+					if (!silent) {
+						this.setState({
+							isTranslating: false,
+							translationStatus: { type: 'error', text: err.message || 'Translation failed' }
+						});
+						// Auto-hide error after 5 seconds
+						setTimeout(() => {
+							this.setState({ translationStatus: null });
+						}, 5000);
+					}
+					reject(err);
+				});
 		}));
 	}
 
@@ -1394,19 +1061,22 @@ class LyricsContainer extends react.Component {
 		}
 	}
 
-	saveLocalLyrics(uri, lyrics) {
-		if (lyrics.genius) {
-			lyrics.unsynced = lyrics.genius.split("<br>").map((lyc) => {
+	async saveLocalLyrics(uri, lyrics) {
+		// Create a copy to avoid modifying the original state object
+		const lyricsToSave = { ...lyrics };
+
+		if (lyricsToSave.genius) {
+			lyricsToSave.unsynced = lyricsToSave.genius.split("<br>").map((lyc) => {
 				return {
 					text: lyc.replace(/<[^>]*>/g, ""),
 				};
 			});
-			lyrics.genius = null;
+			lyricsToSave.genius = null;
 		}
 
 		// Cache translations and conversions
 		const fullLyricsData = {
-			...lyrics,
+			...lyricsToSave,
 			// Japanese conversions
 			romaji: this.state.romaji,
 			furigana: this.state.furigana,
@@ -1425,38 +1095,47 @@ class LyricsContainer extends react.Component {
 			// Current display mode results
 			currentLyrics: this.state.currentLyrics,
 			// Language detection
-			language: this.state.language
+			language: this.state.language,
+			timestamp: Date.now()
 		};
 
-		const localLyrics = JSON.parse(localStorage.getItem(`${APP_NAME}:local-lyrics`)) || {};
+		try {
+			// Save to IndexedDB (Main Storage)
+			await DBManager.set(uri, fullLyricsData);
 
-		// Add timestamp for cache management
-		fullLyricsData.timestamp = Date.now();
-		localLyrics[uri] = fullLyricsData;
+			// Save a lightweight flag to localStorage for quick UI checks
+			const cachedUris = JSON.parse(localStorage.getItem(`${APP_NAME}:cached-uris`) || "[]");
+			if (!cachedUris.includes(uri)) {
+				cachedUris.push(uri);
+				// Limit flag list to last 500 items
+				if (cachedUris.length > 500) cachedUris.shift();
+				localStorage.setItem(`${APP_NAME}:cached-uris`, JSON.stringify(cachedUris));
+			}
 
-		// Prevent localStorage overflow
-		const entries = Object.entries(localLyrics);
-		if (entries.length > 200) {
-			const sorted = entries.sort((a, b) => (a[1].timestamp || 0) - (b[1].timestamp || 0));
-			// Evict oldest entries
-			const toRemove = sorted.slice(0, entries.length - 200);
-			toRemove.forEach(([key]) => delete localLyrics[key]);
+			this.setState({ isCached: true });
+		} catch (e) {
+			console.error("[Lyrics+] Failed to save to IndexedDB:", e);
 		}
-
-		localStorage.setItem(`${APP_NAME}:local-lyrics`, JSON.stringify(localLyrics));
-		this.setState({ isCached: true });
 	}
 
-	deleteLocalLyrics(uri) {
-		const localLyrics = JSON.parse(localStorage.getItem(`${APP_NAME}:local-lyrics`)) || {};
-		delete localLyrics[uri];
-		localStorage.setItem(`${APP_NAME}:local-lyrics`, JSON.stringify(localLyrics));
-		this.setState({ isCached: false });
+	async deleteLocalLyrics(uri) {
+		try {
+			await DBManager.delete(uri);
+			const cachedUris = JSON.parse(localStorage.getItem(`${APP_NAME}:cached-uris`) || "[]");
+			const index = cachedUris.indexOf(uri);
+			if (index > -1) {
+				cachedUris.splice(index, 1);
+				localStorage.setItem(`${APP_NAME}:cached-uris`, JSON.stringify(cachedUris));
+			}
+			this.setState({ isCached: false });
+		} catch (e) {
+			console.error("[Lyrics+] Failed to delete from IndexedDB:", e);
+		}
 	}
 
 	lyricsSaved(uri) {
-		const localLyrics = JSON.parse(localStorage.getItem(`${APP_NAME}:local-lyrics`)) || {};
-		return !!localLyrics[uri];
+		const cachedUris = JSON.parse(localStorage.getItem(`${APP_NAME}:cached-uris`) || "[]");
+		return cachedUris.includes(uri);
 	}
 
 	resetTranslationCache(uri) {
@@ -1546,37 +1225,37 @@ class LyricsContainer extends react.Component {
 			try {
 				const localLyrics = Utils.parseLocalLyrics(e.target.result);
 				const parsedKeys = Object.keys(localLyrics)
-					.filter((key) => localLyrics[key])
-					.map((key) => key[0].toUpperCase() + key.slice(1))
-					.map((key) => `<strong>${key}</strong>`);
+					.filter((key) => localLyrics[key] && localLyrics[key].length > 0)
+					.map((key) => key[0].toUpperCase() + key.slice(1));
 
 				if (!parsedKeys.length) {
 					Spicetify.showNotification("No valid lyrics found in file", true, 3000);
 					return;
 				}
 
-				this.setState({
+				// Determine which lyrics to show immediately
+				const newCurrentLyrics = localLyrics.synced || localLyrics.unsynced || [];
+
+				const newState = {
+					...emptyState, // Reset previous states (Genius, etc.)
 					...localLyrics,
 					provider: "local",
-					// Preserve cached translations if they exist in localLyrics
+					uri: this.currentTrackUri,
+					currentLyrics: newCurrentLyrics,
+					// Preserve cached translations if they happened to be in the file (rare but possible)
 					...(localLyrics.romaji && { romaji: localLyrics.romaji }),
 					...(localLyrics.furigana && { furigana: localLyrics.furigana }),
-					...(localLyrics.hiragana && { hiragana: localLyrics.hiragana }),
-					...(localLyrics.katakana && { katakana: localLyrics.katakana }),
-					...(localLyrics.hangul && { hangul: localLyrics.hangul }),
-					...(localLyrics.romaja && { romaja: localLyrics.romaja }),
-					...(localLyrics.cn && { cn: localLyrics.cn }),
-					...(localLyrics.hk && { hk: localLyrics.hk }),
-					...(localLyrics.tw && { tw: localLyrics.tw }),
-					...(localLyrics.musixmatchTranslation && { musixmatchTranslation: localLyrics.musixmatchTranslation }),
-					...(localLyrics.neteaseTranslation && { neteaseTranslation: localLyrics.neteaseTranslation }),
-					...(localLyrics.currentLyrics && { currentLyrics: localLyrics.currentLyrics }),
 					...(localLyrics.language && { language: localLyrics.language }),
-				});
-				CACHE[this.currentTrackUri] = { ...localLyrics, provider: "local", uri: this.currentTrackUri };
-				this.saveLocalLyrics(this.currentTrackUri, localLyrics);
+					isCached: true
+				};
 
-				Spicetify.showNotification(`✓ Successfully loaded ${parsedKeys.join(", ")} lyrics from file`, false, 3000);
+				this.setState(newState);
+
+				// Update Cache & LocalStorage
+				CACHE[this.currentTrackUri] = newState;
+				this.saveLocalLyrics(this.currentTrackUri, newState);
+
+				Spicetify.showNotification(`✓ Loaded ${parsedKeys.join(", ")} lyrics from file`, false, 3000);
 			} catch (e) {
 				console.error(e);
 				Spicetify.showNotification("Failed to load lyrics: Invalid file format", true, 3000);
@@ -1860,6 +1539,8 @@ class LyricsContainer extends react.Component {
 			return Object.values(CONFIG.providers).some((p) => p.on && p.modes.includes(id));
 		});
 
+		const brightness = CONFIG.visual["background-brightness"] / 100;
+
 		if (CONFIG.visual["transparent-background"]) {
 			this.styleVariables = {
 				"--lyrics-color-active": CONFIG.visual["active-color"],
@@ -1867,6 +1548,7 @@ class LyricsContainer extends react.Component {
 				"--lyrics-color-background": "transparent",
 				"--lyrics-highlight-background": CONFIG.visual["highlight-color"],
 				"--lyrics-background-noise": CONFIG.visual.noise ? "var(--background-noise)" : "unset",
+				"--lyrics-background-brightness": `brightness(${brightness})`,
 			};
 		} else {
 			this.styleVariables = {
@@ -1875,6 +1557,7 @@ class LyricsContainer extends react.Component {
 				"--lyrics-color-background": this.state.colors.background || CONFIG.visual["background-color"],
 				"--lyrics-highlight-background": this.state.colors.inactive || CONFIG.visual["highlight-color"],
 				"--lyrics-background-noise": CONFIG.visual.noise ? "var(--background-noise)" : "unset",
+				"--lyrics-background-brightness": `brightness(${brightness})`,
 			};
 		}
 
@@ -1916,20 +1599,26 @@ class LyricsContainer extends react.Component {
 			// Text colors will be set by FAD extension
 			this.styleVariables = {};
 		} else if (!CONFIG.visual["transparent-background"] && this.state.colors.background) {
+			const brightness = CONFIG.visual["background-brightness"];
+			const brightnessVal = (brightness !== undefined && brightness !== null) ? brightness : 100;
 			this.styleVariables = {
 				"--lyrics-color-active": "white",
 				"--lyrics-color-inactive": "rgba(255, 255, 255, 0.5)",
 				"--lyrics-color-background": this.state.colors.background,
 				"--lyrics-highlight-background": this.state.colors.inactive,
 				"--lyrics-background-noise": CONFIG.visual.noise ? "var(--background-noise)" : "unset",
+				"--lyrics-background-brightness": `brightness(${brightnessVal / 100})`,
 			};
 		}
 
 		const backgroundStyle = {};
-		if (false && this.state.colors.background) {
-			const brightness = CONFIG.visual["background-brightness"] / 100;
+		// Apply brightness to the gradient background layer as well
+		if (!CONFIG.visual["transparent-background"] && this.state.colors.background) {
 			backgroundStyle.backgroundColor = this.state.colors.background;
-			backgroundStyle.filter = `brightness(${brightness})`;
+			const brightness = CONFIG.visual["background-brightness"];
+			// Ensure we have a valid number, default to 100 if missing
+			const brightnessVal = (brightness !== undefined && brightness !== null) ? brightness : 100;
+			backgroundStyle.filter = `brightness(${brightnessVal / 100})`;
 		}
 
 
@@ -1974,12 +1663,22 @@ class LyricsContainer extends react.Component {
 
 		showTranslationButton = (potentialMode === SYNCED || potentialMode === UNSYNCED || mode === -1);
 
+		// Fallback: if currentLyrics not ready yet (translation pending), show original lyrics
+		const getLyricsForRender = (preferredMode) => {
+			if (Array.isArray(this.state.currentLyrics) && this.state.currentLyrics.length > 0) {
+				return this.state.currentLyrics;
+			}
+			// currentLyrics not ready - fall back to original lyrics so UI isn't blank
+			const original = preferredMode === SYNCED ? this.state.synced : this.state.unsynced;
+			return Array.isArray(original) ? original : [];
+		};
+
 		if (mode !== -1) {
 
 			if (mode === SYNCED && this.state.synced) {
 				activeItem = react.createElement(CONFIG.visual["synced-compact"] ? SyncedLyricsPage : SyncedExpandedLyricsPage, {
 					trackUri: this.state.uri,
-					lyrics: Array.isArray(this.state.currentLyrics) ? this.state.currentLyrics : [],
+					lyrics: getLyricsForRender(SYNCED),
 					provider: this.state.provider,
 					copyright: this.state.copyright,
 					reRenderLyricsPage: this.reRenderLyricsPage,
@@ -1987,7 +1686,7 @@ class LyricsContainer extends react.Component {
 			} else if (mode === UNSYNCED && this.state.unsynced) {
 				activeItem = react.createElement(UnsyncedLyricsPage, {
 					trackUri: this.state.uri,
-					lyrics: Array.isArray(this.state.currentLyrics) ? this.state.currentLyrics : [],
+					lyrics: getLyricsForRender(UNSYNCED),
 					provider: this.state.provider,
 					copyright: this.state.copyright,
 					reRenderLyricsPage: this.reRenderLyricsPage,
@@ -2045,6 +1744,12 @@ class LyricsContainer extends react.Component {
 			}),
 			react.createElement("div", {
 				className: "lyrics-lyricsContainer-LyricsBackground",
+			}),
+			// Translation in progress indicator
+			react.createElement(TranslatingIndicator, {
+				isVisible: this.state.isTranslating,
+				status: this.state.translationStatus,
+				text: "Translating..."
 			}),
 			react.createElement(
 				"div",
@@ -2108,41 +1813,39 @@ class LyricsContainer extends react.Component {
 						})
 					)
 				),
-				// TODO: Temporarily hidden - "Load lyrics from file" button is buggy
-				// react.createElement(
-				// 	Spicetify.ReactComponent.TooltipWrapper,
-				// 	{
-				// 		label: "Load lyrics from file",
-				// 	},
-				// 	react.createElement(
-				// 		"button",
-				// 		{
-				// 			className: "lyrics-config-button",
-				// 			onClick: () => {
-				// 				document.getElementById("lyrics-file-input").click();
-				// 			},
-				// 		},
-				// 		react.createElement("input", {
-				// 			type: "file",
-				// 			id: "lyrics-file-input",
-				// 			accept: ".lrc,.txt",
-				// 			onChange: this.processLyricsFromFile.bind(this),
-				// 			style: {
-				// 				display: "none",
-				// 			},
-				// 		}),
-				// 		react.createElement("svg", {
-				// 			width: 16,
-				// 			height: 16,
-				// 			viewBox: "0 0 16 16",
-				// 			fill: "currentColor",
-				// 			dangerouslySetInnerHTML: {
-				// 				__html: Spicetify.SVGIcons["plus-alt"],
-				// 			},
-				// 		})
-				// 	)
-				// ),
-				// Reset Translation button - show when there are lyrics and potential translations
+				react.createElement(
+					Spicetify.ReactComponent.TooltipWrapper,
+					{
+						label: "Load lyrics from file",
+					},
+					react.createElement(
+						"button",
+						{
+							className: "lyrics-config-button",
+							onClick: () => {
+								this.fileInputRef.current.click();
+							},
+						},
+						react.createElement("input", {
+							type: "file",
+							ref: this.fileInputRef,
+							accept: ".lrc,.txt",
+							onChange: this.processLyricsFromFile.bind(this),
+							style: {
+								display: "none",
+							},
+						}),
+						react.createElement("svg", {
+							width: 16,
+							height: 16,
+							viewBox: "0 0 16 16",
+							fill: "currentColor",
+							dangerouslySetInnerHTML: {
+								__html: Spicetify.SVGIcons["plus-alt"],
+							},
+						})
+					)
+				),
 				(() => {
 					const hasLyrics = this.state.synced || this.state.unsynced || this.state.genius;
 					if (window.lyricsPlusDebug) {
