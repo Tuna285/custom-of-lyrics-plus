@@ -295,7 +295,7 @@ CONFIG.visual["background-brightness"] = Number.parseInt(CONFIG.visual["backgrou
 CONFIG.visual["ja-detect-threshold"] = Number.parseInt(CONFIG.visual["ja-detect-threshold"]);
 CONFIG.visual["hans-detect-threshold"] = Number.parseInt(CONFIG.visual["hans-detect-threshold"]);
 
-const CACHE = {};
+let CACHE = {};
 
 const emptyState = {
     karaoke: null,

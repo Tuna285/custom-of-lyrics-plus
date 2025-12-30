@@ -188,9 +188,11 @@ const ServiceList = ({ itemsList, onListChange = () => { }, onToggle = () => { }
 	}, [items]);
 
 	return items.map((key, index) => {
-		const item = CONFIG.providers[key]; item.name = key;
+		const item = CONFIG.providers[key];
+		if (!item) return null; // Skip invalid/removed providers
+		item.name = key;
 		return react.createElement(ServiceOption, { item, key, isFirst: index === 0, isLast: index === maxIndex, onSwap, onTokenChange, onToggle });
-	});
+	}).filter(Boolean);
 };
 
 const corsProxyTemplate = () => {
