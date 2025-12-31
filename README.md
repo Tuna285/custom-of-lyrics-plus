@@ -104,6 +104,12 @@ Prompts are fine-tuned and automatically processed for clean, sensible results.
 
 ---
 
+## Recommended Theme
+
+This app works beautifully with [**Spicetify Lucid**](https://github.com/sanoojes/spicetify-lucid) theme by sanoojes. Highly recommended!
+
+---
+
 ## License
 [LGPL-2.1](LICENSE)
 
