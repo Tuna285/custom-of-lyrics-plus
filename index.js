@@ -670,6 +670,8 @@ class LyricsContainer extends react.Component {
 
 			// Determine mode type and API key
 			// Determine mode type
+			let wantSmartPhonetic = false;
+			let apiKey;
 			if (mode === "gemini_romaji") {
 				wantSmartPhonetic = true;
 			}
