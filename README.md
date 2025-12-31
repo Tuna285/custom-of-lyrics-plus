@@ -1,6 +1,11 @@
-# Custom-of-lyrics-plus-CustomApps
+# Lyric Plus Translate
 
 > A personalized version of **Lyrics Plus** for Spicetify, rebuilt to focus on high-quality lyric translation, ideal for Vietnamese users. Supports personal API (Google) and via [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) or [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal).
+
+> [!NOTE]
+> **Currently, the translation feature only supports Vietnamese (Tiếng Việt).** Support for other languages may be added in future updates.
+
+![Preview](assets/preview.gif)
 
 ---
 
@@ -10,6 +15,20 @@
 Uses Google's LLM models (via API and Proxy) to translate lyrics naturally and accurately.
 - **Dual display modes**: Convert songs to Romaji (Japanese), Romaja (Korean), Pinyin (Chinese) and translate to **Vietnamese** - ideal for language learning.
 - **High quality**: Translations optimized for musical context, preserving meaning and emotion.
+
+<table>
+  <tr>
+    <th>Japanese → Romaji</th>
+    <th>Korean → Romaja</th>
+    <th>Chinese → Pinyin</th>
+  </tr>
+  <tr>
+    <td><img src="assets/japanese_conversion.png" alt="Japanese" width="300"/></td>
+    <td><img src="assets/korean_conversion.png" alt="Korean" width="300"/></td>
+    <td><img src="assets/chinese_conversion.png" alt="Chinese" width="300"/></td>
+  </tr>
+</table>
+
 
 ### 2. Modern Interface & Optimized Experience
 - **Transparent background**: Lyrics displayed on transparent overlay, harmonizing with Spicetify themes.
@@ -21,62 +40,73 @@ Prompts are fine-tuned and automatically processed for clean, sensible results.
 
 ---
 
-# Phiên bản Tiếng Việt
+## Installation
 
-> Phiên bản cá nhân hóa cho **Lyrics Plus** của Spicetify, được xây dựng lại để tập trung vào trải nghiệm dịch thuật lời bài hát chất lượng cao, phù hợp cho người Việt Nam, bao gồm tích hợp API cá nhân (Google) và qua [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) hoặc [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal)
+### Via Spicetify Marketplace (Recommended)
+1. Open Spotify and go to **Marketplace** tab
+2. Search for "Lyric Plus Translate"  
+3. Click **Install**
 
----
+### Manual Installation
 
-## Dưới đây là những tính năng bổ sung của phiên bản này:
-### 1. Dịch lời bài hát với Gemma API
-Dùng mô hình LLM của Google (thông qua API và Proxy) để dịch lời bài hát một cách tự nhiên và chính xác.
--   **Hỗ trợ 2 chế độ hiển thị cùng lúc**: Chuyển ngữ các bài hát sang Romaji (Tiếng Nhật), Romaja (Tiếng Hàn), Pinyin (Tiếng Trung Phồn-Giản Thể) và dịch lời bài hát sang **Tiếng Việt**, lý tưởng cho việc học ngôn ngữ.
--   **Chất lượng cao**: Bản dịch được tối ưu cho ngữ cảnh âm nhạc, giữ lại ý nghĩa và cảm xúc của bài hát.
-<img width="1919" height="1020" alt="image" src="https://github.com/user-attachments/assets/6b49032b-704e-4f35-8aec-cad9f42083f3" />
-<img width="1919" height="1022" alt="image" src="https://github.com/user-attachments/assets/aadf0f62-2c67-4396-89cd-15da4ed6882d" />
-<img width="1919" height="1021" alt="image" src="https://github.com/user-attachments/assets/90c26e06-d7f0-441f-a766-393e3a9ece72" />
-<img width="1919" height="1021" alt="image" src="https://github.com/user-attachments/assets/0c0d6497-5e43-4cb8-9581-218540a38e3f" />
+> **Requirement:** Spotify installed from web, NOT from Microsoft Store
 
-### 2. Giao diện hiện đại & Tối ưu trải nghiệm
-Giao diện được tinh chỉnh để đẹp mắt, gọn gàng và không gây xao nhãng.
--   **Nền trong suốt**: Lời bài hát được hiển thị trên một lớp nền trong suốt, hòa hợp với giao diện của các theme của spicetify.
--   **Nút điều khiển tự ẩn**: Các nút cài đặt chỉ xuất hiện khi bạn di chuột vào khu vực lời bài hát, trả lại không gian hiển thị tối đa.
--   **Hiệu ứng chuyển dòng mượt mà**: Animation được tối ưu để tạo cảm giác chuyển tiếp uyển chuyển giữa các dòng lyric.
+1. Install [Spicetify](https://spicetify.app/docs/getting-started) first
+2. Download and extract this repository
 
-### 3. Tối ưu bản dịch thông minh
-Prompt được tinh chỉnh và tự động xử lý để kết quả hiển thị luôn gọn gàng và hợp lý.
+   ![Download](assets/manual_download.png)
 
----
+3. Copy the `lyrics-plus` folder to Spicetify's CustomApps directory:
+   - **Windows:** `%LocalAppData%\spicetify\CustomApps`
+   - **MacOS/Linux:** `~/.config/spicetify/CustomApps`
 
-## Cài đặt
-
-0.  **(Yêu cầu Spotify cài đặt từ web, không từ Microsoft Store)** Cài đặt [Spicetify và CustomApps (lyrics-plus)](https://spicetify.app/docs/getting-started)
-1.  Tải và giải nén file chứa custom của lyric-plus
-<img width="578" height="455" alt="image" src="https://github.com/user-attachments/assets/5f190f70-3185-4e2d-990f-90068d3bcf8d" />
-  
-2.  Copy và thay thế toàn bộ thư mục `lyrics-plus` đã giải nén vào thư mục `CustomApps` của Spicetify với path: 
-- Windows: ```%LocalAppData%\spicetify\CustomApps```
-- MacOS/Linux: ```~/.config/spicetify/CustomApps```
-
-3.  Mở terminal hoặc PowerShell và chạy lệnh:
-    ```
-    spicetify apply
-    ```
-* Cách lấy API Gemma qua [AiStudio](https://www.youtube.com/watch?v=JomWSwhwThg)
-
-* Chi tiết cách cài đặt [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) hoặc [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal)
+4. Run in terminal:
+   ```bash
+   spicetify apply
+   ```
 
 ---
 
-## Thiết lập ban đầu
+## Configuration
 
-1.  Mở Spotify, vào lyrics plus và nhấn vào avatar chọn **Lyrics Plus config** từ thanh menu bên trái.
-2.  Đến phần Translation chọn API Mode
-<img width="600" height="711" alt="image" src="https://github.com/user-attachments/assets/5b819cb2-b800-456d-a8b3-f9f39c61cc5e" />
+1. Open Spotify, click on your avatar → **Lyric Plus Translate config**
+2. Go to **Translation** section and configure your API mode:
+   - **Direct API**: Use your own [Google AI Studio](https://aistudio.google.com/) API key
+   - **Proxy**: Use [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) or [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal)
 
-4.  Mở một bài hát bất kỳ, di chuột vào vùng hiển thị lời bài hát và nhấp vào biểu tượng chuyển ngữ (⇄) để bắt đầu tùy chỉnh chế độ dịch của bạn.
+3. Hover over lyrics and click the translation icon (⇄) to customize display modes
 
 ---
-**(Dự án đang phát triển, nếu có lỗi vui lòng góp ý)**
 
+## Supported Languages
 
+### Local Mode (Kuromoji, Aromanize, OpenCC)
+| Source Language | Display Mode 1 | Display Mode 2 |
+|-----------------|----------------|----------------|
+| Japanese (日本語) | Romaji, Hiragana, Katakana | - |
+| Korean (한국어) | Romaja | - |
+| Chinese (中文) | Pinyin, Simplified, Traditional | - |
+
+### Gemini/Gemma Mode (AI Translation)
+| Source Language | Display Mode 1 | Display Mode 2 |
+|-----------------|----------------|----------------|
+| Japanese (日本語) | Romaji (Gemini/Gemma), include Local Mode | Vietnamese |
+| Korean (한국어) | Romaja (Gemini/Gemma), include Local Mode | Vietnamese |
+| Chinese (中文) | Pinyin (Gemini/Gemma), include Local Mode | Vietnamese |
+| Other | - | Vietnamese |
+
+---
+
+## Credits
+- Original [lyrics-plus](https://github.com/spicetify/cli/tree/main/CustomApps/lyrics-plus) by Spicetify team
+- Translation powered by Google Gemini API
+- Romanization: [Kuroshiro](https://github.com/hexenq/kuroshiro), [Aromanize](https://github.com/fujaru/aromanize-js), [OpenCC](https://github.com/BYVoid/OpenCC)
+
+---
+
+## License
+[LGPL-2.1](LICENSE)
+
+---
+
+*This project is under active development. Please report any issues!*
