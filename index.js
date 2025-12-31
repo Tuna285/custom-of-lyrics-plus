@@ -663,24 +663,36 @@ class LyricsContainer extends react.Component {
 
 	getGeminiTranslation(lyricsState, lyrics, mode, silent = false) {
 		return (new Promise((resolve, reject) => {
+			const apiMode = CONFIG.visual["gemini:api-mode"] || "official";
 			const viKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini-api-key`);
 			const romajiKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini-api-key-romaji`);
+			const proxyApiKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini:proxy-api-key`);
 
 			// Determine mode type and API key
-			let wantSmartPhonetic = false;
-			let apiKey;
-
+			// Determine mode type
 			if (mode === "gemini_romaji") {
-				// Use Smart Phonetic logic for the unified Romaji, Romaja, Pinyin button
 				wantSmartPhonetic = true;
+			}
+
+			// Determine API key based on mode and settings
+			if (apiMode === "proxy") {
+				// Proxy mode - use proxy API key
+				apiKey = proxyApiKey || "proxy-default";
+			} else if (wantSmartPhonetic) {
+				// Official mode - Romaji specific key or fallback
 				apiKey = romajiKey || viKey;
 			} else {
-				// Default to Vietnamese
+				// Official mode - Default key
 				apiKey = viKey || romajiKey;
 			}
 
-			if (!apiKey || !Array.isArray(lyrics) || lyrics.length === 0) {
+			// Only require API key for official mode
+			if (apiMode === "official" && !apiKey) {
 				return reject(new Error("Gemini API key missing. Please add at least one key in Settings."));
+			}
+
+			if (!Array.isArray(lyrics) || lyrics.length === 0) {
+				return reject(new Error("No lyrics to translate."));
 			}
 
 			// Include style and pronoun in cache key to avoid incorrect cache hits
@@ -1606,17 +1618,31 @@ class LyricsContainer extends react.Component {
 		const fadLyricsContainer = document.getElementById("fad-lyrics-plus-container");
 		this.state.isFADMode = !!fadLyricsContainer;
 
+		const brightness = CONFIG.visual["background-brightness"];
+		const brightnessVal = (brightness !== undefined && brightness !== null) ? brightness : 100;
+
 		if (this.state.isFADMode) {
 			// Text colors will be set by FAD extension
 			this.styleVariables = {};
-		} else if (!CONFIG.visual["transparent-background"] && this.state.colors.background) {
-			const brightness = CONFIG.visual["background-brightness"];
-			const brightnessVal = (brightness !== undefined && brightness !== null) ? brightness : 100;
+		} else if (CONFIG.visual["transparent-background"]) {
+			// Transparent mode - use theme colors
+			this.styleVariables = {
+				"--lyrics-color-active": CONFIG.visual["active-color"],
+				"--lyrics-color-inactive": CONFIG.visual["inactive-color"],
+				"--lyrics-color-background": "transparent",
+				"--lyrics-highlight-background": CONFIG.visual["highlight-color"],
+				"--lyrics-background-noise": CONFIG.visual.noise ? "var(--background-noise)" : "unset",
+				"--lyrics-background-brightness": `brightness(${brightnessVal / 100})`,
+			};
+		} else {
+			// Non-transparent mode - use album colors or fallback
+			const bgColor = this.state.colors?.background || CONFIG.visual["background-color"] || "#121212";
+			const highlightColor = this.state.colors?.inactive || CONFIG.visual["highlight-color"] || "rgba(255, 255, 255, 0.2)";
 			this.styleVariables = {
 				"--lyrics-color-active": "white",
 				"--lyrics-color-inactive": "rgba(255, 255, 255, 0.5)",
-				"--lyrics-color-background": this.state.colors.background,
-				"--lyrics-highlight-background": this.state.colors.inactive,
+				"--lyrics-color-background": bgColor,
+				"--lyrics-highlight-background": highlightColor,
 				"--lyrics-background-noise": CONFIG.visual.noise ? "var(--background-noise)" : "unset",
 				"--lyrics-background-brightness": `brightness(${brightnessVal / 100})`,
 			};
@@ -1624,14 +1650,11 @@ class LyricsContainer extends react.Component {
 
 		const backgroundStyle = {};
 		// Apply brightness to the gradient background layer as well
-		if (!CONFIG.visual["transparent-background"] && this.state.colors.background) {
-			backgroundStyle.backgroundColor = this.state.colors.background;
-			const brightness = CONFIG.visual["background-brightness"];
-			// Ensure we have a valid number, default to 100 if missing
-			const brightnessVal = (brightness !== undefined && brightness !== null) ? brightness : 100;
+		if (!CONFIG.visual["transparent-background"]) {
+			const bgColor = this.state.colors?.background || CONFIG.visual["background-color"] || "#121212";
+			backgroundStyle.backgroundColor = bgColor;
 			backgroundStyle.filter = `brightness(${brightnessVal / 100})`;
 		}
-
 
 		this.styleVariables = {
 			...this.styleVariables,
