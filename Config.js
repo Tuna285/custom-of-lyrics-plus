@@ -88,7 +88,7 @@ const DebugLogger = {
 const UpdateChecker = {
     REPO_URL: "https://github.com/Tuna285/custom-of-lyrics-plus",
     VERSION_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/version.json",
-    CURRENT_VERSION: "1.1.1",
+    CURRENT_VERSION: "1.2.2",
     CHECK_INTERVAL: 24 * 60 * 60 * 1000, // 24 hours
 
     async checkForUpdates(silent = false) {
