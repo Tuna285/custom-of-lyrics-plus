@@ -1,5 +1,7 @@
 # Lyric Plus Translate
 
+[![Tiếng Việt](https://img.shields.io/badge/Lang-Tiếng%20Việt-red?style=flat-square)](README_VI.md)
+
 > A personalized version of **Lyrics Plus** for Spicetify, rebuilt to focus on high-quality lyric translation, ideal for Vietnamese users. Supports personal API (Google) and via [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) or [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal).
 
 > [!NOTE]
