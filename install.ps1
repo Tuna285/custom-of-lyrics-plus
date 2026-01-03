@@ -13,15 +13,13 @@ $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 Write-Host ""
-Write-Host "╔════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║         Lyrics Plus Translate - Installer                  ║" -ForegroundColor Cyan
-Write-Host "║     AI-powered lyrics translation for Spotify              ║" -ForegroundColor Cyan
-Write-Host "╚════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host "+============================================================+" -ForegroundColor Cyan
+Write-Host "|         Lyrics Plus Translate - Installer                  |" -ForegroundColor Cyan
+Write-Host "|     AI-powered lyrics translation for Spotify              |" -ForegroundColor Cyan
+Write-Host "+============================================================+" -ForegroundColor Cyan
 Write-Host ""
 
-# ─────────────────────────────────────────────────────────────
 # Configuration
-# ─────────────────────────────────────────────────────────────
 $repoOwner = "Tuna285"
 $repoName = "custom-of-lyrics-plus"
 $branch = "main"
@@ -54,7 +52,9 @@ $filesToDownload = @(
     "version.json",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "install.ps1",
+    "uninstall.ps1"
 )
 
 # Asset files (in assets/ folder)
@@ -62,17 +62,30 @@ $assetsToDownload = @(
     "preview.gif"
 )
 
-# ─────────────────────────────────────────────────────────────
-# Check Spicetify installation
-# ─────────────────────────────────────────────────────────────
-Write-Host "[1/5] Checking Spicetify installation..." -ForegroundColor Yellow
+# [0/6] Close Spotify to prevent file lock issues
+Write-Host "[0/6] Checking for running Spotify..." -ForegroundColor Yellow
+
+$spotifyProcess = Get-Process -Name "Spotify" -ErrorAction SilentlyContinue
+if ($spotifyProcess) {
+    Write-Host "  -> Spotify is running. Closing it..." -ForegroundColor DarkYellow
+    Stop-Process -Name "Spotify" -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    Write-Host "  [OK] Spotify closed" -ForegroundColor Green
+}
+else {
+    Write-Host "  [OK] Spotify is not running" -ForegroundColor Green
+}
+
+# [1/6] Check Spicetify installation
+Write-Host "[1/6] Checking Spicetify installation..." -ForegroundColor Yellow
 
 $spicetifyPath = ""
 try {
     $spicetifyPath = (Get-Command spicetify -ErrorAction Stop).Source
-    Write-Host "  ✓ Spicetify found at: $spicetifyPath" -ForegroundColor Green
-} catch {
-    Write-Host "  ✗ Spicetify not found!" -ForegroundColor Red
+    Write-Host "  [OK] Spicetify found at: $spicetifyPath" -ForegroundColor Green
+}
+catch {
+    Write-Host "  [ERROR] Spicetify not found!" -ForegroundColor Red
     Write-Host ""
     Write-Host "Please install Spicetify first:" -ForegroundColor Yellow
     Write-Host "  iwr -useb https://raw.githubusercontent.com/spicetify/cli/main/install.ps1 | iex" -ForegroundColor Cyan
@@ -80,10 +93,8 @@ try {
     exit 1
 }
 
-# ─────────────────────────────────────────────────────────────
-# Get CustomApps path
-# ─────────────────────────────────────────────────────────────
-Write-Host "[2/5] Locating CustomApps directory..." -ForegroundColor Yellow
+# [2/6] Get CustomApps path
+Write-Host "[2/6] Locating CustomApps directory..." -ForegroundColor Yellow
 
 $spicetifyConfig = & spicetify -c 2>$null
 if (-not $spicetifyConfig) {
@@ -92,32 +103,51 @@ if (-not $spicetifyConfig) {
 $configDir = Split-Path $spicetifyConfig -Parent
 $customAppsDir = Join-Path $env:LOCALAPPDATA "spicetify\CustomApps"
 
-# Create CustomApps directory if not exists
 if (-not (Test-Path $customAppsDir)) {
     New-Item -ItemType Directory -Path $customAppsDir -Force | Out-Null
 }
 
 $appDir = Join-Path $customAppsDir $appName
-Write-Host "  ✓ CustomApps directory: $customAppsDir" -ForegroundColor Green
+Write-Host "  [OK] CustomApps directory: $customAppsDir" -ForegroundColor Green
 
-# ─────────────────────────────────────────────────────────────
-# Remove existing installation (if any)
-# ─────────────────────────────────────────────────────────────
-Write-Host "[3/5] Preparing installation directory..." -ForegroundColor Yellow
+# [3/6] Prepare installation directory with retry logic
+Write-Host "[3/6] Preparing installation directory..." -ForegroundColor Yellow
 
-if (Test-Path $appDir) {
-    Write-Host "  → Removing existing $appName installation..." -ForegroundColor DarkYellow
-    Remove-Item -Recurse -Force $appDir
+$maxRetries = 3
+$retryCount = 0
+$removed = $false
+
+while (-not $removed -and $retryCount -lt $maxRetries) {
+    if (Test-Path $appDir) {
+        try {
+            Write-Host "  -> Removing existing $appName installation..." -ForegroundColor DarkYellow
+            Remove-Item -Recurse -Force $appDir -ErrorAction Stop
+            $removed = $true
+        }
+        catch {
+            $retryCount++
+            if ($retryCount -lt $maxRetries) {
+                Write-Host "  [WARN] Folder locked, retrying in 2 seconds... ($retryCount/$maxRetries)" -ForegroundColor DarkYellow
+                Start-Sleep -Seconds 2
+            }
+            else {
+                Write-Host "  [ERROR] Cannot remove folder. Please close any editors or apps using these files." -ForegroundColor Red
+                Write-Host "    Folder: $appDir" -ForegroundColor DarkYellow
+                exit 1
+            }
+        }
+    }
+    else {
+        $removed = $true
+    }
 }
 
 New-Item -ItemType Directory -Path $appDir -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $appDir "assets") -Force | Out-Null
-Write-Host "  ✓ Created: $appDir" -ForegroundColor Green
+Write-Host "  [OK] Created: $appDir" -ForegroundColor Green
 
-# ─────────────────────────────────────────────────────────────
-# Download files
-# ─────────────────────────────────────────────────────────────
-Write-Host "[4/5] Downloading files..." -ForegroundColor Yellow
+# [4/6] Download files
+Write-Host "[4/6] Downloading files..." -ForegroundColor Yellow
 
 $downloadedCount = 0
 $totalFiles = $filesToDownload.Count + $assetsToDownload.Count
@@ -130,8 +160,9 @@ foreach ($file in $filesToDownload) {
         $downloadedCount++
         $percent = [math]::Round(($downloadedCount / $totalFiles) * 100)
         Write-Host "  [$percent%] Downloaded: $file" -ForegroundColor DarkGray
-    } catch {
-        Write-Host "  ⚠ Failed to download: $file (optional)" -ForegroundColor DarkYellow
+    }
+    catch {
+        Write-Host "  [WARN] Failed to download: $file (optional)" -ForegroundColor DarkYellow
     }
 }
 
@@ -143,44 +174,41 @@ foreach ($asset in $assetsToDownload) {
         $downloadedCount++
         $percent = [math]::Round(($downloadedCount / $totalFiles) * 100)
         Write-Host "  [$percent%] Downloaded: assets/$asset" -ForegroundColor DarkGray
-    } catch {
-        Write-Host "  ⚠ Failed to download: assets/$asset (optional)" -ForegroundColor DarkYellow
+    }
+    catch {
+        Write-Host "  [WARN] Failed to download: assets/$asset (optional)" -ForegroundColor DarkYellow
     }
 }
 
-Write-Host "  ✓ Downloaded $downloadedCount files" -ForegroundColor Green
+Write-Host "  [OK] Downloaded $downloadedCount files" -ForegroundColor Green
 
-# ─────────────────────────────────────────────────────────────
-# Configure Spicetify
-# ─────────────────────────────────────────────────────────────
-Write-Host "[5/5] Configuring Spicetify..." -ForegroundColor Yellow
+# [5/6] Configure Spicetify
+Write-Host "[5/6] Configuring Spicetify..." -ForegroundColor Yellow
 
-# Add custom app to config
 $currentApps = & spicetify config custom_apps 2>$null
 if ($currentApps -notmatch $appName) {
     & spicetify config custom_apps "$appName" 2>$null
-    Write-Host "  ✓ Added $appName to custom_apps" -ForegroundColor Green
-} else {
-    Write-Host "  ✓ $appName already in custom_apps" -ForegroundColor Green
+    Write-Host "  [OK] Added $appName to custom_apps" -ForegroundColor Green
+}
+else {
+    Write-Host "  [OK] $appName already in custom_apps" -ForegroundColor Green
 }
 
-# Apply changes
+# [6/6] Apply changes
 Write-Host ""
-Write-Host "Applying Spicetify changes..." -ForegroundColor Yellow
+Write-Host "[6/6] Applying Spicetify changes..." -ForegroundColor Yellow
 & spicetify apply 2>$null
 
-# ─────────────────────────────────────────────────────────────
 # Done!
-# ─────────────────────────────────────────────────────────────
 Write-Host ""
-Write-Host "╔════════════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║              Installation Complete!                        ║" -ForegroundColor Green
-Write-Host "╚════════════════════════════════════════════════════════════╝" -ForegroundColor Green
+Write-Host "+============================================================+" -ForegroundColor Green
+Write-Host "|              Installation Complete!                        |" -ForegroundColor Green
+Write-Host "+============================================================+" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Installed to: $appDir" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Next steps:" -ForegroundColor Yellow
-Write-Host "    1. Restart Spotify" -ForegroundColor White
+Write-Host "    1. Start Spotify" -ForegroundColor White
 Write-Host "    2. Click the lyrics icon in the sidebar" -ForegroundColor White
 Write-Host "    3. Configure your Gemini API key in settings" -ForegroundColor White
 Write-Host ""
