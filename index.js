@@ -507,24 +507,40 @@ class LyricsContainer extends react.Component {
 			this._dmResults[currentUri].mode2 = tryLoadCachedTranslation(displayMode2);
 		}
 
-		let lyricsMode1 = this._dmResults[currentUri].mode1;
-		let lyricsMode2 = this._dmResults[currentUri].mode2;
+		// Get current results - always read from _dmResults to avoid stale closure
+		const getResults = () => ({
+			mode1: this._dmResults?.[currentUri]?.mode1 || null,
+			mode2: this._dmResults?.[currentUri]?.mode2 || null
+		});
 
-		const updateCombinedLyrics = () => {
+		const updateCombinedLyrics = (force = false) => {
 			// Guard clause to prevent race conditions from previous songs
 			if (this.state.uri !== uri) {
 				return;
 			}
+
+			const { mode1, mode2 } = getResults();
+
+			// If display mode is set but no result yet and not forced, skip update
+			// This prevents overwriting with original lyrics when translation is pending
+			if (!force && displayMode1 && displayMode1 !== "none" && !mode1 && !mode2) {
+				// Still waiting for translation - don't overwrite existing display
+				return;
+			}
+
 			// Smart deduplication and optimization
-			const optimizedTranslations = this.optimizeTranslations(lyrics, lyricsMode1, lyricsMode2);
+			const optimizedTranslations = this.optimizeTranslations(lyrics, mode1, mode2);
 			this.setState({ currentLyrics: Array.isArray(optimizedTranslations) ? optimizedTranslations : [] });
 		};
 
-		// If both modes already have results (e.g., from pre-translation), update UI immediately
-		if (lyricsMode1 || lyricsMode2) {
-			updateCombinedLyrics();
+		// Check if we already have cached results
+		const { mode1: cachedMode1, mode2: cachedMode2 } = getResults();
+
+		// If we have cached results, show them immediately
+		if (cachedMode1 || cachedMode2) {
+			updateCombinedLyrics(true);
 		} else {
-			// No cache yet - show original lyrics immediately so UI isn't blank while waiting for translation
+			// No cache yet - show original lyrics immediately so UI isn't blank while waiting
 			const optimizedOriginal = this.optimizeTranslations(lyrics, null, null);
 			this.setState({ currentLyrics: Array.isArray(optimizedOriginal) ? optimizedOriginal : [] });
 		}
@@ -536,25 +552,23 @@ class LyricsContainer extends react.Component {
 		promise1.then(result => {
 			// Early exit if track changed while translating
 			if (this.state.uri !== uri) return;
-			lyricsMode1 = result;
 			if (this._dmResults?.[currentUri]) this._dmResults[currentUri].mode1 = result;
-			updateCombinedLyrics();
+			updateCombinedLyrics(true); // Force update with new result
 		}).catch(error => {
 			if (this.state.uri !== uri) return;
 			console.warn("Display Mode 1 translation failed:", error.message);
-			updateCombinedLyrics();
+			updateCombinedLyrics(true);
 		});
 
 		promise2.then(result => {
 			// Early exit if track changed while translating
 			if (this.state.uri !== uri) return;
-			lyricsMode2 = result;
 			if (this._dmResults?.[currentUri]) this._dmResults[currentUri].mode2 = result;
-			updateCombinedLyrics();
+			updateCombinedLyrics(true); // Force update with new result
 		}).catch(error => {
 			if (this.state.uri !== uri) return;
 			console.warn("Display Mode 2 translation failed:", error.message);
-			updateCombinedLyrics();
+			updateCombinedLyrics(true);
 		});
 
 		// Auto-save cache after all translations complete

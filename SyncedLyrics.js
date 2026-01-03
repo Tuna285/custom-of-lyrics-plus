@@ -1,10 +1,25 @@
 // SyncedLyrics.js - Synced Lyrics Pages
 
-// Robust check for note lines (handles whitespace/artifacts)
+// Robust check for note lines - checks text AND originalText to handle translated data
 const isReallyNote = (text) => {
     if (!text) return false;
     if (isNoteLine(text)) return true;
     return typeof text === "string" && text.trim() === "♪";
+};
+
+// Check if a lyric line object is a note (checks all text fields)
+const isNoteLineObject = (line) => {
+    if (!line) return false;
+    // Check all possible text fields for note content
+    const textIsNote = isReallyNote(line.text);
+    const originalIsNote = isReallyNote(line.originalText);
+    const text2IsNote = !line.text2 || isReallyNote(line.text2);
+
+    // If original is a note, treat the whole line as a note
+    // OR if there's no original and text is a note
+    if (originalIsNote) return true;
+    if (!line.originalText && textIsNote) return true;
+    return false;
 };
 
 const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara }) => {
@@ -45,13 +60,14 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
             }
 
             if (currentLine && nextLine && currentLine.startTime && nextLine.startTime) {
-                const textLen = (currentLine.text || "").length;
+                const textLen = (currentLine.originalText || currentLine.text || "").length;
                 // Estimate duration based on text length (120ms per char), min 3s
                 const estDur = Math.max(3000, textLen * 120);
                 const gap = nextLine.startTime - (currentLine.startTime + estDur);
 
                 // Auto-gap detector: Insert idling indicator if gap is large (>7s)
-                if (gap > 7000 && !isReallyNote(currentLine.text) && !isReallyNote(nextLine.text)) {
+                // Use isNoteLineObject to check the entire line object, not just text field
+                if (gap > 7000 && !isNoteLineObject(currentLine) && !isNoteLineObject(nextLine)) {
                     const insertTime = currentLine.startTime + estDur;
                     processed.push({
                         text: "♪",
@@ -68,7 +84,8 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
             const current = processed[i];
             const prev = merged[merged.length - 1];
 
-            if (isReallyNote(current.text)) {
+            // Use isNoteLineObject to properly detect notes after translation
+            if (isNoteLineObject(current)) {
                 // Look-back Merge Strategy:
                 // Check if the current note should be merged with a previous note (ignoring empty lines).
                 // This handles cases where auto-generated notes and original source notes are separated by artifacts.
@@ -77,13 +94,16 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
                 let lastNonEmptyIndex = merged.length - 1;
                 while (lastNonEmptyIndex >= 0) {
                     const item = merged[lastNonEmptyIndex];
-                    if (item.text && (typeof item.text !== "string" || item.text.trim() !== "")) {
+                    // Check if item has any meaningful text content
+                    const hasContent = item.text && (typeof item.text !== "string" || item.text.trim() !== "");
+                    const hasOriginal = item.originalText && (typeof item.originalText !== "string" || item.originalText.trim() !== "");
+                    if (hasContent || hasOriginal) {
                         break;
                     }
                     lastNonEmptyIndex--;
                 }
 
-                if (lastNonEmptyIndex >= 0 && isReallyNote(merged[lastNonEmptyIndex].text)) {
+                if (lastNonEmptyIndex >= 0 && isNoteLineObject(merged[lastNonEmptyIndex])) {
                     // 2. If the last real item was ALSO a note, merge them.
                     // We do this by removing all intermediate empty lines (truncating the array)
                     // and skipping the addition of the current note (continue).
@@ -99,9 +119,8 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
 
         while (merged.length > 0) {
             const last = merged[merged.length - 1];
-            const text = last ? String(last.text || "").trim() : "";
-
-            if (!text || isReallyNote(text)) {
+            // Check both text and originalText for trailing notes
+            if (isNoteLineObject(last)) {
                 merged.pop();
             } else {
                 break;
@@ -307,13 +326,14 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
             }
 
             if (currentLine && nextLine && currentLine.startTime && nextLine.startTime) {
-                const textLen = (currentLine.text || "").length;
+                const textLen = (currentLine.originalText || currentLine.text || "").length;
                 // Estimate duration based on text length (120ms per char), min 3s
                 const estDur = Math.max(3000, textLen * 120);
                 const gap = nextLine.startTime - (currentLine.startTime + estDur);
 
                 // Auto-gap detector: Insert idling indicator if gap is large (>7s)
-                if (gap > 7000 && !isReallyNote(currentLine.text) && !isReallyNote(nextLine.text)) {
+                // Use isNoteLineObject to check the entire line object, not just text field
+                if (gap > 7000 && !isNoteLineObject(currentLine) && !isNoteLineObject(nextLine)) {
                     const insertTime = currentLine.startTime + estDur;
                     processed.push({
                         text: "♪",
@@ -329,7 +349,8 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
             const current = processed[i];
             const prev = merged[merged.length - 1];
 
-            if (isReallyNote(current.text)) {
+            // Use isNoteLineObject to properly detect notes after translation
+            if (isNoteLineObject(current)) {
                 // Look-back Merge Strategy:
                 // Check if the current note should be merged with a previous note (ignoring empty lines).
                 // This handles cases where auto-generated notes and original source notes are separated by artifacts.
@@ -338,13 +359,16 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
                 let lastNonEmptyIndex = merged.length - 1;
                 while (lastNonEmptyIndex >= 0) {
                     const item = merged[lastNonEmptyIndex];
-                    if (item.text && (typeof item.text !== "string" || item.text.trim() !== "")) {
+                    // Check if item has any meaningful text content
+                    const hasContent = item.text && (typeof item.text !== "string" || item.text.trim() !== "");
+                    const hasOriginal = item.originalText && (typeof item.originalText !== "string" || item.originalText.trim() !== "");
+                    if (hasContent || hasOriginal) {
                         break;
                     }
                     lastNonEmptyIndex--;
                 }
 
-                if (lastNonEmptyIndex >= 0 && isReallyNote(merged[lastNonEmptyIndex].text)) {
+                if (lastNonEmptyIndex >= 0 && isNoteLineObject(merged[lastNonEmptyIndex])) {
                     // 2. If the last real item was ALSO a note, merge them.
                     // We do this by removing all intermediate empty lines (truncating the array)
                     // and skipping the addition of the current note (continue).
@@ -358,9 +382,8 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
 
         while (merged.length > 0) {
             const last = merged[merged.length - 1];
-            const text = last ? String(last.text || "").trim() : "";
-
-            if (!text || isReallyNote(text)) {
+            // Check both text and originalText for trailing notes
+            if (isNoteLineObject(last)) {
                 merged.pop();
             } else {
                 break;

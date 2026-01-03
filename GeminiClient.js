@@ -4,14 +4,31 @@ class RequestQueue {
     constructor() {
         this.queue = [];
         this.isProcessing = false;
+        this.pendingPromises = new Map(); // For deduplication
+        this.lastRateLimited = false;
+        this.baseDelay = 100; // Adaptive delay
     }
 
     add(requestFn, priority = false, key = null) {
-        return new Promise((resolve, reject) => {
+        // Deduplication: If same key is already pending, return existing promise
+        if (key && this.pendingPromises.has(key)) {
+            console.log(`[Queue] Deduped request: ${key}`);
+            return this.pendingPromises.get(key);
+        }
+
+        const promise = new Promise((resolve, reject) => {
             const item = { requestFn, resolve, reject, key };
             priority ? this.queue.unshift(item) : this.queue.push(item);
             this.process();
         });
+
+        // Track pending promise for deduplication
+        if (key) {
+            this.pendingPromises.set(key, promise);
+            promise.finally(() => this.pendingPromises.delete(key));
+        }
+
+        return promise;
     }
 
     promote(key) {
@@ -24,24 +41,62 @@ class RequestQueue {
         }
     }
 
+    // Cancel all pending requests (call when track changes)
+    cancelAll(reason = 'Track changed') {
+        const cancelled = this.queue.length;
+        this.queue.forEach(item => {
+            item.reject(new Error(reason));
+            if (item.key) this.pendingPromises.delete(item.key);
+        });
+        this.queue = [];
+        if (cancelled > 0) console.log(`[Queue] Cancelled ${cancelled} pending requests`);
+        return cancelled;
+    }
+
+    // Remove specific key from queue
+    cancel(key) {
+        if (!key) return false;
+        const index = this.queue.findIndex(item => item.key === key);
+        if (index !== -1) {
+            const [item] = this.queue.splice(index, 1);
+            item.reject(new Error('Cancelled'));
+            this.pendingPromises.delete(key);
+            return true;
+        }
+        return false;
+    }
+
     async process() {
         if (this.isProcessing) return;
         if (this.queue.length === 0) return;
 
         this.isProcessing = true;
-        const { requestFn, resolve, reject } = this.queue.shift();
+        const { requestFn, resolve, reject, key } = this.queue.shift();
 
         try {
             const result = await requestFn();
+            this.lastRateLimited = false;
             resolve(result);
         } catch (e) {
+            // Track rate limiting for adaptive delay
+            if (e.status === 429) this.lastRateLimited = true;
             reject(e);
         } finally {
-            // Small delay to prevent bursting too hard even without rate limit
-            await new Promise(r => setTimeout(r, 200));
+            // Adaptive delay: longer if rate limited, shorter otherwise
+            const delay = this.lastRateLimited ? 500 : this.baseDelay;
+            await new Promise(r => setTimeout(r, delay));
             this.isProcessing = false;
             this.process();
         }
+    }
+
+    // Get queue status
+    get status() {
+        return {
+            pending: this.queue.length,
+            isProcessing: this.isProcessing,
+            rateLimited: this.lastRateLimited
+        };
     }
 }
 
@@ -50,7 +105,13 @@ const geminiQueueTranslation = new RequestQueue();
 const geminiQueuePhonetic = new RequestQueue();
 
 const GeminiClient = {
-    async fetchWithRetry(fn, retries = 3, baseDelay = 1000) {
+    // Cancel all pending requests in both queues (call when track changes)
+    cancelAllQueues() {
+        const cancelled = geminiQueueTranslation.cancelAll() + geminiQueuePhonetic.cancelAll();
+        return cancelled;
+    },
+
+    async fetchWithRetry(fn, retries = 3, baseDelay = 1000, attempt = 1) {
         try {
             return await fn();
         } catch (error) {
@@ -58,17 +119,18 @@ const GeminiClient = {
             // Don't retry on client errors (4xx), except 429 (Too Many Requests)
             if (error.status >= 400 && error.status < 500 && error.status !== 429) throw error;
 
-            const delay = baseDelay * 2;
+            // True exponential backoff: delay = baseDelay * 2^attempt
+            const delay = baseDelay * Math.pow(2, attempt - 1);
             if (error.status === 429) {
                 const retryMsg = `Rate Limited (429). Retrying in ${delay / 1000}s...`;
                 console.warn(`[Lyrics+] ${retryMsg}`);
                 Spicetify.showNotification(retryMsg);
             } else {
-                console.warn(`[Retry] Operation failed, retrying in ${delay}ms... (${retries} left)`, error.message);
+                console.warn(`[Retry] Attempt ${attempt}: retrying in ${delay}ms... (${retries} left)`, error.message);
             }
 
             await new Promise(resolve => setTimeout(resolve, delay));
-            return this.fetchWithRetry(fn, retries - 1, delay);
+            return this.fetchWithRetry(fn, retries - 1, baseDelay, attempt + 1);
         }
     },
 

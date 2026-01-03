@@ -42,25 +42,35 @@ Prompts are fine-tuned and automatically processed for clean, sensible results.
 
 ## Installation
 
-### Via Spicetify Marketplace (Not Available Now)
-1. Open Spotify and go to **Marketplace** tab
-2. Search for "Lyric Plus Translate"  
-3. Click **Install**
+> **Requirement:** Spotify installed from web, NOT from Microsoft Store. Install [Spicetify](https://spicetify.app/docs/getting-started) first.
+
+### Quick Install (Recommended)
+
+Open **PowerShell** and run:
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/install.ps1 | iex
+```
+
+This will automatically download and configure the app for you.
+
+### Uninstall
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/uninstall.ps1 | iex
+```
 
 ### Manual Installation
 
-> **Requirement:** Spotify installed from web, NOT from Microsoft Store
-
-1. Install [Spicetify](https://spicetify.app/docs/getting-started) first
-2. Download and extract this repository
+1. Download and extract this repository
 
    ![Download](assets/manual_download.png)
 
-3. Copy the `lyrics-plus` folder to Spicetify's CustomApps directory:
+2. Copy the `lyrics-plus` folder to Spicetify's CustomApps directory:
    - **Windows:** `%LocalAppData%\spicetify\CustomApps`
    - **MacOS/Linux:** `~/.config/spicetify/CustomApps`
 
-4. Run in CMD:
+3. Run in terminal:
    ```bash
    spicetify config custom_apps lyrics-plus
    spicetify apply

@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] - 2026-01-03
+
+### Added
+- **One-Click Update**: Beautiful update modal with copy-to-clipboard install command
+- One-liner installation via PowerShell: `iwr -useb .../install.ps1 | iex`
+- Uninstall script for easy removal
+- Settings button in lyrics header for quick access
+- Synchronous cache preload for instant translation display
+- `GeminiClient.cancelAllQueues()` - Cancel all pending API requests
+- `CacheManager.stats` - Get cache statistics
+- Queue status monitoring via `queue.status`
+
+### Performance
+- Request deduplication: Prevents duplicate API calls for same content
+- Adaptive queue delay: 100ms normal, 500ms when rate limited (was fixed 200ms)
+- True exponential backoff: 1s → 2s → 4s retry delays
+- Queue cancellation: Cancel pending requests when track changes
+- Cache TTL increased from 1 hour to 7 days (translations don't change)
+- Cache size increased from 200 to 500 songs
+- Persistent cache: Translations survive browser restart via localStorage
+
+### Fixed
+- **Translations not displaying**: Fixed issue where cached translations wouldn't show until display mode was toggled to "none" and back
+- **Duplicate idling indicators (♪)**: Added `isNoteLineObject()` helper to check all text fields (`text`, `originalText`, `text2`) instead of just `text`, fixing detection after translation processing
+- Robust note detection with `isReallyNote` helper for Unicode handling
+- Look-back merge strategy to prevent consecutive note artifacts
+- Refactored `updateCombinedLyrics` to read directly from `_dmResults` instead of stale closure variables
+
+### Improved
+- Update notification now shows command directly in modal
+- Removed excessive debug logs for cleaner console output
+
+---
+
 ## [1.2.2] - 2025-12-31
 
 ### Fixed

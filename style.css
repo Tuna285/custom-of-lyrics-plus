@@ -929,6 +929,7 @@ div[role="dialog"]::-webkit-scrollbar,
 }
 
 @keyframes idlingPulse {
+
 	/* 0-56% = original 0-90% (no glow, building up) */
 	0% {
 		filter: brightness(1);
@@ -956,6 +957,7 @@ div[role="dialog"]::-webkit-scrollbar,
 @keyframes idlingDrop {
 	0% {
 		opacity: 1;
+		transform: translateY(0) scale(0.7);
 	}
 
 	100% {
@@ -966,7 +968,7 @@ div[role="dialog"]::-webkit-scrollbar,
 
 .lyrics-idling-indicator.lyrics-idling-indicator-exiting .lyrics-idling-indicator__circle,
 .lyrics-idling-indicator-hidden .lyrics-idling-indicator__circle {
-	animation: idlingDrop 0.6s cubic-bezier(0.55, 0.055, 0.675, 0.19) forwards !important;
+	animation: idlingDrop 0.5s cubic-bezier(0.4, 0, 0.6, 1) forwards !important;
 	pointer-events: none;
 }
 
