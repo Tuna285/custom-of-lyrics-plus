@@ -64,7 +64,7 @@ $assetsToDownload = @(
     "chinese_conversion.png",
     "japanese_conversion.png",
     "korean_conversion.png",
-    "manual_download.png",
+    "manual_download.png"
 )
 
 # [0/6] Close Spotify to prevent file lock issues
