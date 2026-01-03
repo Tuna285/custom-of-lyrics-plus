@@ -60,7 +60,7 @@ $filesToDownload = @(
 
 # Asset files (in assets/ folder)
 $assetsToDownload = @(
-    "preview.gif"
+    "preview.gif",
     "chinese_conversion.png",
     "japanese_conversion.png",
     "korean_conversion.png",
