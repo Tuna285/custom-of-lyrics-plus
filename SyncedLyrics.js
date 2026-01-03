@@ -1,5 +1,12 @@
 // SyncedLyrics.js - Synced Lyrics Pages
 
+// Robust check for note lines (handles whitespace/artifacts)
+const isReallyNote = (text) => {
+    if (!text) return false;
+    if (isNoteLine(text)) return true;
+    return typeof text === "string" && text.trim() === "♪";
+};
+
 const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara }) => {
     const [position, setPosition] = useState(0);
     const activeLineEle = useRef();
@@ -17,6 +24,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
         const raw = [emptyLine, emptyLine, ...lyrics];
         const processed = [];
         let newIndex = 0;
+
 
         for (let i = 0; i < raw.length; i++) {
             const currentLine = raw[i];
@@ -38,10 +46,12 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
 
             if (currentLine && nextLine && currentLine.startTime && nextLine.startTime) {
                 const textLen = (currentLine.text || "").length;
+                // Estimate duration based on text length (120ms per char), min 3s
                 const estDur = Math.max(3000, textLen * 120);
                 const gap = nextLine.startTime - (currentLine.startTime + estDur);
 
-                if (gap > 7000 && !isNoteLine(currentLine.text) && !isNoteLine(nextLine.text)) {
+                // Auto-gap detector: Insert idling indicator if gap is large (>7s)
+                if (gap > 7000 && !isReallyNote(currentLine.text) && !isReallyNote(nextLine.text)) {
                     const insertTime = currentLine.startTime + estDur;
                     processed.push({
                         text: "♪",
@@ -58,8 +68,29 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
             const current = processed[i];
             const prev = merged[merged.length - 1];
 
-            if (prev && isNoteLine(prev.text) && isNoteLine(current.text)) {
-                continue;
+            if (isReallyNote(current.text)) {
+                // Look-back Merge Strategy:
+                // Check if the current note should be merged with a previous note (ignoring empty lines).
+                // This handles cases where auto-generated notes and original source notes are separated by artifacts.
+
+                // 1. Find the last non-empty item in the merged list
+                let lastNonEmptyIndex = merged.length - 1;
+                while (lastNonEmptyIndex >= 0) {
+                    const item = merged[lastNonEmptyIndex];
+                    if (item.text && (typeof item.text !== "string" || item.text.trim() !== "")) {
+                        break;
+                    }
+                    lastNonEmptyIndex--;
+                }
+
+                if (lastNonEmptyIndex >= 0 && isReallyNote(merged[lastNonEmptyIndex].text)) {
+                    // 2. If the last real item was ALSO a note, merge them.
+                    // We do this by removing all intermediate empty lines (truncating the array)
+                    // and skipping the addition of the current note (continue).
+                    // This effectively extends the duration of the previous note to cover this one.
+                    merged.length = lastNonEmptyIndex + 1;
+                    continue; // Skip adding current note
+                }
             }
             merged.push(current);
         }
@@ -70,15 +101,12 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
             const last = merged[merged.length - 1];
             const text = last ? String(last.text || "").trim() : "";
 
-            if (!text || isNoteLine(text)) {
-                DebugLogger.log('Removing trailing garbage/note:', text);
+            if (!text || isReallyNote(text)) {
                 merged.pop();
             } else {
                 break;
             }
         }
-
-        DebugLogger.log('After trailing removal, last 3:', JSON.stringify(merged.slice(-3).map(l => l.text)));
 
         return merged;
     }, [lyrics]);
@@ -149,8 +177,10 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
                     ref = activeLineEle;
                 }
 
-                // Check if this is a note line (check both mainText and original text)
-                const isNote = isNoteLine(mainText) || isNoteLine(text);
+                // Check if this is a note line - only render IdlingIndicator if ALL texts are notes
+                // This prevents duplicate indicators when display mode shows both original and translation
+                const isNote = isReallyNote(mainText) && (!subText || isReallyNote(subText)) && (!subText2 || isReallyNote(subText2));
+
                 if (isNote) {
                     // Find next line's start time to calculate progress
                     let nextStartTime = startTime + 5000; // Default fallback
@@ -261,6 +291,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
         const raw = [emptyLine, ...lyrics];
         const processed = [];
 
+
         for (let i = 0; i < raw.length; i++) {
             const currentLine = raw[i];
             const nextLine = raw[i + 1];
@@ -277,10 +308,12 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
 
             if (currentLine && nextLine && currentLine.startTime && nextLine.startTime) {
                 const textLen = (currentLine.text || "").length;
+                // Estimate duration based on text length (120ms per char), min 3s
                 const estDur = Math.max(3000, textLen * 120);
                 const gap = nextLine.startTime - (currentLine.startTime + estDur);
 
-                if (gap > 7000 && !isNoteLine(currentLine.text) && !isNoteLine(nextLine.text)) {
+                // Auto-gap detector: Insert idling indicator if gap is large (>7s)
+                if (gap > 7000 && !isReallyNote(currentLine.text) && !isReallyNote(nextLine.text)) {
                     const insertTime = currentLine.startTime + estDur;
                     processed.push({
                         text: "♪",
@@ -296,20 +329,38 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
             const current = processed[i];
             const prev = merged[merged.length - 1];
 
-            if (prev && isNoteLine(prev.text) && isNoteLine(current.text)) {
-                // Skip this note, keep the previous one (extends its duration)
-                DebugLogger.log('Merging consecutive notes, skipping:', current.text);
-                continue;
+            if (isReallyNote(current.text)) {
+                // Look-back Merge Strategy:
+                // Check if the current note should be merged with a previous note (ignoring empty lines).
+                // This handles cases where auto-generated notes and original source notes are separated by artifacts.
+
+                // 1. Find the last non-empty item in the merged list
+                let lastNonEmptyIndex = merged.length - 1;
+                while (lastNonEmptyIndex >= 0) {
+                    const item = merged[lastNonEmptyIndex];
+                    if (item.text && (typeof item.text !== "string" || item.text.trim() !== "")) {
+                        break;
+                    }
+                    lastNonEmptyIndex--;
+                }
+
+                if (lastNonEmptyIndex >= 0 && isReallyNote(merged[lastNonEmptyIndex].text)) {
+                    // 2. If the last real item was ALSO a note, merge them.
+                    // We do this by removing all intermediate empty lines (truncating the array)
+                    // and skipping the addition of the current note (continue).
+                    // This effectively extends the duration of the previous note to cover this one.
+                    merged.length = lastNonEmptyIndex + 1;
+                    continue; // Skip adding current note
+                }
             }
             merged.push(current);
         }
 
-        DebugLogger.log('Before trailing removal, last 3:', JSON.stringify(merged.slice(-3).map(l => l.text)));        // Remove trailing note lines AND empty/invalid lines at end of song
         while (merged.length > 0) {
             const last = merged[merged.length - 1];
             const text = last ? String(last.text || "").trim() : "";
 
-            if (!text || isNoteLine(text)) {
+            if (!text || isReallyNote(text)) {
                 merged.pop();
             } else {
                 break;
@@ -376,8 +427,11 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
                 className += " lyrics-lyricsContainer-LyricsLine-paddingLine";
             }
 
-            // Check if this is a note line (check both mainText and original text)
-            if (isNoteLine(mainText) || isNoteLine(text)) {
+            // Check if this is a note line - only render IdlingIndicator if ALL texts are notes
+            // This prevents duplicate indicators when display mode shows both original and translation
+            const isNote = isReallyNote(mainText) && (!subText || isReallyNote(subText)) && (!subText2 || isReallyNote(subText2));
+
+            if (isNote) {
                 // Find next line's start time
                 let nextStartTime = startTime + 5000; // Default fallback
                 if (i < padded.length - 1) {

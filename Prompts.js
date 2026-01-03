@@ -110,6 +110,7 @@ SMART ANTI-HALLUCINATION (SEMANTIC PRECISION):
 3) NO emotion adjectives unless explicit (e.g., don't add "buồn bã/chán chường/cô đơn/đau đớn" if not in source).
 4) ALLOWED: minimal grammatical particles for Vietnamese flow (đang, đã, sẽ, vẫn, mà, thì, là, những...), as long as meaning does not change.
 5) Idioms & interjections ONLY: translate the meaning/function minimally.
+   - "Oh my, my" -> "Hỡi ôi" | "Oh my, my love" -> "Hỡi tình yêu của anh ơi"
    - "Break a leg" -> "Chúc may mắn"
    - "tsk"/"click tongue" -> "chậc" / "tặc lưỡi" (do NOT add extra emotion words)
 6) No explanations. Do not add parentheses like "(meaning: ...)".
