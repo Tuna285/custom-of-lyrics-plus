@@ -51,6 +51,7 @@ $filesToDownload = @(
     "PlaybarButton.js",
     "version.json",
     "README.md",
+    "README_VI.md",
     "CHANGELOG.md",
     "LICENSE",
     "install.ps1",
@@ -60,6 +61,10 @@ $filesToDownload = @(
 # Asset files (in assets/ folder)
 $assetsToDownload = @(
     "preview.gif"
+    "chinese_conversion.png",
+    "japanese_conversion.png",
+    "korean_conversion.png",
+    "manual_download.png",
 )
 
 # [0/6] Close Spotify to prevent file lock issues
