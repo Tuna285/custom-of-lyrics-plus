@@ -12,6 +12,17 @@
 $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
+# Check for Administrator privileges
+$currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+if ($currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Host ""
+    Write-Host "[ERROR] DO NOT RUN AS ADMINISTRATOR!" -ForegroundColor Red
+    Write-Host "Spicetify cannot apply changes when running as Admin." -ForegroundColor Yellow
+    Write-Host "Please close this window and run PowerShell normally." -ForegroundColor Cyan
+    Write-Host ""
+    exit 1
+}
+
 Write-Host ""
 Write-Host "+============================================================+" -ForegroundColor Cyan
 Write-Host "|         Lyrics Plus Translate - Installer                  |" -ForegroundColor Cyan
@@ -202,7 +213,17 @@ else {
 # [6/6] Apply changes
 Write-Host ""
 Write-Host "[6/6] Applying Spicetify changes..." -ForegroundColor Yellow
-& spicetify apply 2>$null
+
+# Run spicetify apply
+& spicetify apply
+
+# Check for failure
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ""
+    Write-Host "  [ERROR] Spicetify apply failed!" -ForegroundColor Red
+    Write-Host "  Please check the errors above." -ForegroundColor Yellow
+    exit 1
+}
 
 # Done!
 Write-Host ""
