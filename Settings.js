@@ -274,16 +274,16 @@ const ConfigHelper = () => {
 
 	// Translation Settings
 	const translationSettings = [
-		{ desc: "API Mode", key: "gemini:api-mode", type: ConfigSelection, options: { "official": "Official (API Key)", "proxy": "ProxyPal, CLIProxyAPI (Free)" }, info: "Choose between official Google API (requires API key) or CLI Proxy for free access." },
+		{ desc: "API Mode", key: "gemini:api-mode", type: ConfigSelection, options: { "official": "Official (API Key)", "proxy": "ProxyPal (Free)" }, info: "Choose between official Google API (requires API key) or ProxyPal for free access." },
 
 		// Official Settings
 		{ desc: "Gemini, Gemma API Key (Display Mode 1)", key: "gemini-api-key", type: ConfigInput, info: "Gemini, Gemma API for Display Mode 1.", when: () => CONFIG.visual["gemini:api-mode"] !== "proxy" },
 		{ desc: "Gemini, Gemma API Key (Display Mode 2)", key: "gemini-api-key-romaji", type: ConfigInput, info: "Gemini, Gemma API for Display Mode 2 (Romaji, Romaja, Pinyin modes), leave blank if you only use 1 API.", when: () => CONFIG.visual["gemini:api-mode"] !== "proxy" },
 
 		// Proxy Settings
-		{ desc: "Proxy Model", key: "gemini:proxy-model", type: ConfigSelection, options: { "gemini-3-flash-preview": "Gemini 3 Flash Preview (Recommended)", "gemini-3-pro-preview": "Gemini 3 Pro Preview", "gemini-2.5-flash": "Gemini 2.5 Flash", "gemini-2.5-pro": "Gemini 2.5 Pro", "gemini-2.0-flash": "Gemini 2.0 Flash", "gemma-3-27b-it": "Gemma 3 27B" }, info: "Model to use with CLIProxyAPI or ProxyPal", when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
-		{ desc: "Proxy API Key", key: "gemini:proxy-api-key", type: ConfigInput, info: "API Key (default: proxypal-local for ProxyPal, your-api-key-1 for CLIProxyAPI).", when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
-		{ desc: "Proxy Endpoint", key: "gemini:proxy-endpoint", type: ConfigInput, info: "Full CLI Proxy URL (default: http://localhost:8317/v1/chat/completions).", when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
+		{ desc: "Proxy Model", key: "gemini:proxy-model", type: ConfigSelection, options: { "gemini-3-flash-preview": "Gemini 3 Flash Preview (Recommended)", "gemini-3-pro-preview": "Gemini 3 Pro Preview", "gemini-2.5-flash": "Gemini 2.5 Flash", "gemini-2.5-pro": "Gemini 2.5 Pro", "gemini-2.0-flash": "Gemini 2.0 Flash", "gemma-3-27b-it": "Gemma 3 27B" }, info: "Model to use with ProxyPal", when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
+		{ desc: "Proxy API Key", key: "gemini:proxy-api-key", type: ConfigInput, info: "API Key (default: proxypal-local).", when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
+		{ desc: "Proxy Endpoint", key: "gemini:proxy-endpoint", type: ConfigInput, info: "Full Proxy URL (default: http://localhost:8317/v1/chat/completions).", when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
 
 		// Common Settings
 		{ desc: "Pre-translation", key: "pre-translation", type: ConfigSlider, info: "Automatically translate lyrics when a song starts playing." },

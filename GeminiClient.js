@@ -275,8 +275,29 @@ const GeminiClient = {
                             signal: controller.signal
                         });
                         if (!response.ok) {
-                            const error = new Error(`HTTP ${response.status}`);
+                            let errorDetails = `HTTP ${response.status}`;
+                            try {
+                                const errorBody = await response.text();
+                                if (errorBody) {
+                                    // Try to parse JSON error
+                                    try {
+                                        // Handle various error formats
+                                        const errorJson = JSON.parse(errorBody);
+                                        const msg = errorJson.error?.message || errorJson.message || errorJson.error || JSON.stringify(errorJson);
+                                        errorDetails = `HTTP ${response.status}: ${msg}`;
+                                    } catch {
+                                        errorDetails = `HTTP ${response.status}: ${errorBody.substring(0, 300)}`; // Increased limit
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn('[Lyrics+] Failed to read error response body:', e);
+                            }
+                            
+                            const error = new Error(errorDetails);
                             error.status = response.status;
+                            // Attach extra info for the catch block
+                            error.endpoint = endpoint;
+                            error.model = body.model; 
                             throw error;
                         }
                         return response;
@@ -294,16 +315,41 @@ const GeminiClient = {
             }
 
         } catch (error) {
-            console.error(`Gemma Error: ${error.message}`);
+            const errorMsg = error.message || 'Unknown error';
+            
+            // Log full details for debugging
+            console.error(`[Lyrics+] Translation Error:`, { 
+                message: errorMsg, 
+                status: error.status,
+                apiMode,
+                model: error.model || body?.model,
+                endpoint: error.endpoint || (apiMode === 'proxy' ? proxyEndpoint : 'Official API'),
+                stack: error.stack
+            });
             console.groupEnd();
 
             if (error.name !== 'AbortError' && !_isRetry) {
+                console.log('[Lyrics+] Retrying with fallback minimal prompt...');
                 return this.callGemini({
                     apiKey, artist, title, text,
                     styleKey: 'literal_study', pronounKey: 'default',
                     wantSmartPhonetic, _isRetry: true
                 });
             }
+
+            // Make error message more user-friendly for UI
+            let userMessage = errorMsg;
+            if (error.status === 500) {
+                userMessage = `Server Error (500). Please check if ProxyPal is running and connected. Details: ${errorMsg.replace(/^HTTP 500:\s*/, '')}`;
+            } else if (error.status === 404) {
+                userMessage = `Model Not Found (404). The model '${error.model || body?.model}' might not be supported by your proxy.`;
+            } else if (error.status === 401 || error.status === 403) {
+                userMessage = `Authentication Failed (${error.status}). Please check your API key in Settings.`;
+            } else if (error.status === 429) {
+                userMessage = `Rate Limit Exceeded. Please wait a moment.`;
+            }
+            
+            error.message = userMessage;
             throw error;
         }
     },
