@@ -2,7 +2,7 @@
 
 [![English](https://img.shields.io/badge/Lang-English-blue?style=flat-square)](README.md)
 
-> Phiên bản tùy chỉnh của **Lyrics Plus** dành cho Spicetify, tập trung vào dịch lời bài hát chất lượng cao, tối ưu cho người dùng Việt Nam. Hỗ trợ API cá nhân (Google) và thông qua [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) hoặc [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal).
+> Phiên bản tùy chỉnh của **Lyrics Plus** dành cho Spicetify, tập trung vào dịch lời bài hát chất lượng cao, tối ưu cho người dùng Việt Nam. Hỗ trợ API cá nhân (Google) và thông qua [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal).
 
 > [!NOTE]
 > **Hiện tại, tính năng dịch chỉ hỗ trợ tiếng Việt.** Hỗ trợ cho các ngôn ngữ khác có thể được thêm vào trong các bản cập nhật tương lai.
@@ -44,9 +44,15 @@ Các prompt được tinh chỉnh và xử lý tự động để cho ra kết q
 
 ## Cài đặt
 
-> **Yêu cầu:** Spotify được cài đặt từ web, KHÔNG phải từ Microsoft Store. Cài đặt [Spicetify](https://spicetify.app/docs/getting-started) trước.
+> **Yêu cầu:** [Spotify](https://download.scdn.co/SpotifySetup.exe) được cài đặt từ web, KHÔNG phải từ Microsoft Store.
 
-### Cài đặt nhanh (Khuyên dùng)
+Cài đặt Spicetify:
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/spicetify/cli/main/install.ps1 | iex
+```
+
+### - Cài đặt nhanh (Khuyên dùng)
 
 Mở **PowerShell** và chạy lệnh:
 
@@ -54,17 +60,15 @@ Mở **PowerShell** và chạy lệnh:
 iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/install.ps1 | iex
 ```
 
-Lệnh sẽ tự động tải xuống và cấu hình ứng dụng cho bạn.
-
 ### Gỡ cài đặt
 
 ```powershell
 iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/uninstall.ps1 | iex
 ```
 
-### Cài đặt thủ công
+### - Cài đặt thủ công
 
-1. Tải xuống và giải nén file.zip này
+1. Tải xuống và giải nén file .zip này
 
    ![Download](assets/manual_download.png)
 
@@ -85,7 +89,7 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 1. Mở Spotify, nhấp vào avatar của bạn → **Lyric Plus Translate config**
 2. Tới phần **Translation** và setting cấu hình chế độ API của bạn:
    - **Direct API**: Sử dụng key API [Google AI Studio](https://aistudio.google.com/)
-   - **Proxy**: Sử dụng [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) hoặc [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal)
+   - **Proxy**: Sử dụng [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal)
 
 3. Di chuột qua lời bài hát và nhấp vào biểu tượng Translation (⇄) để tùy chỉnh chế độ hiển thị
 
