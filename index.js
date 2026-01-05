@@ -317,7 +317,11 @@ class LyricsContainer extends react.Component {
 
 			// Reset state and apply, preserving cached translations if any
 			// Set currentLyrics immediately with original lyrics so UI renders while translation runs
-			const initialCurrentLyrics = tempState.currentLyrics || tempState.synced || tempState.unsynced || [];
+			// CRITICAL: If currentLyrics already has Gemini translations from lyricsSource(), preserve them!
+			const initialCurrentLyrics = this.state.currentLyrics?.length > 0 && this.state.currentLyrics?.some(l => l.text || l.text2)
+				? this.state.currentLyrics  // Preserve Gemini translations if they exist
+				: (tempState.currentLyrics || tempState.synced || tempState.unsynced || []);
+			
 			this.setState({
 				furigana: null,
 				romaji: null,
@@ -350,7 +354,11 @@ class LyricsContainer extends react.Component {
 		}
 
 		//Preserve cached translations when not changing songs
-		const initialCurrentLyrics2 = tempState.currentLyrics || tempState.synced || tempState.unsynced || [];
+		// CRITICAL: Same fix as above - preserve Gemini translations if they exist
+		const initialCurrentLyrics2 = this.state.currentLyrics?.length > 0 && this.state.currentLyrics?.some(l => l.text || l.text2)
+			? this.state.currentLyrics  // Preserve Gemini translations if they exist
+			: (tempState.currentLyrics || tempState.synced || tempState.unsynced || []);
+		
 		this.setState({
 			...tempState,
 			currentLyrics: initialCurrentLyrics2,
@@ -469,7 +477,11 @@ class LyricsContainer extends react.Component {
 		}
 
 		// Progressive loading: keep results per track so Mode 1 does not disappear when Mode 2 finishes
-		this._dmResults[currentUri] = this._dmResults[currentUri] || { mode1: null, mode2: null };
+		// CRITICAL: Use ||= instead of || to avoid resetting cached data on subsequent calls
+		this._dmResults = this._dmResults || {};
+		if (!this._dmResults[currentUri]) {
+			this._dmResults[currentUri] = { mode1: null, mode2: null };
+		}
 
 		// Synchronous cache preload: Check localStorage for cached translations BEFORE async calls
 		// This ensures cached translations display immediately without waiting for Promise.then()
@@ -536,14 +548,17 @@ class LyricsContainer extends react.Component {
 		// Check if we already have cached results
 		const { mode1: cachedMode1, mode2: cachedMode2 } = getResults();
 
-		// If we have cached results, show them immediately
+		// If we have cached results, show them immediately and skip API calls
 		if (cachedMode1 || cachedMode2) {
 			updateCombinedLyrics(true);
-		} else {
-			// No cache yet - show original lyrics immediately so UI isn't blank while waiting
-			const optimizedOriginal = this.optimizeTranslations(lyrics, null, null);
-			this.setState({ currentLyrics: Array.isArray(optimizedOriginal) ? optimizedOriginal : [] });
+			// Important: Don't call processMode again if we already have cache
+			// This prevents race conditions that could overwrite the displayed cache
+			return;
 		}
+
+		// No cache yet - show original lyrics immediately so UI isn't blank while waiting
+		const optimizedOriginal = this.optimizeTranslations(lyrics, null, null);
+		this.setState({ currentLyrics: Array.isArray(optimizedOriginal) ? optimizedOriginal : [] });
 
 		// Start both requests, but don't wait for both to finish to update UI
 		const promise1 = processMode(displayMode1, lyrics);

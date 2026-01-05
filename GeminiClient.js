@@ -105,6 +105,26 @@ const geminiQueueTranslation = new RequestQueue();
 const geminiQueuePhonetic = new RequestQueue();
 
 const GeminiClient = {
+    // Notification throttling to prevent spam
+    lastNotificationTime: 0,
+    lastNotificationMessage: '',
+    
+    shouldShowNotification(message) {
+        const now = Date.now();
+        const throttleWindow = 10000; // 10 seconds
+        
+        // If same message within throttle window, suppress
+        if (this.lastNotificationMessage === message && 
+            (now - this.lastNotificationTime) < throttleWindow) {
+            console.log(`[Lyrics+] Suppressed duplicate notification: ${message.substring(0, 50)}...`);
+            return false;
+        }
+        
+        this.lastNotificationTime = now;
+        this.lastNotificationMessage = message;
+        return true;
+    },
+    
     // Cancel all pending requests in both queues (call when track changes)
     cancelAllQueues() {
         const cancelled = geminiQueueTranslation.cancelAll() + geminiQueuePhonetic.cancelAll();
@@ -122,9 +142,7 @@ const GeminiClient = {
             // True exponential backoff: delay = baseDelay * 2^attempt
             const delay = baseDelay * Math.pow(2, attempt - 1);
             if (error.status === 429) {
-                const retryMsg = `Rate Limited (429). Retrying in ${delay / 1000}s...`;
-                console.warn(`[Lyrics+] ${retryMsg}`);
-                Spicetify.showNotification(retryMsg);
+                console.warn(`[Lyrics+] Rate Limited (429). Retrying in ${delay / 1000}s... (${retries} retries left)`);
             } else {
                 console.warn(`[Retry] Attempt ${attempt}: retrying in ${delay}ms... (${retries} left)`, error.message);
             }
@@ -375,10 +393,16 @@ const GeminiClient = {
                 userMessage = `Bad Request (400). The request format may be invalid: ${errorMsg.replace(/^HTTP 400:\s*/, '').substring(0, 100)}`;
             }
             
-            // Show notification to user
-            try {
-                Spicetify.showNotification(userMessage.substring(0, 100), true, 5000);
-            } catch (e) { /* Spicetify not available */ }
+            // Show notification for critical errors only (not 429 rate limit spam)
+            const shouldNotify = error.status !== 429; // Silent for rate limit
+            
+            if (shouldNotify) {
+                try {
+                    if (this.shouldShowNotification(userMessage)) {
+                        Spicetify.showNotification(userMessage.substring(0, 100), true, 5000);
+                    }
+                } catch (e) { /* Spicetify not available */ }
+            }
             
             error.message = userMessage;
             throw error;
@@ -436,6 +460,9 @@ const GeminiClient = {
             } else if (result.vi.length > lineCount) {
                 result.vi = result.vi.slice(0, lineCount);
             }
+        }
+        // Update phonetic after any modifications
+        if (result.vi) {
             result.phonetic = result.vi.join('\n');
         }
         // Log translation results for debugging
