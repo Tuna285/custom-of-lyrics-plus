@@ -90,7 +90,7 @@ const UpdateChecker = {
     VERSION_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/version.json",
     RAW_BASE_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main",
     INSTALL_COMMAND: "iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/install.ps1 | iex",
-    CURRENT_VERSION: "1.2.3",
+    CURRENT_VERSION: "1.2.4",
     CHECK_INTERVAL: 24 * 60 * 60 * 1000, // 24 hours
 
     // List of files to download for update
@@ -397,7 +397,7 @@ const CONFIG = {
         "translation-mode-2:gemini": localStorage.getItem("lyrics-plus:visual:translation-mode-2:gemini") || "none",
         "gemini-api-key": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key") || "",
         "gemini-api-key-romaji": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key-romaji") || "",
-        "gemini:api-mode": localStorage.getItem("lyrics-plus:visual:gemini:api-mode") || "official",
+        "gemini:api-mode": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:api-mode") || "official",
         "gemini:proxy-model": localStorage.getItem("lyrics-plus:visual:gemini:proxy-model") || "gemini-3-flash-preview",
         "gemini:proxy-api-key": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:proxy-api-key") || "",
         "gemini:proxy-endpoint": localStorage.getItem("lyrics-plus:visual:gemini:proxy-endpoint") || "http://localhost:8317/v1/chat/completions",

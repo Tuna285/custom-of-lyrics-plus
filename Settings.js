@@ -299,7 +299,8 @@ const ConfigHelper = () => {
 				localStorage.setItem(`${APP_NAME}:visual:translate:translated-lyrics-source`, "none");
 			}
 			reloadLyrics?.();
-		} else if (name === "gemini-api-key" || name === "gemini-api-key-romaji" || name.startsWith("gemini:proxy")) {
+		} else if (name === "gemini-api-key" || name === "gemini-api-key-romaji" || name.startsWith("gemini:")) {
+			// Persist gemini settings to both storages so they survive spicetify apply
 			try { Spicetify?.LocalStorage?.set(`${APP_NAME}:visual:${name}`, value); } catch (error) { console.warn(`Failed to save to Spicetify LocalStorage '${name}':`, error); }
 			try { localStorage.setItem(`${APP_NAME}:visual:${name}`, value); } catch (error) { console.warn(`Failed to save to localStorage '${name}':`, error); }
 		} else {

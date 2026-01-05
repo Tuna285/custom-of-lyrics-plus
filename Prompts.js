@@ -28,26 +28,28 @@ const Prompts = {
     buildGemma3Prompt({ artist, title, text, styleKey = 'smart_adaptive', pronounKey = 'default', wantSmartPhonetic = false }) {
         const lines = text.split('\n');
         const lineCount = lines.length;
-        const linesJson = JSON.stringify(lines);
+        // Numbered list format for better line anchoring (prevents shifting)
+        const numberedInput = lines.map((l, i) => `${i + 1}. ${l}`).join('\n');
 
         if (wantSmartPhonetic) {
             return `Task: Phonetic Transcription (Karaoke System).
-Input lines: ${lineCount}
-Rules: 
-1. Output JSON Array of exactly ${lineCount} strings.
+Total lines: ${lineCount}
+
+Rules:
+1. Output a NUMBERED LIST matching input line numbers exactly.
 2. Transcription Standards:
-   - Japanese: Hepburn Romaji with macrons for long vowels (chōonpu: ā, ē, ī, ō, ū, e.g., "東京" → "tōkyō").
-   - Korean: Revised Romanization with word spacing (e.g., "사랑해요" → "sarang haeyo").
-   - Chinese: Pinyin with tone marks and word spacing (e.g., "我爱你" → "wǒ ài nǐ").
+   - Japanese: Hepburn Romaji with macrons (ā, ē, ī, ō, ū). Example: "東京" → "tōkyō"
+   - Korean: Revised Romanization with word spacing. Example: "사랑해요" → "sarang haeyo"
+   - Chinese: Pinyin with tone marks. Example: "我爱你" → "wǒ ài nǐ"
 3. Keep punctuation/English unchanged.
 4. Romanize sound effects (e.g., "Ah" not "Tiếng hét").
-5. All lowercase, NO capitalization at the beginning of lines.
-6. Number translation: Convert numbers to romanized words, not digits:
-   - Japanese: "1" → "ichi", "2000" → "ni-sen", "3つ" → "mittsu"
-   - Korean: "1" → "il/hana", "2000" → "i-cheon", "100" → "baek"
-   - Chinese: "1" → "yī", "2000" → "liǎngqiān", "100" → "bǎi"
-Input: ${linesJson}
-Output JSON:`;
+5. All lowercase, NO capitalization.
+6. Numbers → romanized words: "2000" → "ni-sen" (JP), "i-cheon" (KR), "liǎngqiān" (CN)
+
+Input (${lineCount} lines):
+${numberedInput}
+
+Output (${lineCount} lines, numbered 1-${lineCount}):`;
         }
 
         const STYLE_DESC = {
@@ -80,49 +82,49 @@ Output JSON:`;
         const styleObj = STYLE_DESC[styleKey] || STYLE_DESC.smart_adaptive;
         const style = typeof styleObj === 'string' ? styleObj : styleObj.description;
 
-        let pronoun = "AUTO (stable): If speaker/target is ambiguous, prefer neutral Vietnamese that can omit pronouns. Do not invent relationship/age/gender. If a pronoun is needed for clarity, use a neutral scheme and keep it consistent across the whole song.";
+        let pronoun = "AUTO: Prefer neutral phrasing. If pronoun needed, keep consistent throughout.";
         if (pronounKey !== 'default' && PRONOUN_MODES[pronounKey]) {
-            pronoun = `FORCE use pronouns: "${PRONOUN_MODES[pronounKey].value}".`;
+            pronoun = `FORCE pronouns: "${PRONOUN_MODES[pronounKey].value}".`;
         }
 
-        return `Context: You are a Vietnamese Lyrics Adapter.
-Target: "${artist} - ${title}"
+        return `You are a Vietnamese Lyrics Adapter.
+Song: "${artist} - ${title}"
 Style: ${style}
 Pronoun: ${pronoun}
 
-STRATEGY: "NUANCE OVER ADDITION"
-1) Choose Vietnamese verbs/nouns that already carry the tone, instead of adding emotion adjectives.
-   - Bad: "Anh đi bộ buồn bã" (adds sadness)
-   - Good: "Anh lê bước" (verb implies heaviness)
-   - Bad: "Nhìn chằm chằm đầy tình yêu" (adds love)
-   - Good: "Ngắm nhìn" / "dõi theo" (nuanced verb)
+CRITICAL: LINE-BY-LINE MAPPING
+- Input has ${lineCount} numbered lines (1-${lineCount})
+- Output MUST have exactly ${lineCount} numbered lines
+- Line N input → Line N output. NEVER merge, split, or shift lines.
 
-HARD CONSTRAINTS (MUST):
-1) Output MUST be a JSON Array of EXACTLY ${lineCount} strings.
-2) 1 source line = 1 output line. NEVER merge, split, or reorder lines.
-3) Empty/whitespace-only input line -> output "" (empty string).
-4) Keep tags/labels exactly as-is: [Intro], [Chorus], (Instrumental), etc.
-5) Output ONLY the JSON Array. No markdown, no code fences, no extra text.
+OUTPUT FORMAT (NUMBERED LIST):
+1. [Vietnamese translation of line 1]
+2. [Vietnamese translation of line 2]
+...
+${lineCount}. [Vietnamese translation of line ${lineCount}]
 
-SMART ANTI-HALLUCINATION (SEMANTIC PRECISION):
-1) NO new facts or imagery. Do not add rain, tears, sunsets, colors, places, or extra events unless explicitly present.
-2) NO intensifiers unless explicit (e.g., don't add "rất/quá/thật/đầy/cực" if not in source).
-3) NO emotion adjectives unless explicit (e.g., don't add "buồn bã/chán chường/cô đơn/đau đớn" if not in source).
-4) ALLOWED: minimal grammatical particles for Vietnamese flow (đang, đã, sẽ, vẫn, mà, thì, là, những...), as long as meaning does not change.
-5) Idioms & interjections ONLY: translate the meaning/function minimally.
-   - "Oh my, my" -> "Hỡi ôi" | "Oh my, my love" -> "Hỡi tình yêu của anh ơi"
-   - "Break a leg" -> "Chúc may mắn"
-   - "tsk"/"click tongue" -> "chậc" / "tặc lưỡi" (do NOT add extra emotion words)
-6) No explanations. Do not add parentheses like "(meaning: ...)".
+RULES:
+1) Empty input line → empty output (just the number, e.g., "5. ")
+2) Keep tags as-is: [Intro], [Chorus], (Instrumental)
+3) Keep English phrases unchanged. Translate CJK to Vietnamese.
+4) Keep vocal sounds: Ah, Oh, Yeah, La la la
+5) NO hallucination: Don't add imagery, emotions, or details not in source.
 
-FLOW & PUNCTUATION:
-1) Avoid rigid "Người mà...". Use natural Vietnamese phrasing.
-2) If the sentence continues to the next line, do NOT end the current line with a comma.
-3) Keep vocal sounds unchanged: Ah, Oh, Yeah, La la la, Aa...
-4) You may reorder phrases WITHIN a line for natural Vietnamese word order, but you MUST NOT add/remove meaning.
+EXAMPLE (3-line input):
+Input:
+1. 君を愛してる
+2. 
+3. I love you
 
-Input JSON:
-${linesJson}`;
+Output:
+1. Anh yêu em
+2. 
+3. I love you
+
+Input (${lineCount} lines):
+${numberedInput}
+
+Output (${lineCount} lines):`;
     },
 
     buildMinimalFallbackPrompt({ artist, title, text }) {
