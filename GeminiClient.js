@@ -143,8 +143,34 @@ const GeminiClient = {
         let raw = String(text || "").trim();
         raw = raw.replace(/```[a-z]*\n?/gim, "").replace(/```/g, "").trim();
 
-        function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
+        // Priority 1: Parse numbered list format (e.g., "1. line1\n2. line2")
+        const hasNumberedLines = /^\d+\.\s*/m.test(raw);
+        if (hasNumberedLines) {
+            const result = [];
+            const lines = raw.split('\n');
+            
+            for (const line of lines) {
+                const match = line.match(/^(\d+)\.\s*(.*)/s);
+                if (match) {
+                    const idx = parseInt(match[1], 10) - 1;
+                    // Handle empty lines (e.g., "5. " or "5.")
+                    result[idx] = match[2].trim();
+                }
+            }
+            
+            // Fill any gaps with empty strings
+            for (let i = 0; i < result.length; i++) {
+                if (result[i] === undefined) result[i] = '';
+            }
+            
+            if (result.length > 0) {
+                console.log(`[Lyrics+] Parsed ${result.length} lines via Numbered List`);
+                return { vi: result, phonetic: result.join('\n') };
+            }
+        }
 
+        // Priority 2: Try JSON array
+        function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
         let parsed = safeParse(raw);
         if (!parsed || !Array.isArray(parsed)) {
             const start = raw.indexOf("[");
@@ -159,31 +185,8 @@ const GeminiClient = {
             return { vi: parsed, phonetic: parsed.join('\n') };
         }
 
-        DebugLogger.warn("JSON parse failed, trying fallback...");
-        const hasDelimiter = raw.includes("|||");
-        const hasNumberedLines = /^\d+\.\s+/m.test(raw);
-
-        if (hasDelimiter || hasNumberedLines) {
-            let normalized = raw.replace(/\n+(\d+\.)/g, '|||$1');
-            const parts = normalized.split("|||").map(p => p.trim()).filter(Boolean);
-            const result = [];
-
-            parts.forEach(part => {
-                const match = part.match(/^(\d+)\.\s*(.*)/s);
-                if (match) {
-                    result[parseInt(match[1], 10) - 1] = match[2].trim();
-                } else if (result.length === 0) {
-                    result.push(part);
-                }
-            });
-
-            const cleaned = result.filter(item => item !== undefined && item !== null);
-            if (cleaned.length > 0) {
-                DebugLogger.log(`Parsed ${cleaned.length} lines via Fallback`);
-                return { vi: cleaned, phonetic: cleaned.join('\n') };
-            }
-        }
-
+        // Priority 3: Fallback - split by newlines
+        DebugLogger.warn("Structured parse failed, using line split fallback...");
         const rawLines = raw.split('\n').filter(l => l.trim());
         return { vi: rawLines, phonetic: rawLines.join('\n') };
     },
@@ -245,7 +248,7 @@ const GeminiClient = {
             body = {
                 contents: [{ parts: [{ text: gemma3Prompt }] }],
                 generationConfig: {
-                    temperature: 1.0,
+                    temperature: 0.5,  // Lower temp = more deterministic, less line shifting
                     topP: 0.95,
                     topK: 40,
                     maxOutputTokens: 3000
@@ -328,7 +331,8 @@ const GeminiClient = {
             });
             console.groupEnd();
 
-            if (error.name !== 'AbortError' && !_isRetry) {
+            // Retry with fallback prompt if first attempt failed (not AbortError, not network error)
+            if (error.name !== 'AbortError' && !_isRetry && error.status) {
                 console.log('[Lyrics+] Retrying with fallback minimal prompt...');
                 return this.callGemini({
                     apiKey, artist, title, text,
@@ -337,17 +341,44 @@ const GeminiClient = {
                 });
             }
 
-            // Make error message
+            // Build user-friendly error message
             let userMessage = errorMsg;
-            if (error.status === 500) {
-                userMessage = `Server Error (500). Please check if ProxyPal is running and connected. Details: ${errorMsg.replace(/^HTTP 500:\s*/, '')}`;
-            } else if (error.status === 404) {
-                userMessage = `Model Not Found (404). The model '${error.model || body?.model}' might not be supported by your proxy.`;
-            } else if (error.status === 401 || error.status === 403) {
-                userMessage = `Authentication Failed (${error.status}). Please check your API key in Settings.`;
-            } else if (error.status === 429) {
-                userMessage = `Rate Limit Exceeded. Please wait a moment.`;
+            
+            // Network/Connection errors (no status code)
+            if (!error.status) {
+                if (error.name === 'AbortError') {
+                    userMessage = `Request timed out after 120s. The API is taking too long to respond.`;
+                } else if (error.message?.includes('fetch') || error.message?.includes('network') || error.message?.includes('Failed to fetch')) {
+                    userMessage = apiMode === 'proxy' 
+                        ? `Network Error. Check if ProxyPal is running at ${proxyEndpoint}`
+                        : `Network Error. Check your internet connection.`;
+                } else {
+                    userMessage = `Connection failed: ${errorMsg}`;
+                }
             }
+            // HTTP Status code errors
+            else if (error.status === 500) {
+                userMessage = apiMode === 'proxy'
+                    ? `Server Error (500). Check if ProxyPal is running and the model is supported.`
+                    : `Server Error (500). Google API is temporarily unavailable. Try again later.`;
+            } else if (error.status === 502 || error.status === 503 || error.status === 504) {
+                userMessage = `Service Unavailable (${error.status}). The API is overloaded or down. Try again later.`;
+            } else if (error.status === 404) {
+                userMessage = `Model Not Found (404). The model '${error.model || body?.model}' is not available.`;
+            } else if (error.status === 401 || error.status === 403) {
+                userMessage = apiMode === 'proxy'
+                    ? `Authentication Failed (${error.status}). Check your Proxy API Key in Settings.`
+                    : `Authentication Failed (${error.status}). Check your Gemini API Key in Settings.`;
+            } else if (error.status === 429) {
+                userMessage = `Rate Limit Exceeded (429). Too many requests. Please wait a moment.`;
+            } else if (error.status === 400) {
+                userMessage = `Bad Request (400). The request format may be invalid: ${errorMsg.replace(/^HTTP 400:\s*/, '').substring(0, 100)}`;
+            }
+            
+            // Show notification to user
+            try {
+                Spicetify.showNotification(userMessage.substring(0, 100), true, 5000);
+            } catch (e) { /* Spicetify not available */ }
             
             error.message = userMessage;
             throw error;
