@@ -445,6 +445,11 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
                 animationIndex = i - CONFIG.visual["lines-before"] - 1;
             }
 
+            let className = "lyrics-lyricsContainer-LyricsLine";
+            if (isActive) {
+                className += " lyrics-lyricsContainer-LyricsLine-active";
+            }
+
             const paddingLine = (animationIndex < 0 && -animationIndex > CONFIG.visual["lines-before"]) || animationIndex > CONFIG.visual["lines-after"];
             if (paddingLine) {
                 className += " lyrics-lyricsContainer-LyricsLine-paddingLine";

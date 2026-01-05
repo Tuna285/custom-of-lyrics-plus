@@ -90,8 +90,8 @@ const UpdateChecker = {
     VERSION_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/version.json",
     RAW_BASE_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main",
     INSTALL_COMMAND: "iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/install.ps1 | iex",
-    CURRENT_VERSION: "1.2.4",
-    CHECK_INTERVAL: 24 * 60 * 60 * 1000, // 24 hours
+    CURRENT_VERSION: "1.2.5",
+    CHECK_INTERVAL: 0,
 
     // List of files to download for update
     UPDATE_FILES: [
@@ -121,6 +121,15 @@ const UpdateChecker = {
             localStorage.setItem("lyrics-plus:last-update-check", String(now));
 
             if (this.compareVersions(data.version, this.CURRENT_VERSION) > 0) {
+                // Check if version is skipped (only for silent/auto checks)
+                if (silent) {
+                    const skippedVersions = JSON.parse(localStorage.getItem("lyrics-plus:skipped-versions") || "[]");
+                    if (skippedVersions.includes(data.version)) {
+                        console.log(`[Lyrics+] Skipping update notification for v${data.version} (user skipped)`);
+                        return null;
+                    }
+                }
+
                 console.log(`[Lyrics+] New version available: ${data.version} (current: ${this.CURRENT_VERSION})`);
                 this.showUpdateNotification(data.version, data.changelog);
                 return data;
@@ -311,6 +320,27 @@ const UpdateChecker = {
                             }
                         }, "View Changelog"),
                         React.createElement("button", {
+                            onClick: () => {
+                                const skippedVersions = JSON.parse(localStorage.getItem("lyrics-plus:skipped-versions") || "[]");
+                                if (!skippedVersions.includes(newVersion)) {
+                                    skippedVersions.push(newVersion);
+                                    localStorage.setItem("lyrics-plus:skipped-versions", JSON.stringify(skippedVersions));
+                                }
+                                Spicetify.PopupModal.hide();
+                                Spicetify.showNotification("Update skipped", false, 1500);
+                            },
+                            style: {
+                                flex: 1,
+                                padding: "10px",
+                                background: "transparent",
+                                color: "var(--spice-subtext)",
+                                border: "1px solid var(--spice-subtext)",
+                                borderRadius: "20px",
+                                cursor: "pointer",
+                                fontSize: "12px"
+                            }
+                        }, "Skip This Version"),
+                        React.createElement("button", {
                             onClick: () => Spicetify.PopupModal.hide(),
                             style: {
                                 flex: 1,
@@ -367,51 +397,51 @@ const GENIUS = 3;
 //Configuration & Settings
 const CONFIG = {
     visual: {
-        "debug-mode": ConfigUtils.get("lyrics-plus:visual:debug-mode", false),
-        "playbar-button": ConfigUtils.get("lyrics-plus:visual:playbar-button", false),
-        colorful: ConfigUtils.get("lyrics-plus:visual:colorful"),
-        "gradient-background": ConfigUtils.get("lyrics-plus:visual:gradient-background"),
-        "transparent-background": ConfigUtils.get("lyrics-plus:visual:transparent-background", true),
-        "background-brightness": localStorage.getItem("lyrics-plus:visual:background-brightness") || "80",
-        noise: ConfigUtils.get("lyrics-plus:visual:noise"),
-        "background-color": localStorage.getItem("lyrics-plus:visual:background-color") || "#000000",
-        "active-color": localStorage.getItem("lyrics-plus:visual:active-color") || "var(--spice-text)",
-        "inactive-color": localStorage.getItem("lyrics-plus:visual:inactive-color") || "rgba(var(--spice-rgb-subtext),0.5)",
-        "highlight-color": localStorage.getItem("lyrics-plus:visual:highlight-color") || "var(--spice-button)",
-        alignment: localStorage.getItem("lyrics-plus:visual:alignment") || "center",
-        "lines-before": localStorage.getItem("lyrics-plus:visual:lines-before") || "0",
-        "lines-after": localStorage.getItem("lyrics-plus:visual:lines-after") || "2",
-        "font-size": localStorage.getItem("lyrics-plus:visual:font-size") || "32",
-        "translate:translated-lyrics-source": localStorage.getItem("lyrics-plus:visual:translate:translated-lyrics-source") || "geminiVi",
-        "translate:display-mode": localStorage.getItem("lyrics-plus:visual:translate:display-mode") || "replace",
-        "translate:detect-language-override": localStorage.getItem("lyrics-plus:visual:translate:detect-language-override") || "off",
-        "translate:translation-style": localStorage.getItem("lyrics-plus:visual:translate:translation-style") || "smart_adaptive",
-        "translate:pronoun-mode": localStorage.getItem("lyrics-plus:visual:translate:pronoun-mode") || "default",
-        "translation-mode:japanese": localStorage.getItem("lyrics-plus:visual:translation-mode:japanese") || "none",
-        "translation-mode:korean": localStorage.getItem("lyrics-plus:visual:translation-mode:korean") || "none",
-        "translation-mode:chinese": localStorage.getItem("lyrics-plus:visual:translation-mode:chinese") || "none",
-        "translation-mode:gemini": localStorage.getItem("lyrics-plus:visual:translation-mode:gemini") || "none",
-        "translation-mode-2:japanese": localStorage.getItem("lyrics-plus:visual:translation-mode-2:japanese") || "none",
-        "translation-mode-2:korean": localStorage.getItem("lyrics-plus:visual:translation-mode-2:korean") || "none",
-        "translation-mode-2:chinese": localStorage.getItem("lyrics-plus:visual:translation-mode-2:chinese") || "none",
-        "translation-mode-2:gemini": localStorage.getItem("lyrics-plus:visual:translation-mode-2:gemini") || "none",
+        "debug-mode": ConfigUtils.getPersisted("lyrics-plus:visual:debug-mode") === "true",
+        "playbar-button": ConfigUtils.getPersisted("lyrics-plus:visual:playbar-button") === "true",
+        colorful: ConfigUtils.getPersisted("lyrics-plus:visual:colorful") === "true",
+        "gradient-background": ConfigUtils.getPersisted("lyrics-plus:visual:gradient-background") === "true",
+        "transparent-background": ConfigUtils.getPersisted("lyrics-plus:visual:transparent-background") !== "false",
+        "background-brightness": ConfigUtils.getPersisted("lyrics-plus:visual:background-brightness") || "80",
+        noise: ConfigUtils.getPersisted("lyrics-plus:visual:noise") === "true",
+        "background-color": ConfigUtils.getPersisted("lyrics-plus:visual:background-color") || "#000000",
+        "active-color": ConfigUtils.getPersisted("lyrics-plus:visual:active-color") || "var(--spice-text)",
+        "inactive-color": ConfigUtils.getPersisted("lyrics-plus:visual:inactive-color") || "rgba(var(--spice-rgb-subtext),0.5)",
+        "highlight-color": ConfigUtils.getPersisted("lyrics-plus:visual:highlight-color") || "var(--spice-button)",
+        alignment: ConfigUtils.getPersisted("lyrics-plus:visual:alignment") || "center",
+        "lines-before": ConfigUtils.getPersisted("lyrics-plus:visual:lines-before") || "0",
+        "lines-after": ConfigUtils.getPersisted("lyrics-plus:visual:lines-after") || "2",
+        "font-size": ConfigUtils.getPersisted("lyrics-plus:visual:font-size") || "32",
+        "translate:translated-lyrics-source": ConfigUtils.getPersisted("lyrics-plus:visual:translate:translated-lyrics-source") || "geminiVi",
+        "translate:display-mode": ConfigUtils.getPersisted("lyrics-plus:visual:translate:display-mode") || "replace",
+        "translate:detect-language-override": ConfigUtils.getPersisted("lyrics-plus:visual:translate:detect-language-override") || "off",
+        "translate:translation-style": ConfigUtils.getPersisted("lyrics-plus:visual:translate:translation-style") || "smart_adaptive",
+        "translate:pronoun-mode": ConfigUtils.getPersisted("lyrics-plus:visual:translate:pronoun-mode") || "default",
+        "translation-mode:japanese": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode:japanese") || "none",
+        "translation-mode:korean": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode:korean") || "none",
+        "translation-mode:chinese": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode:chinese") || "none",
+        "translation-mode:gemini": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode:gemini") || "none",
+        "translation-mode-2:japanese": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode-2:japanese") || "none",
+        "translation-mode-2:korean": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode-2:korean") || "none",
+        "translation-mode-2:chinese": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode-2:chinese") || "none",
+        "translation-mode-2:gemini": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode-2:gemini") || "none",
         "gemini-api-key": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key") || "",
         "gemini-api-key-romaji": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key-romaji") || "",
         "gemini:api-mode": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:api-mode") || "official",
-        "gemini:proxy-model": localStorage.getItem("lyrics-plus:visual:gemini:proxy-model") || "gemini-3-flash-preview",
+        "gemini:proxy-model": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:proxy-model") || "gemini-2.5-flash",
         "gemini:proxy-api-key": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:proxy-api-key") || "",
-        "gemini:proxy-endpoint": localStorage.getItem("lyrics-plus:visual:gemini:proxy-endpoint") || "http://localhost:8317/v1/chat/completions",
-        translate: ConfigUtils.get("lyrics-plus:visual:translate", false),
-        "ja-detect-threshold": localStorage.getItem("lyrics-plus:visual:ja-detect-threshold") || "40",
-        "hans-detect-threshold": localStorage.getItem("lyrics-plus:visual:hans-detect-threshold") || "40",
-        "musixmatch-translation-language": localStorage.getItem("lyrics-plus:visual:musixmatch-translation-language") || "none",
-        "fade-blur": ConfigUtils.get("lyrics-plus:visual:fade-blur"),
-        "unsynced-auto-scroll": ConfigUtils.get("lyrics-plus:visual:unsynced-auto-scroll", true),
-        "fullscreen-key": localStorage.getItem("lyrics-plus:visual:fullscreen-key") || "f12",
-        "synced-compact": ConfigUtils.get("lyrics-plus:visual:synced-compact"),
-        "dual-genius": ConfigUtils.get("lyrics-plus:visual:dual-genius"),
-        "pre-translation": ConfigUtils.get("lyrics-plus:visual:pre-translation", true),
-        "global-delay": Number(localStorage.getItem("lyrics-plus:visual:global-delay")) || 0,
+        "gemini:proxy-endpoint": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:proxy-endpoint") || "http://localhost:8317/v1/chat/completions",
+        translate: ConfigUtils.getPersisted("lyrics-plus:visual:translate") === "true",
+        "ja-detect-threshold": ConfigUtils.getPersisted("lyrics-plus:visual:ja-detect-threshold") || "40",
+        "hans-detect-threshold": ConfigUtils.getPersisted("lyrics-plus:visual:hans-detect-threshold") || "40",
+        "musixmatch-translation-language": ConfigUtils.getPersisted("lyrics-plus:visual:musixmatch-translation-language") || "none",
+        "fade-blur": ConfigUtils.getPersisted("lyrics-plus:visual:fade-blur") === "true",
+        "unsynced-auto-scroll": ConfigUtils.getPersisted("lyrics-plus:visual:unsynced-auto-scroll") !== "false",
+        "fullscreen-key": ConfigUtils.getPersisted("lyrics-plus:visual:fullscreen-key") || "f12",
+        "synced-compact": ConfigUtils.getPersisted("lyrics-plus:visual:synced-compact") !== "false",
+        "dual-genius": ConfigUtils.getPersisted("lyrics-plus:visual:dual-genius") === "true",
+        "pre-translation": ConfigUtils.getPersisted("lyrics-plus:visual:pre-translation") !== "false",
+        "global-delay": Number(ConfigUtils.getPersisted("lyrics-plus:visual:global-delay")) || 0,
         delay: 0,
     },
     providers: {

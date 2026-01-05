@@ -203,7 +203,7 @@ const GeminiClient = {
         let endpoint, body, headers;
 
         if (apiMode === "proxy") {
-            const proxyModel = CONFIG?.visual?.["gemini:proxy-model"] || "gemini-3-flash-preview";
+            const proxyModel = CONFIG?.visual?.["gemini:proxy-model"] || "gemini-2.5-flash";
             const proxyApiKey = CONFIG?.visual?.["gemini:proxy-api-key"] || "proxypal-local";
             endpoint = proxyEndpoint;
             headers = {

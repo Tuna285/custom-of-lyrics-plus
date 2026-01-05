@@ -107,8 +107,10 @@ RULES:
 1) Empty input line → empty output (just the number, e.g., "5. ")
 2) Keep tags as-is: [Intro], [Chorus], (Instrumental)
 3) Keep English phrases unchanged. Translate CJK to Vietnamese.
-4) Keep vocal sounds: Ah, Oh, Yeah, La la la
+4) Map emotional interjections (e.g., 嗚呼, 呜呼, 아) to "Ah". Do NOT use archaic words like "Than ôi" or "Ôi". Keep vocal sounds (Yeah, La la, Oh) unchanged.
 5) NO hallucination: Don't add imagery, emotions, or details not in source.
+6) NO conversational fillers. Do NOT say "Here is the translation". Start directly with "1. ".
+7) STRICTLY preserve line count. If line 5 is empty input, output "5. " (empty).
 
 EXAMPLE (3-line input):
 Input:
@@ -262,6 +264,10 @@ ${styleObj.style}
 1) 1 source line = 1 output line. NEVER split, merge, or reorder lines.
 2) Empty/whitespace-only source line -> output "" (empty string).
 3) Keep tags/labels exactly as-is: [Intro], [Chorus], (Instrumental), etc.
+4) CRITICAL: Mirror quotation marks (「」, "", '') EXACTLY.
+   - If source has "「" start but NO "」" end -> Output must ALSO have "「" start and NO "」" end.
+   - Do NOT auto-close quotes if the source line doesn't close them.
+   - Preserve multi-line quote separation.
 
 **TIGHT HYBRID GUARDRAILS (SEMANTIC PRECISION):**
 1) NO new facts or imagery (rain, tears, sunsets, colors, places, extra events) unless explicitly present.
@@ -274,7 +280,7 @@ ${styleObj.style}
 **FLOW & PUNCTUATION:**
 1) Avoid rigid "Người mà...". Use natural Vietnamese phrasing.
 2) If a sentence continues to the next line, do NOT end the current line with a comma.
-3) Keep vocal sounds unchanged: Ah, Oh, Yeah, La la la, Aa...
+3) Map emotional interjections (嗚呼, 呜呼, 아) to "Ah". Do not use "Ôi"/"Than ôi". Keep vocal sounds (Yeah, La la, Oh, Ah) unchanged.
 4) You may reorder phrases WITHIN a line for natural Vietnamese word order, but you MUST preserve meaning.`,
 
             user: `Translate lyrics to Vietnamese.

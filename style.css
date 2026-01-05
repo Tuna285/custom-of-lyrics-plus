@@ -492,43 +492,23 @@ div.lyrics-tabBar-headerItemLink {
 	/* Firefox */
 }
 
-/* ============================================
-   GLOBAL SCROLLBAR HIDING - Hide ALL scrollbars
-   ============================================ */
-
-/* Hide ALL scrollbars globally (Chrome, Safari, Edge) */
-*::-webkit-scrollbar {
+/* Hide scrollbars inside lyrics containers (Chrome, Safari, Edge) */
+.lyrics-lyricsContainer-LyricsContainer *::-webkit-scrollbar,
+#lyrics-fullscreen-container *::-webkit-scrollbar,
+.lyrics-lyricsContainer-UnsyncedLyricsPage::-webkit-scrollbar,
+.lyrics-lyricsContainer-SyncedLyricsPage::-webkit-scrollbar {
 	display: none !important;
 	width: 0 !important;
 	height: 0 !important;
 }
 
-/* Hide scrollbars for Firefox */
-* {
+/* Hide scrollbars inside lyrics containers (Firefox) */
+.lyrics-lyricsContainer-LyricsContainer *,
+#lyrics-fullscreen-container *,
+.lyrics-lyricsContainer-UnsyncedLyricsPage,
+.lyrics-lyricsContainer-SyncedLyricsPage {
 	scrollbar-width: none !important;
 	-ms-overflow-style: none !important;
-}
-
-/* Make sure body and html also have no scrollbar */
-html::-webkit-scrollbar,
-body::-webkit-scrollbar {
-	display: none !important;
-}
-
-html,
-body {
-	scrollbar-width: none !important;
-	-ms-overflow-style: none !important;
-}
-
-/* Specific targeting for modals */
-.GenericModal::-webkit-scrollbar,
-.GenericModal__overlay::-webkit-scrollbar,
-div[role="dialog"]::-webkit-scrollbar,
-.main-trackCreditsModal-container::-webkit-scrollbar,
-.main-trackCreditsModal-mainSection::-webkit-scrollbar {
-	display: none !important;
-	width: 0 !important;
 }
 
 #lyrics-plus-config-container h2 {
@@ -1066,4 +1046,10 @@ div[role="dialog"]::-webkit-scrollbar,
 
 .lyrics-translating-icon.error {
 	color: #ff5555;
+}
+
+
+/* Fix: Hide scrollbar in lyrics background container */
+.os-scrollbar-vertical.os-theme-spotify {
+	display: none !important;
 }

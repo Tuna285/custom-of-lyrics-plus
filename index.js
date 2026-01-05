@@ -784,7 +784,9 @@ class LyricsContainer extends react.Component {
 				return this._inflightGemini.get(cacheKey2).then(resolve).catch(reject);
 			}
 
-			const text = lyrics.map((l) => l?.text || "").filter(Boolean).join("\n");
+			// CRITICAL: Preserve empty lines to maintain 1:1 index mapping
+			// Do NOT use filter(Boolean) as it removes empty lines and causes shifting
+			const text = lyrics.map((l) => l?.text || " ").join("\n");
 
 			// Show translating indicator immediately (not silent = foreground request)
 			if (!silent) {
@@ -1526,9 +1528,18 @@ class LyricsContainer extends react.Component {
 		Utils.addQueueListener(this.onQueueChange);
 
 		lyricContainerUpdate = () => {
+			// Clear per-track translation results so display mode changes take effect immediately
+			this._dmResults = {};
+			
 			this.reRenderLyricsPage = !this.reRenderLyricsPage;
 			this.updateVisualOnConfigChange();
 			this.forceUpdate();
+			
+			// Re-trigger lyricsSource to recalculate with new display mode settings
+			const currentMode = this.getCurrentMode();
+			if (currentMode !== -1 && this.state[CONFIG.modes[currentMode]]) {
+				this.lyricsSource(this.state, currentMode);
+			}
 		};
 
 		reloadLyrics = () => {

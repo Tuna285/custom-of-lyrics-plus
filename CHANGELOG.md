@@ -5,13 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5] - 2026-01-05
+
+### Added
+
+- **Skip Update**: Added "Skip This Version" button to update notification to mute future alerts for specific versions
+- **Update Check**: Changed update check to run on every startup (removed 24h delay)
+
+### Fixed
+
+- **Lyric Alignment**: Fixed translation misalignment caused by empty line filtering (preserved 1:1 line mapping)
+- **Scrollbar**: Refined scrollbar hiding logic without breaking scroll behavior
+- **Prompts**: Explicitly preserved Japanese quotation marks style in translation rules
+
+---
+
 ## [1.2.4] - 2026-01-05
 
 ### Added
 
 - **Vietnamese README**: Added `README_VI.md` with full Vietnamese documentation
 - **Installer Improvements**: Admin check, auto-close Spotify, retry logic for locked files
-- **Screenshot Assets**: Added conversion preview images for Japanese, Korean, Chinese
 
 ### Improved
 

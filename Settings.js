@@ -281,7 +281,7 @@ const ConfigHelper = () => {
 		{ desc: "Gemini, Gemma API Key (Display Mode 2)", key: "gemini-api-key-romaji", type: ConfigInput, info: "Gemini, Gemma API for Display Mode 2 (Romaji, Romaja, Pinyin modes), leave blank if you only use 1 API.", when: () => CONFIG.visual["gemini:api-mode"] !== "proxy" },
 
 		// Proxy Settings
-		{ desc: "Proxy Model", key: "gemini:proxy-model", type: ConfigSelection, options: { "gemini-3-flash-preview": "Gemini 3 Flash Preview (Recommended)", "gemini-3-pro-preview": "Gemini 3 Pro Preview", "gemini-2.5-flash": "Gemini 2.5 Flash", "gemini-2.5-pro": "Gemini 2.5 Pro", "gemini-2.0-flash": "Gemini 2.0 Flash", "gemma-3-27b-it": "Gemma 3 27B" }, info: "Model to use with ProxyPal", when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
+		{ desc: "Proxy Model", key: "gemini:proxy-model", type: ConfigSelection, options: { "gemini-2.5-flash": "Gemini 2.5 Flash (Default)", "gemini-2.5-pro": "Gemini 2.5 Pro", "gemini-3-flash-preview": "Gemini 3 Flash Preview", "gemini-3-pro-preview": "Gemini 3 Pro Preview", "gemini-2.0-flash": "Gemini 2.0 Flash", "gemma-3-27b-it": "Gemma 3 27B" }, info: "Model to use with ProxyPal", when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
 		{ desc: "Proxy API Key", key: "gemini:proxy-api-key", type: ConfigInput, info: "API Key (default: proxypal-local).", when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
 		{ desc: "Proxy Endpoint", key: "gemini:proxy-endpoint", type: ConfigInput, info: "Full Proxy URL (default: http://localhost:8317/v1/chat/completions).", when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
 
@@ -290,22 +290,21 @@ const ConfigHelper = () => {
 		{ desc: "Disable Queue (Parallel Requests)", key: "gemini:disable-queue", type: ConfigSlider, info: "Process all translation requests in parallel without queuing. May hit rate limits faster but translates quicker." },
 	];
 
-	// Callback
+	// Callback - persist all settings to both storages
 	const onChange = (name, value) => {
 		CONFIG.visual[name] = value;
+		
+		// Special handling for musixmatch
 		if (name === "musixmatch-translation-language") {
 			if (value === "none") {
 				CONFIG.visual["translate:translated-lyrics-source"] = "none";
-				localStorage.setItem(`${APP_NAME}:visual:translate:translated-lyrics-source`, "none");
+				ConfigUtils.setPersisted(`${APP_NAME}:visual:translate:translated-lyrics-source`, "none");
 			}
 			reloadLyrics?.();
-		} else if (name === "gemini-api-key" || name === "gemini-api-key-romaji" || name.startsWith("gemini:")) {
-			// Persist gemini settings to both storages so they survive spicetify apply
-			try { Spicetify?.LocalStorage?.set(`${APP_NAME}:visual:${name}`, value); } catch (error) { console.warn(`Failed to save to Spicetify LocalStorage '${name}':`, error); }
-			try { localStorage.setItem(`${APP_NAME}:visual:${name}`, value); } catch (error) { console.warn(`Failed to save to localStorage '${name}':`, error); }
-		} else {
-			localStorage.setItem(`${APP_NAME}:visual:${name}`, value);
 		}
+		
+		// Persist to both storages for all settings (survive spicetify apply)
+		ConfigUtils.setPersisted(`${APP_NAME}:visual:${name}`, value);
 
 		if (name !== "musixmatch-translation-language") lyricContainerUpdate?.();
 
