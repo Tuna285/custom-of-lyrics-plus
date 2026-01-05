@@ -2,7 +2,7 @@
 
 [![Tiếng Việt](https://img.shields.io/badge/Lang-Tiếng%20Việt-red?style=flat-square)](README_VI.md)
 
-> A personalized version of **Lyrics Plus** for Spicetify, rebuilt to focus on high-quality lyric translation, ideal for Vietnamese users. Supports personal API (Google) and via [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) or [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal).
+> A personalized version of **Lyrics Plus** for Spicetify, rebuilt to focus on high-quality lyric translation, ideal for Vietnamese users. Supports personal API (Google) and via [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal).
 
 > [!NOTE]
 > **Currently, the translation feature only supports Vietnamese (Tiếng Việt).** Support for other languages may be added in future updates.
@@ -44,9 +44,15 @@ Prompts are fine-tuned and automatically processed for clean, sensible results.
 
 ## Installation
 
-> **Requirement:** Spotify installed from web, NOT from Microsoft Store. Install [Spicetify](https://spicetify.app/docs/getting-started) first.
+> **Requirement:** [Spotify](https://download.scdn.co/SpotifySetup.exe) installed from web, NOT from Microsoft Store.
 
-### Quick Install (Recommended)
+Install Spicetify:
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/spicetify/cli/main/install.ps1 | iex
+```
+
+  ### - Quick Install (Recommended)
 
 Open **PowerShell** and run:
 
@@ -62,7 +68,7 @@ This will automatically download and configure the app for you.
 iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/uninstall.ps1 | iex
 ```
 
-### Manual Installation
+  ### - Manual Installation
 
 1. Download and extract this repository
 
@@ -85,7 +91,7 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 1. Open Spotify, click on your avatar → **Lyric Plus Translate config**
 2. Go to **Translation** section and configure your API mode:
    - **Direct API**: Use your own [Google AI Studio](https://aistudio.google.com/) API key
-   - **Proxy**: Use [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) or [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal)
+   - **Proxy**: Use [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal)
 
 3. Hover over lyrics and click the translation icon (⇄) to customize display modes
 
