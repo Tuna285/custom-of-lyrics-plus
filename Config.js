@@ -90,7 +90,7 @@ const UpdateChecker = {
     VERSION_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/version.json",
     RAW_BASE_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main",
     INSTALL_COMMAND: "iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/install.ps1 | iex",
-    CURRENT_VERSION: "1.2.5",
+    CURRENT_VERSION: "1.2.6",
     CHECK_INTERVAL: 0,
 
     // List of files to download for update

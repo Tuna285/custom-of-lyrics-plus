@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.6] - 2026-01-05
+
+### Fixed
+
+- **Cached Translation Display Bug**: Fixed critical race condition where cached Gemini translations would briefly appear then disappear when switching tracks
+  - Root cause: `fetchLyrics()` was overwriting `currentLyrics` with original lyrics after `lyricsSource()` had already loaded cached translations
+  - Applied fix to both code paths (new song and same song scenarios)
+  - Prevented `_dmResults` from being reset on repeated `lyricsSource()` calls
+  - Added early return when cached translations exist to skip unnecessary API calls
+- **Rate Limit Notification Spam**: Silenced 429 error notifications (logged to console only) and added global throttling to prevent duplicate error messages
+
+---
+
 ## [1.2.5] - 2026-01-05
 
 ### Added
