@@ -337,7 +337,7 @@ const GeminiClient = {
                 });
             }
 
-            // Make error message more user-friendly for UI
+            // Make error message
             let userMessage = errorMsg;
             if (error.status === 500) {
                 userMessage = `Server Error (500). Please check if ProxyPal is running and connected. Details: ${errorMsg.replace(/^HTTP 500:\s*/, '')}`;

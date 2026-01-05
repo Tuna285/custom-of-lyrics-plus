@@ -42,10 +42,10 @@ Rules:
 3. Keep punctuation/English unchanged.
 4. Romanize sound effects (e.g., "Ah" not "Tiếng hét").
 5. All lowercase, NO capitalization at the beginning of lines.
-6. Convert numbers to words in their respective languages:
-   - Japanese: "1" → "ichi", "3つ" → "mittsu"
-   - Korean: "1" → "il/hana", "100" → "baek"
-   - Chinese: "1" → "yī", "100" → "bǎi"
+6. Number translation: Convert numbers to romanized words, not digits:
+   - Japanese: "1" → "ichi", "2000" → "ni-sen", "3つ" → "mittsu"
+   - Korean: "1" → "il/hana", "2000" → "i-cheon", "100" → "baek"
+   - Chinese: "1" → "yī", "2000" → "liǎngqiān", "100" → "bǎi"
 Input: ${linesJson}
 Output JSON:`;
         }
@@ -305,7 +305,8 @@ ${lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}
 3. 1 source line = 1 romanized line. NEVER split/merge.
 4. Empty lines → empty string "".
 5. All lowercase. NO capitalization.
-6. Keep punctuation and English unchanged.`,
+6. Keep punctuation and English unchanged.
+7. Number translation: Convert numbers to romanized words (2000 → "ni-sen" JP, "i-cheon" KR, "liǎngqiān" CN).`,
 
             user: `Romanize lyrics for: "${artist} - ${title}"
 
