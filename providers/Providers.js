@@ -211,3 +211,6 @@ const Providers = {
 		return result;
 	},
 };
+
+// Expose to global scope
+window.Providers = Providers;

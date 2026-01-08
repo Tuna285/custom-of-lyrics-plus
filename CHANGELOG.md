@@ -13,7 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed / Improved
 
-- **Localization Engine**: Implemented `I18n.js` for better performance and future language support.
 - **Cache Logic**: Resetting translation cache now only affects active Display Modes.
 - **Cache Persistence**: Cached translations are now preserved when changing Style or Pronoun settings.
 - **General**: Added and improved various minor functions for better stability.

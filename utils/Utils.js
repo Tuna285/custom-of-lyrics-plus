@@ -400,75 +400,13 @@ const Utils = {
 			conver,
 		};
 	},
-	parseLocalLyrics(lyrics) {
-		console.log("[Lyrics+] Parsing local lyrics file...");
-		// Xóa các tag metadata [ti:...] [ar:...]
-		const rawLines = lyrics.replaceAll(/\[[a-zA-Z]+:.+\]/g, "").trim();
-		// Xử lý xuống dòng cho cả Windows (\r\n) và Unix (\n), loại bỏ dòng trống
-		const lines = rawLines.replace(/\r\n/g, "\n").split("\n").map(line => line.trim()).filter(line => line !== "");
-
-		console.log(`[Lyrics+] Found ${lines.length} non-empty lines`);
-
-		const syncedTimestamp = /\[([0-9:.]+)\]/;
-		const karaokeTimestamp = /<([0-9:.]+)>/;
-		const unsynced = [];
-
-		const isSynced = lines.some(line => syncedTimestamp.test(line));
-		const synced = isSynced ? [] : null;
-		const isKaraoke = lines.some(line => karaokeTimestamp.test(line));
-		const karaoke = isKaraoke ? [] : null;
-
-		function timestampToMs(timestamp) {
-			// Chuẩn hóa timestamp bằng cách xóa các ký tự [], <>
-			const parts = timestamp.replace(/[\[\]<>]/g, "").split(":");
-			return parts.length === 2 ? Number(parts[0]) * 60 * 1000 + Number(parts[1]) * 1000 : 0;
-		}
-
-		function parseKaraokeLine(line, startTime) {
-			let wordTime = timestampToMs(startTime);
-			const karaokeLine = [];
-			const matches = line.matchAll(/(\S+ ?)<([0-9:.]+)>/g);
-			for (const match of matches) {
-				const msTime = timestampToMs(match[2]);
-				if (!isNaN(msTime)) {
-					karaokeLine.push({ word: match[1], time: msTime - wordTime });
-					wordTime = msTime;
-				}
-			}
-			return karaokeLine;
-		}
-
-		for (const [i, line] of lines.entries()) {
-			const timeMatch = line.match(syncedTimestamp);
-			const time = timeMatch?.[1];
-			// Use global regex to remove ALL timestamps from the text content
-			let lyricContent = line.replace(/\[\d{1,3}:\d{1,3}(\.\d+)?\]/g, "").trim();
-			const lyric = lyricContent.replaceAll(/<([0-9:.]+)>/g, "").trim();
-
-			if (isSynced && time) {
-				const ms = timestampToMs(time);
-				if (!isNaN(ms)) synced.push({ text: lyric || "♪", startTime: ms });
-			}
-			if (isKaraoke && time) {
-				const nextTime = lines[i + 1]?.match(syncedTimestamp)?.[1];
-				const endTime = nextTime || this.formatTime(Number(Spicetify.Player.getDuration() || 0));
-				if (!lyricContent.endsWith(">")) lyricContent += `<${endTime}>`;
-				const ms = timestampToMs(time);
-				if (!isNaN(ms)) karaoke.push({ text: parseKaraokeLine(lyricContent, time), startTime: ms });
-			}
-			unsynced.push({ text: lyric || "♪" });
-		}
-
-		// Sắp xếp lại lời theo thời gian để tránh lỗi kẹt ở dòng cuối
-		if (synced) synced.sort((a, b) => a.startTime - b.startTime);
-
-		return { synced, unsynced, karaoke };
-	},
-	processLyrics(lyrics) {
-		return lyrics
-			.replace(/　| /g, "") // Remove space
-			.replace(/[!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~？！，。、《》【】「」]/g, ""); // Remove punctuation
-	},
+    // Facade for LRCParser (Anti-Corruption Layer)
+    parseLocalLyrics(lyrics) {
+        return LRCParser.parseLocalLyrics(lyrics);
+    },
+    processLyrics(lyrics) {
+        return LRCParser.processLyrics(lyrics);
+    },
 	/**
 	 * Determines if a color is light or dark.
 	 * @param {string} color - The color in "rgb(r,g,b)" format.
@@ -485,11 +423,17 @@ const Utils = {
 		const isBelow = displayMode === "below";
 		const isReplace = displayMode === "replace";
 
+		// Robustness: If originalText is same as text, treat as no translation
+		if (originalText === text) originalText = null;
+
 		if (isBelow && originalText) {
 			return { mainText: originalText, subText: text, subText2: text2 };
 		} else if (isReplace) {
+			// If replace mode, we prioritize text (translation).
+			// If text is missing (shouldn't happen often), fallback to originalText.
 			return { mainText: text || originalText, subText: text2, subText2: null };
 		}
+		// Default / Unchanged / Fixed mode fallback
 		return { mainText: text, subText: null, subText2: null };
 	},
 };
@@ -562,3 +506,7 @@ const DBManager = {
 		});
 	}
 };
+
+// Expose to global scope for other modules
+window.Utils = Utils;
+window.DBManager = DBManager;

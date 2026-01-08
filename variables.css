@@ -1,0 +1,48 @@
+/**
+ * Lyrics Plus - CSS Design Tokens
+ * Z-index hierarchy and common variables
+ */
+
+:root {
+    /* ==========================================================================
+       Z-INDEX HIERARCHY
+       Use these tokens instead of magic numbers to prevent layer conflicts.
+       ========================================================================== */
+    
+    /* Layer 0: Background elements (gradient, video, album art) */
+    --z-background: 0;
+    
+    /* Layer 1: Content (lyrics text, provider info) */
+    --z-content: 10;
+    
+    /* Layer 2: Interactive UI (buttons, controls, menus) */
+    --z-controls: 100;
+    
+    /* Layer 3: Elevated content (highlighted lyrics, active lines) */
+    --z-elevated: 200;
+    
+    /* Layer 4: Overlays (loading spinners, notifications) */
+    --z-overlay: 999;
+    
+    /* Layer 5: Modals (settings panel, popups) */
+    --z-modal: 9999;
+    
+    /* Layer 6: Critical (fullscreen, tooltips) */
+    --z-critical: 99999;
+    
+    /* ==========================================================================
+       ANIMATION TIMING
+       ========================================================================== */
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.25s ease;
+    --transition-slow: 0.4s ease;
+    
+    /* ==========================================================================
+       SPACING
+       ========================================================================== */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+}

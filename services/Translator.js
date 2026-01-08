@@ -179,3 +179,5 @@ class Translator {
 		// Compatibility fallback if anyone calls this
 	}
 }
+
+window.Translator = Translator;

@@ -560,3 +560,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
         react.createElement(SearchBar, null)
     );
 });
+
+// Expose to global scope
+window.SyncedLyricsPage = SyncedLyricsPage;
+window.SyncedExpandedLyricsPage = SyncedExpandedLyricsPage;

@@ -496,3 +496,5 @@ const GeminiClient = {
         return { ...result, duration };
     }
 };
+
+window.GeminiClient = GeminiClient;

@@ -11,7 +11,7 @@ const spotifyVersion = Spicetify.Platform.version;
 
 function render() {
 	// Check for updates silently on startup (once per 24h)
-	setTimeout(() => UpdateChecker.checkForUpdates(true), 3000);
+	setTimeout(() => UpdateService.checkForUpdates(true), 3000);
 	return react.createElement(LyricsContainer, null);
 }
 
@@ -97,61 +97,14 @@ async fetchVideoBackgroundWithLyrics(track, lyrics = []) {
 	const info = this.infoFromTrack(track);
 	if (!info) return;
 
-	// Prevent duplicate API calls for same track
-	if (this.lastVideoFetchUri === info.uri) {
-		console.log("[Lyrics+] Skipping duplicate video fetch for:", info.uri);
-		return;
-	}
-	this.lastVideoFetchUri = info.uri;
-
-	const serverUrl = CONFIG.visual["video-background-server"] || "http://localhost:8000";
-	console.log("[Lyrics+] Fetching from Server URL:", serverUrl);
+	// Delegate to VideoManager (Strangler Fig - Reroute)
+	const videoData = await VideoManager.fetchVideoForTrack(info, lyrics);
 	
-	// Prepare payload
-	const firstLyricTime = lyrics?.[0]?.startTime || 0;
-	const lyricsSnippet = lyrics.slice(0, 5).map(l => ({
-		text: l.text,
-		time: l.startTime
-	}));
-
-	const payload = {
-		track: info.title,
-		artist: info.artist,
-		duration: Math.round(info.duration),
-		firstLyricTime: Math.round(firstLyricTime),
-		lyrics: lyricsSnippet
-	};
-
-	console.log("[Lyrics+] Sending sync request with lyrics snippet:", lyricsSnippet.length, "lines");
-
-	try {
-		const res = await fetch(`${serverUrl}/sync`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify(payload)
-		});
-		
-		if (res.ok) {
-			const data = await res.json();
-			if (data.video_id) {
-				this.setState({
-					videoBackground: {
-						video_id: data.video_id,
-						sync_offset: data.sync_offset || 0,
-						title: data.title,
-						has_subtitles: data.has_subtitles
-					}
-				});
-				console.log("[Lyrics+] Video Background Set:", data.title, "| Offset:", data.sync_offset, "| FirstLyric:", firstLyricTime);
-				return;
-			}
-		}
-	} catch (e) {
-		console.warn("[Lyrics+] Failed to fetch video background:", e);
+	if (videoData) {
+		this.setState({ videoBackground: videoData });
+	} else {
+		this.setState({ videoBackground: null });
 	}
-	this.setState({ videoBackground: null });
 }
 
 openVideoSettingsModal() {
@@ -183,15 +136,9 @@ openVideoSettingsModal() {
 
 		react.useEffect(() => {
 			(async () => {
-				try {
-					const res = await fetch(`${serverUrl}/search?track=${encodeURIComponent(info.title)}&artist=${encodeURIComponent(info.artist)}&limit=3`);
-					if (res.ok) {
-						const data = await res.json();
-						setTopVideos(data.results || []);
-					}
-				} catch (e) {
-					console.warn("[Lyrics+] Failed to fetch top videos:", e);
-				}
+				// Delegate to VideoManager (Strangler Fig - Reroute)
+				const results = await VideoManager.searchVideos(info, 3);
+				setTopVideos(results);
 				setIsLoading(false);
 			})();
 		}, []);
@@ -468,7 +415,8 @@ openVideoSettingsModal() {
 					Spicetify.PopupModal.hide();
 					Spicetify.showNotification(`✓ ${getText("notifications.videoSet", { videoId })}`, false, 2000);
 
-					// Fetch and Sync with Server
+					// TODO: Migrate to VideoManager.syncManualVideo() - Strangler Fig Phase 2a
+				// Fetch and Sync with Server
 					try {
 						console.log("[Lyrics+] Syncing video. VideoId:", videoId, "SliderTouched:", sliderTouched, "Offset:", baseOffset + nudge);
 						
@@ -526,7 +474,7 @@ openVideoSettingsModal() {
 			react.createElement("button", {
 				className: "btn",
 				onClick: () => {
-					self.lastVideoFetchUri = null;
+					VideoManager.reset(); // Use VideoManager instead of direct access
 					self.setState({ videoBackground: null });
 					Spicetify.PopupModal.hide();
 					Spicetify.showNotification(getText("notifications.videoReset"), false, 2000);
@@ -590,8 +538,47 @@ infoFromTrack(track) {
 	}
 
 	async fetchTempo(uri) {
-		const audio = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features/${uri.split(":")[2]}`);
-		let tempo = audio.tempo;
+		const cacheKey = `${uri}:tempo`;
+		let audio = await CacheManager.get(cacheKey);
+
+		if (!audio) {
+			// Global rate limiter: prevent spam during rapid track skipping
+			const now = Date.now();
+			const RATE_LIMIT_MS = 2000; // 2 seconds between requests
+			this._lastTempoRequest = this._lastTempoRequest || 0;
+			
+			if (now - this._lastTempoRequest < RATE_LIMIT_MS) {
+				// Too soon - use default tempo, don't spam API
+				audio = { tempo: 105 };
+			} else {
+				// Deduplicate in-flight requests
+				this._inflightTempo = this._inflightTempo || new Map();
+				if (this._inflightTempo.has(uri)) {
+					audio = await this._inflightTempo.get(uri);
+				} else {
+					this._lastTempoRequest = now;
+					const promise = (async () => {
+						try {
+							const res = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features/${uri.split(":")[2]}`);
+							CacheManager.set(cacheKey, res);
+							return res;
+						} catch (e) {
+							// Cache default to prevent spamming
+							const fallback = { tempo: 105 };
+							CacheManager.set(cacheKey, fallback);
+							return fallback;
+						} finally {
+							this._inflightTempo.delete(uri);
+						}
+					})();
+					
+					this._inflightTempo.set(uri, promise);
+					audio = await promise;
+				}
+			}
+		}
+
+		let tempo = audio?.tempo;
 
 		const MIN_TEMPO = 60;
 		const MAX_TEMPO = 150;
@@ -682,46 +669,56 @@ infoFromTrack(track) {
 		this.fetchTempo(info.uri);
 		this.resetDelay();
 
-		let tempState;
-		//If lyrics are cached
-		if ((mode === -1 && CACHE[info.uri]) || CACHE[info.uri]?.[CONFIG.modes?.[mode]]) {
-			tempState = { ...CACHE[info.uri], isCached };
-			if (CACHE[info.uri]?.mode) {
-				this.state.explicitMode = CACHE[info.uri]?.mode;
-				tempState = { ...tempState, mode: CACHE[info.uri]?.mode };
+	let tempState;
+		//If lyrics are cached in L1 RAM (sync check)
+		const l1Cached = CacheManager.getSync(info.uri);
+		if ((mode === -1 && l1Cached) || l1Cached?.[CONFIG.modes?.[mode]]) {
+			tempState = { ...l1Cached, isCached };
+			if (l1Cached?.mode) {
+				this.state.explicitMode = l1Cached.mode;
+				tempState = { ...tempState, mode: l1Cached.mode };
 			}
 		} else {
-			//Save current mode before loading to maintain UI consistency
-			const currentMode = this.getCurrentMode();
-			this.lastModeBeforeLoading = currentMode !== -1 ? currentMode : SYNCED;
-			this.setState({ ...emptyState, isLoading: true, isCached: false });
+			// Check L2 IndexedDB cache before going to network
+			const l2Cached = await CacheManager.get(info.uri);
+			if (l2Cached && (l2Cached.synced || l2Cached.unsynced || l2Cached.genius)) {
+				console.log(`[Lyrics+] L2 Cache HIT for: ${info.uri.split(':').pop()}`);
+				// Restore to L1 for faster subsequent access
+				CacheManager.set(info.uri, l2Cached, false); // L1 only, already in L2
+				tempState = { ...l2Cached, isCached: true };
+			} else {
+				//Save current mode before loading to maintain UI consistency
+				const currentMode = this.getCurrentMode();
+				this.lastModeBeforeLoading = currentMode !== -1 ? currentMode : SYNCED;
+				this.setState({ ...emptyState, isLoading: true, isCached: false });
 
-			try {
-				const resp = await this.tryServices(info, mode);
+				try {
+					const resp = await this.tryServices(info, mode);
 
-				// Critical check: Ensure we are still on the same track before updating state
-				if (info.uri !== this.currentTrackUri) return;
+					// Critical check: Ensure we are still on the same track before updating state
+					if (info.uri !== this.currentTrackUri) return;
 
-				if (resp.provider) {
-					// Cache lyrics
-					CacheManager.set(resp.uri, resp);
-					//Auto-save to localStorage (persistent)
-					this.saveLocalLyrics(resp.uri, resp);
-				}
+					if (resp.provider) {
+						// Cache lyrics to L1 and L2
+						CacheManager.set(resp.uri, resp);
+						//Auto-save to localStorage (persistent)
+						this.saveLocalLyrics(resp.uri, resp);
+					}
 
-				// Logic for manual cache to localStorage
-				isCached = this.lyricsSaved(resp.uri);
+					// Logic for manual cache to localStorage
+					isCached = this.lyricsSaved(resp.uri);
 
-				// Handle rapid track skipping to prevent setting wrong lyrics
-				if (resp.uri === this.currentTrackUri) {
-					tempState = { ...resp, isLoading: false, isCached };
-				} else {
+					// Handle rapid track skipping to prevent setting wrong lyrics
+					if (resp.uri === this.currentTrackUri) {
+						tempState = { ...resp, isLoading: false, isCached };
+					} else {
+						return;
+					}
+				} catch (e) {
+					console.error("[Lyrics+] Fetch error:", e);
+					this.setState({ error: "Failed to load lyrics", isLoading: false });
 					return;
 				}
-			} catch (e) {
-				console.error("[Lyrics+] Fetch error:", e);
-				this.setState({ error: "Failed to load lyrics", isLoading: false });
-				return;
 			}
 		}
 
@@ -842,7 +839,7 @@ infoFromTrack(track) {
 	}
 }
 
-	lyricsSource(lyricsState, mode) {
+	async lyricsSource(lyricsState, mode) {
 		if (!lyricsState) return;
 
 		// Timestamp to verify if this request is still the active one
@@ -953,38 +950,97 @@ infoFromTrack(track) {
 			this._dmResults[currentUri] = { mode1: null, mode2: null };
 		}
 
-		// Settings change detection: If styleKey or pronounKey changed, force re-fetch
-		// but keep displaying old translation until new one arrives
-		const currentStyleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
-		const currentPronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
-		const settingsChanged = this._lastStyleKey !== null && this._lastPronounKey !== null &&
-			(this._lastStyleKey !== currentStyleKey || this._lastPronounKey !== currentPronounKey);
-		
-		if (settingsChanged && this._dmResults[currentUri]) {
-			// Clear cached results for this URI to force re-fetch with new settings
-			// Old translation continues to display via currentLyrics until new arrives
-			this._dmResults[currentUri] = { mode1: null, mode2: null };
-			console.log(`[Lyrics+] Settings changed (${this._lastStyleKey}/${this._lastPronounKey} → ${currentStyleKey}/${currentPronounKey}), re-fetching...`);
-		}
-		
-		// Update tracking for next call
+	// Settings change detection logic adjusted to ignore initial undefined state
+	const currentStyleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
+	const currentPronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
+
+	// If _lastStyleKey is undefined (first run), we initialize it and don't count it as a change
+	if (this._lastStyleKey === undefined || this._lastPronounKey === undefined) {
 		this._lastStyleKey = currentStyleKey;
 		this._lastPronounKey = currentPronounKey;
+	}
 
-		// Synchronous cache preload: Check localStorage for cached translations BEFORE async calls
-		// This ensures cached translations display immediately without waiting for Promise.then()
-		const tryLoadCachedTranslation = (mode) => {
+	const settingsChanged = (this._lastStyleKey !== currentStyleKey || this._lastPronounKey !== currentPronounKey);
+
+	if (settingsChanged && this._dmResults[currentUri]) {
+		// Clear cached results for this URI to force re-fetch with new settings
+		// Old translation continues to display via currentLyrics until new arrives
+		this._dmResults[currentUri] = { mode1: null, mode2: null };
+		console.log(`[Lyrics+] Settings changed (${this._lastStyleKey}/${this._lastPronounKey} → ${currentStyleKey}/${currentPronounKey}), re-fetching...`);
+	}
+	
+	// Update tracking for next call
+	this._lastStyleKey = currentStyleKey;
+	this._lastPronounKey = currentPronounKey;
+
+	// ... [existing code] ...
+
+	// Fix Uncaught Promise in onQueueChange
+	this.onQueueChange = async ({ data: queue }) => {
+		try {
+			if (!queue) return;
+
+			this.state.explicitMode = this.state.lockMode;
+			this.currentTrackUri = queue.current.uri;
+			this.fetchLyrics(queue.current, this.state.explicitMode);
+			this.viewPort.scrollTo(0, 0);
+
+			// Reset pre-translation state when track changes
+			this.pretranslatedUri = null;
+			this.setState({ preTranslated: false });
+
+			// 1. Get next track info
+			const nextTrack = queue.queued?.[0] || queue.nextUp?.[0];
+			if (!nextTrack) return;
+
+			const nextUri = nextTrack.uri;
+			// Debounce next track fetch
+			if (nextUri === this.nextTrackUri) return;
+			this.nextTrackUri = nextUri;
+
+			// 2. Check cache for raw lyrics
+			let rawLyrics = await CacheManager.get(nextUri);
+
+			if (!rawLyrics) {
+				// Fetch raw lyrics if not cached
+				const nextInfo = {
+					uri: nextUri,
+					artist: nextTrack.metadata.artist_name,
+					title: nextTrack.metadata.title,
+					duration: nextTrack.metadata.duration,
+					album: nextTrack.metadata.album_title,
+					images: nextTrack.metadata.image_url
+				};
+
+				// Note: tryServices returns data but doesn't set state
+				try {
+					rawLyrics = await this.tryServices(nextInfo);
+				} catch (err) {
+					console.warn("[Lyrics+] Failed to pre-fetch next track lyrics:", err);
+				}
+
+				if (rawLyrics) {
+					CacheManager.set(nextUri, rawLyrics);
+				}
+			}
+		} catch (error) {
+			console.error("[Lyrics+] Error in onQueueChange:", error);
+		}
+	};
+
+		// Async cache preload: Check CacheManager for cached translations
+		const tryLoadCachedTranslation = async (mode) => {
 			if (!mode || mode === "none" || !String(mode).startsWith("gemini")) return null;
 			try {
 				const styleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
 				const pronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
 				const cacheKey2 = `${currentUri}:${mode}:${styleKey}:${pronounKey}`;
 
-				// Check in-memory CacheManager first
-				const memCached = CacheManager.get(cacheKey2);
+				// Check cache first (async - L1 then L2)
+				const memCached = await CacheManager.get(cacheKey2);
 				if (memCached) return memCached;
 
-				// Check persistent localStorage
+				// Check persistent localStorage (legacy fallback)
 				const persistKey = `${APP_NAME}:gemini-cache`;
 				const persistedCache = JSON.parse(localStorage.getItem(persistKey)) || {};
 				const persisted = persistedCache[cacheKey2];
@@ -999,12 +1055,12 @@ infoFromTrack(track) {
 			return null;
 		};
 
-		// Preload cached translations synchronously
+		// Preload cached translations (async)
 		if (!this._dmResults[currentUri].mode1 && displayMode1) {
-			this._dmResults[currentUri].mode1 = tryLoadCachedTranslation(displayMode1);
+			this._dmResults[currentUri].mode1 = await tryLoadCachedTranslation(displayMode1);
 		}
 		if (!this._dmResults[currentUri].mode2 && displayMode2) {
-			this._dmResults[currentUri].mode2 = tryLoadCachedTranslation(displayMode2);
+			this._dmResults[currentUri].mode2 = await tryLoadCachedTranslation(displayMode2);
 		}
 
 		// Get current results - always read from _dmResults to avoid stale closure
@@ -1237,259 +1293,188 @@ infoFromTrack(track) {
 		return processedLyrics;
 	}
 
-	getGeminiTranslation(lyricsState, lyrics, mode, silent = false) {
-		return (new Promise((resolve, reject) => {
-			const apiMode = CONFIG.visual["gemini:api-mode"] || "official";
-			const viKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini-api-key`);
-			const romajiKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini-api-key-romaji`);
-			const proxyApiKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini:proxy-api-key`);
+	async getGeminiTranslation(lyricsState, lyrics, mode, silent = false) {
+		const apiMode = CONFIG.visual["gemini:api-mode"] || "official";
+		const viKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini-api-key`);
+		const romajiKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini-api-key-romaji`);
+		const proxyApiKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini:proxy-api-key`);
 
-			// Determine mode type and API key
-			// Determine mode type
-			let wantSmartPhonetic = false;
-			let apiKey;
-			if (mode === "gemini_romaji") {
-				wantSmartPhonetic = true;
-			}
+		// --- 1. CONFIG VALIDATION (Sync) ---
+		let wantSmartPhonetic = (mode === "gemini_romaji");
+		let apiKey;
 
-			// Determine API key based on mode and settings
-			if (apiMode === "proxy") {
-				// Proxy mode - use proxy API key
-				apiKey = proxyApiKey || "proxy-default";
-			} else if (wantSmartPhonetic) {
-				// Official mode - Romaji specific key or fallback
-				apiKey = romajiKey || viKey;
-			} else {
-				// Official mode - Default key
-				apiKey = viKey || romajiKey;
-			}
+		if (apiMode === "proxy") {
+			apiKey = proxyApiKey || "proxy-default";
+		} else if (wantSmartPhonetic) {
+			apiKey = romajiKey || viKey;
+		} else {
+			apiKey = viKey || romajiKey;
+		}
 
-			// Only require API key for official mode
-			if (apiMode === "official" && !apiKey) {
-				return reject(new Error("Gemini API key missing. Please add at least one key in Settings."));
-			}
+		if (apiMode === "official" && !apiKey) {
+			throw new Error("Gemini API key missing. Please add at least one key in Settings.");
+		}
 
-			if (!Array.isArray(lyrics) || lyrics.length === 0) {
-				return reject(new Error("No lyrics to translate."));
-			}
+		if (!Array.isArray(lyrics) || lyrics.length === 0) {
+			throw new Error("No lyrics to translate.");
+		}
 
-			// Include style and pronoun in cache key to avoid incorrect cache hits
-			const styleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
-			const pronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
-			const cacheKey = mode;
-			const cacheKey2 = `${lyricsState.uri}:${cacheKey}:${styleKey}:${pronounKey}`;
-			const cached = CacheManager.get(cacheKey2);
+		// --- 2. CACHE CHECK (Async) ---
+		const styleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
+		const pronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
+		const cacheKey = mode;
+		const cacheKey2 = `${lyricsState.uri}:${cacheKey}:${styleKey}:${pronounKey}`;
 
-			if (cached) {
-				return resolve(cached);
-			}
+		// Await Cache (L1 -> L2 logic inside CacheManager)
+		const cached = await CacheManager.get(cacheKey2);
+		if (cached) {
+			return cached;
+		}
 
-			// Try to load from persistent localStorage cache
+		// --- 3. IN-FLIGHT DEDUPLICATION ---
+		this._inflightGemini = this._inflightGemini || new Map();
+		if (this._inflightGemini.has(cacheKey2)) {
+			return this._inflightGemini.get(cacheKey2); // Return existing Promise
+		}
+
+		// --- 4. PREPARE REQUEST ---
+		const text = lyrics.map((l) => l?.text || " ").join("\n");
+		if (!silent) this.setState({ isTranslating: true });
+
+		// --- 5. EXECUTE (Async) ---
+		const executionPromise = (async () => {
 			try {
-				const persistKey = `${APP_NAME}:gemini-cache`;
-				const persistedCache = JSON.parse(localStorage.getItem(persistKey)) || {};
-				const persisted = persistedCache[cacheKey2];
+				const { vi, phonetic, duration } = await Translator.callGemini({
+					apiKey,
+					artist: lyricsState.artist || this.state.artist,
+					title: lyricsState.title || this.state.title,
+					text,
+					styleKey,
+					pronounKey,
+					wantSmartPhonetic,
+					priority: !silent,
+					taskId: cacheKey2
+				});
 
-				if (persisted && persisted.data) {
-					// Verify cache is for current settings
-					if (persisted.styleKey === styleKey && persisted.pronounKey === pronounKey) {
-						// Load into CacheManager for this session
-						CacheManager.set(cacheKey2, persisted.data);
-						return resolve(persisted.data);
-					}
+				// UI Feedback
+				if (duration && !silent) {
+					this.setState({
+						isTranslating: false,
+						translationStatus: { type: 'success', text: getText("notifications.translatedIn", { duration }) }
+					});
+					setTimeout(() => this.setState({ translationStatus: null }), 3000);
 				}
-			} catch (e) {
-				console.warn("[Lyrics+] Failed to load persisted Gemini cache:", e);
+
+				// Process Result
+				let outText = wantSmartPhonetic ? phonetic : vi;
+				if (!outText) throw new Error("Empty result from Gemini.");
+
+				let lines = Array.isArray(outText) ? outText : (typeof outText === 'string' ? outText.split("\n") : null);
+				if (!lines) throw new Error("Invalid translation format.");
+
+				const mapped = lyrics.map((line, i) => ({
+					...line,
+					text: lines[i]?.trim() || line?.text || "",
+					originalText: line?.text || "",
+				}));
+
+				// --- 6. SAVE TO CACHE (Fire & Forget) ---
+				CacheManager.set(cacheKey2, mapped);
+
+				return mapped;
+
+			} catch (err) {
+				// UI Error Handling
+				if (!silent) {
+					this.setState({
+						isTranslating: false,
+						translationStatus: { type: 'error', text: err.message || getText("notifications.translationFailed") }
+					});
+					setTimeout(() => this.setState({ translationStatus: null }), 5000);
+				}
+				throw err;
+			} finally {
+				// Cleanup
+				this._inflightGemini.delete(cacheKey2);
+				if (this.state.isTranslating) this.setState({ isTranslating: false });
 			}
+		})();
 
-			// De-duplicate concurrent requests for the same translation
-			this._inflightGemini = this._inflightGemini || new Map();
-			if (this._inflightGemini.has(cacheKey2)) {
-				// Return existing in-flight promise instead of making a new request
-				return this._inflightGemini.get(cacheKey2).then(resolve).catch(reject);
-			}
+		// Store the promise for deduplication
+		this._inflightGemini.set(cacheKey2, executionPromise);
 
-			// CRITICAL: Preserve empty lines to maintain 1:1 index mapping
-			// Do NOT use filter(Boolean) as it removes empty lines and causes shifting
-			const text = lyrics.map((l) => l?.text || " ").join("\n");
-
-			// Show translating indicator immediately (not silent = foreground request)
-			if (!silent) {
-				this.setState({ isTranslating: true });
-			}
-
-			// Create the translation promise
-			const inflightPromise = Translator.callGemini({
-				apiKey,
-				artist: lyricsState.artist || this.state.artist,
-				title: lyricsState.title || this.state.title,
-				text,
-				styleKey,
-				pronounKey,
-				wantSmartPhonetic,
-				priority: !silent,
-				taskId: cacheKey2
-			})
-				.then(({ vi, phonetic, duration }) => {
-					// Show success in indicator instead of toast
-					if (duration && !silent) {
-						this.setState({
-							isTranslating: false,
-							translationStatus: { type: 'success', text: getText("notifications.translatedIn", { duration }) }
-						});
-						// Auto-hide success message after 3 seconds
-						setTimeout(() => {
-							this.setState({ translationStatus: null });
-						}, 3000);
-					}
-
-					let outText = wantSmartPhonetic ? phonetic : vi;
-
-					if (!outText) throw new Error("Empty result from Gemini.");
-
-					// Handle both array and string formats
-					let lines;
-					if (Array.isArray(outText)) {
-						lines = outText;
-					} else if (typeof outText === 'string') {
-						lines = outText.split("\n");
-					} else {
-						throw new Error("Invalid translation format received from Gemini.");
-					}
-
-					const mapped = lyrics.map((line, i) => ({
-						...line,
-						text: lines[i]?.trim() || line?.text || "",
-						originalText: line?.text || "",
-					}));
-
-					CacheManager.set(cacheKey2, mapped);
-
-					// Persist Gemini translations to localStorage for long-term storage
-					try {
-						const persistKey = `${APP_NAME}:gemini-cache`;
-						const persistedCache = JSON.parse(localStorage.getItem(persistKey)) || {};
-						persistedCache[cacheKey2] = {
-							data: mapped,
-							timestamp: Date.now(),
-							styleKey,
-							pronounKey
-						};
-
-						// Limit localStorage cache to 50 entries (prevent overflow)
-						const entries = Object.entries(persistedCache);
-						if (entries.length > 50) {
-							entries
-								.sort((a, b) => a[1].timestamp - b[1].timestamp)
-								.slice(0, 10)
-								.forEach(([key]) => delete persistedCache[key]);
-						}
-
-						localStorage.setItem(persistKey, JSON.stringify(persistedCache));
-					} catch (e) {
-						console.warn("[Lyrics+] Failed to persist Gemini cache:", e);
-					}
-
-					return mapped;
-				})
-				.finally(() => {
-					// Clean up in-flight tracking
-					this._inflightGemini.delete(cacheKey2);
-					// Only reset translating if not already set by success/error handlers
-					if (this.state.isTranslating) {
-						this.setState({ isTranslating: false });
-					}
-				});
-
-			// Store the in-flight promise
-			this._inflightGemini.set(cacheKey2, inflightPromise);
-
-			// Attach resolve/reject handlers
-			inflightPromise
-				.then(resolve)
-				.catch(err => {
-					// Show error in indicator
-					if (!silent) {
-						this.setState({
-							isTranslating: false,
-							translationStatus: { type: 'error', text: err.message || getText("notifications.translationFailed") }
-						});
-						// Auto-hide error after 5 seconds
-						setTimeout(() => {
-							this.setState({ translationStatus: null });
-						}, 5000);
-					}
-					reject(err);
-				});
-		}));
+		return executionPromise;
 	}
 
-	getTraditionalConversion(lyricsState, lyrics, language, displayMode) {
-		return new Promise((resolve, reject) => {
-			// Debug logging
-			if (window.lyricsPlusDebug) {
-				console.log("[Lyrics+] getTraditionalConversion called:", { language, displayMode, lyricsCount: lyrics?.length, uri: lyricsState?.uri?.split(':').pop() });
+	async getTraditionalConversion(lyricsState, lyrics, language, displayMode) {
+		// Debug logging
+		if (window.lyricsPlusDebug) {
+			console.log("[Lyrics+] getTraditionalConversion called:", { language, displayMode, lyricsCount: lyrics?.length, uri: lyricsState?.uri?.split(':').pop() });
+		}
+
+		if (!Array.isArray(lyrics)) {
+			if (window.lyricsPlusDebug) console.log("[Lyrics+] getTraditionalConversion - REJECTED: lyrics is not array");
+			throw new Error("Invalid lyrics format for conversion.");
+		}
+
+		const cacheKey = `${lyricsState.uri}:trad:${language}:${displayMode}`;
+
+		// Await Cache
+		const cached = await CacheManager.get(cacheKey);
+		if (cached) {
+			if (window.lyricsPlusDebug) console.log("[Lyrics+] getTraditionalConversion - CACHE HIT, returning cached");
+			// Handle legacy cache format (string array)
+			if (Array.isArray(cached) && cached.length > 0 && typeof cached[0] === 'string') {
+				return cached.map(t => ({ text: t }));
 			}
+			return cached;
+		}
 
-			if (!Array.isArray(lyrics)) {
-				if (window.lyricsPlusDebug) console.log("[Lyrics+] getTraditionalConversion - REJECTED: lyrics is not array");
-				return reject(new Error("Invalid lyrics format for conversion."));
-			}
+		// De-duplicate concurrent calls
+		this._inflightTrad = this._inflightTrad || new Map();
+		const inflightKey = cacheKey;
+		if (this._inflightTrad.has(inflightKey)) {
+			if (window.lyricsPlusDebug) console.log("[Lyrics+] getTraditionalConversion - INFLIGHT HIT, waiting for existing request");
+			return this._inflightTrad.get(inflightKey);
+		}
 
-			const cacheKey = `${lyricsState.uri}:trad:${language}:${displayMode}`;
-			const cached = CacheManager.get(cacheKey);
-			if (cached) {
-				if (window.lyricsPlusDebug) console.log("[Lyrics+] getTraditionalConversion - CACHE HIT, returning cached");
-				// Handle legacy cache format (string array)
-				if (Array.isArray(cached) && cached.length > 0 && typeof cached[0] === 'string') {
-					return resolve(cached.map(t => ({ text: t })));
-				}
-				return resolve(cached);
-			}
+		if (window.lyricsPlusDebug) console.log("[Lyrics+] getTraditionalConversion - Proceeding to translateLyrics");
 
-			// De-duplicate concurrent calls per (uri, language, mode)
-			this._inflightTrad = this._inflightTrad || new Map();
-			const inflightKey = `${lyricsState.uri}:trad:${language}:${displayMode}`;
-			if (this._inflightTrad.has(inflightKey)) {
-				if (window.lyricsPlusDebug) console.log("[Lyrics+] getTraditionalConversion - INFLIGHT HIT, waiting for existing request");
-				return this._inflightTrad.get(inflightKey).then(resolve).catch(reject);
-			}
-
-			if (window.lyricsPlusDebug) console.log("[Lyrics+] getTraditionalConversion - Proceeding to translateLyrics");
-
-			// Show pending notification if conversion takes longer than 3s
-			const pendingTimer = setTimeout(() => {
-				try {
-					Spicetify.showNotification("Still converting...", false, 2000);
-				} catch (e) {
-					// Notification API may not be available in some contexts
-					if (window.lyricsPlusDebug) console.warn("[Lyrics+] Could not show notification:", e);
-				}
-			}, 3000);
-
-			const inflightPromise = this.translateLyrics(language, lyrics, displayMode)
-				.then((translated) => {
-					if (translated !== undefined && translated !== null) {
-						// Standardize format: Convert array of strings to array of objects {text: "..."}
-						// consistent with Gemini response format for optimizeTranslations
-						let formattedResult = translated;
-						if (Array.isArray(translated) && translated.length > 0 && typeof translated[0] === 'string') {
-							formattedResult = translated.map(t => ({ text: t }));
-						}
-
-						CacheManager.set(cacheKey, formattedResult);
-						return formattedResult;
+		// Execution Promise
+		const executionPromise = (async () => {
+			let pendingTimer = null;
+			try {
+				// Show pending notification if conversion takes longer than 3s
+				pendingTimer = setTimeout(() => {
+					try {
+						Spicetify.showNotification("Still converting...", false, 2000);
+					} catch (e) {
+						if (window.lyricsPlusDebug) console.warn("[Lyrics+] Could not show notification:", e);
 					}
-					throw new Error("Empty result from conversion.");
-				})
-				.finally(() => {
-					clearTimeout(pendingTimer);
-					this._inflightTrad.delete(inflightKey);
-				});
+				}, 3000);
 
-			this._inflightTrad.set(inflightKey, inflightPromise);
-			inflightPromise.then(resolve).catch(reject);
-		});
+				const translated = await this.translateLyrics(language, lyrics, displayMode);
+
+				if (translated !== undefined && translated !== null) {
+					// Standardize format
+					let formattedResult = translated;
+					if (Array.isArray(translated) && translated.length > 0 && typeof translated[0] === 'string') {
+						formattedResult = translated.map(t => ({ text: t }));
+					}
+
+					CacheManager.set(cacheKey, formattedResult);
+					return formattedResult;
+				}
+				throw new Error("Empty result from conversion.");
+
+			} finally {
+				if (pendingTimer) clearTimeout(pendingTimer);
+				this._inflightTrad.delete(inflightKey);
+			}
+		})();
+
+		this._inflightTrad.set(inflightKey, executionPromise);
+		return executionPromise;
 	}
 
 	provideLanguageCode(lyrics) {
@@ -1937,8 +1922,8 @@ infoFromTrack(track) {
 
 				this.setState(newState);
 
-				// Update Cache & LocalStorage
-				CACHE[this.currentTrackUri] = newState;
+				// Update Cache
+				CacheManager.set(this.currentTrackUri, newState);
 				this.saveLocalLyrics(this.currentTrackUri, newState);
 
 				Spicetify.showNotification(`✓ Loaded ${parsedKeys.join(", ")} lyrics from file`, false, 3000);
@@ -1992,13 +1977,13 @@ infoFromTrack(track) {
 		this.pretranslatedUri = nextInfo.uri;
 
 		// 1. Check/Fetch Raw Lyrics (without setting state)
-		let lyricsData = CACHE[nextInfo.uri];
+		let lyricsData = CacheManager.getSync(nextInfo.uri);
 
 		if (!lyricsData) {
 			try {
 				lyricsData = await this.tryServices(nextInfo);
 				if (lyricsData.provider) {
-					CACHE[nextInfo.uri] = lyricsData;
+					CacheManager.set(nextInfo.uri, lyricsData);
 				}
 			} catch (e) {
 				console.warn("[Lyrics+] Pre-translation fetch failed:", e);
@@ -2108,7 +2093,7 @@ infoFromTrack(track) {
 			this.nextTrackUri = nextUri;
 
 			// 2. Check cache for raw lyrics
-			let rawLyrics = CacheManager.get(nextUri);
+			let rawLyrics = await CacheManager.get(nextUri);
 
 			if (!rawLyrics) {
 				// Fetch raw lyrics if not cached
@@ -2155,7 +2140,8 @@ infoFromTrack(track) {
 		};
 
 		reloadLyrics = () => {
-			CACHE = {};
+			// Clear L1 cache synchronously (L2 will be overwritten on next fetch)
+			CacheManager.clearL1();
 			this.updateVisualOnConfigChange();
 			this.forceUpdate();
 			this.fetchLyrics(Spicetify.Player.data.item, this.state.explicitMode, true);

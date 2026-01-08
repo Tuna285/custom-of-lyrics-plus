@@ -203,3 +203,5 @@ const ProviderNetease = (() => {
 
 	return { findLyrics, getKaraoke, getSynced, getUnsynced, getTranslation };
 })();
+
+window.ProviderNetease = ProviderNetease;

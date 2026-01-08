@@ -49,5 +49,7 @@ const ProviderLRCLIB = (() => {
 		return Utils.parseLocalLyrics(syncedLyrics).synced;
 	}
 
-	return { findLyrics, getSynced, getUnsynced };
+	    return { findLyrics, getSynced, getUnsynced };
 })();
+
+window.ProviderLRCLIB = ProviderLRCLIB;

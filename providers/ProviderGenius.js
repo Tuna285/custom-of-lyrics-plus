@@ -129,5 +129,7 @@ const ProviderGenius = (() => {
 		return { lyrics, versions: hits };
 	}
 
-	return { fetchLyrics, getNote, fetchLyricsVersion };
+	    return { fetchLyrics, fetchLyricsVersion };
 })();
+
+window.ProviderGenius = ProviderGenius;

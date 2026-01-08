@@ -24,10 +24,10 @@ if ($currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administ
 }
 
 Write-Host ""
-Write-Host "+============================================================+" -ForegroundColor Cyan
-Write-Host "|         Lyrics Plus Translate - Installer                  |" -ForegroundColor Cyan
-Write-Host "|     AI-powered lyrics translation for Spotify              |" -ForegroundColor Cyan
-Write-Host "+============================================================+" -ForegroundColor Cyan
+Write-Host "+===================================================================+" -ForegroundColor Cyan
+Write-Host "|                 Lyrics Plus Translate - Installer                 |" -ForegroundColor Cyan
+Write-Host "|             AI-powered lyrics translation for Spotify             |" -ForegroundColor Cyan
+Write-Host "+===================================================================+" -ForegroundColor Cyan
 Write-Host ""
 
 # Configuration
@@ -42,34 +42,40 @@ $filesToDownload = @(
     "index.js",
     "style.css",
     "manifest.json",
-    "Utils.js",
-    "Config.js",
-    "Cache.js",
-    "Prompts.js",
-    "GeminiClient.js",
-    "Translator.js",
-    "Components.js",
-    "ProviderLRCLIB.js",
-    "ProviderMusixmatch.js",
-    "I18n.js",
-    "LangEN.js",
-    "LangVI.js",
-    "ProviderNetease.js",
-    "ProviderGenius.js",
-    "Providers.js",
-    "SyncedLyrics.js",
-    "UnsyncedLyrics.js",
-    "TabBar.js",
-    "Settings.js",
-    "OptionsMenu.js",
-    "PlaybarButton.js",
     "version.json",
     "README.md",
     "README_VI.md",
     "CHANGELOG.md",
     "LICENSE",
     "install.ps1",
-    "uninstall.ps1"
+    "uninstall.ps1",
+    "i18n/LangEN.js",
+    "i18n/LangVI.js",
+    "i18n/I18n.js",
+    "parsers/LRCParser.js",
+    "utils/Utils.js",
+    "services/AdBlocker.js",
+    "utils/Config.js",
+    "services/IDBCache.js",
+    "utils/Cache.js",
+    "services/UpdateService.js",
+    "components/VideoManager.js",
+    "utils/Prompts.js",
+    "services/GeminiClient.js",
+    "services/Translator.js",
+    "components/Components.js",
+    "providers/ProviderLRCLIB.js",
+    "providers/ProviderMusixmatch.js",
+    "providers/ProviderNetease.js",
+    "providers/ProviderGenius.js",
+    "providers/Providers.js",
+    "components/SyncedLyrics.js",
+    "components/UnsyncedLyrics.js",
+    "components/TabBar.js",
+    "components/Settings.js",
+    "components/OptionsMenu.js",
+    "components/PlaybarButton.js",
+    "components/VideoBackground.js"
 )
 
 # [0/6] Close Spotify to prevent file lock issues
@@ -110,7 +116,6 @@ $spicetifyConfig = & spicetify -c 2>$null
 if (-not $spicetifyConfig) {
     $spicetifyConfig = Join-Path $env:APPDATA "spicetify"
 }
-$configDir = Split-Path $spicetifyConfig -Parent
 $customAppsDir = Join-Path $env:LOCALAPPDATA "spicetify\CustomApps"
 
 if (-not (Test-Path $customAppsDir)) {
@@ -164,6 +169,13 @@ $downloadedCount = 0
 foreach ($file in $filesToDownload) {
     $url = "$baseUrl/$file"
     $dest = Join-Path $appDir $file
+    
+    # Create subdirectory if needed
+    $parentDir = Split-Path $dest -Parent
+    if (-not (Test-Path $parentDir)) {
+        New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+    }
+
     try {
         Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing -ErrorAction Stop
         $downloadedCount++
@@ -204,9 +216,9 @@ if ($LASTEXITCODE -ne 0) {
 
 # Done!
 Write-Host ""
-Write-Host "+============================================================+" -ForegroundColor Green
-Write-Host "|              Installation Complete!                        |" -ForegroundColor Green
-Write-Host "+============================================================+" -ForegroundColor Green
+Write-Host "+======================================================================+" -ForegroundColor Green
+Write-Host "|                        Installation Complete!                        |" -ForegroundColor Green
+Write-Host "+======================================================================+" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Installed to: $appDir" -ForegroundColor Cyan
 Write-Host ""

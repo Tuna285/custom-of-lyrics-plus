@@ -194,5 +194,7 @@ const ProviderMusixmatch = (() => {
 		}));
 	}
 
-	return { findLyrics, getKaraoke, getSynced, getUnsynced, getTranslation };
+	return { findLyrics, getSynced, getUnsynced, getTranslation };
 })();
+
+window.ProviderMusixmatch = ProviderMusixmatch;
