@@ -2481,11 +2481,7 @@ infoFromTrack(track) {
 			scale: CONFIG.visual["video-background-scale"],
 			videoInfo: this.state.videoBackground
 		}),
-		this.state.provider !== "local" && react.createElement(CreditFooter, {
-			provider: this.state.provider,
-			copyright: this.state.copyright,
-			currentLang: CONFIG.visual["ui-language"]
-		}),
+
 		react.createElement("div", {
 			className: "lyrics-lyricsContainer-LyricsBackground",
 		}),
