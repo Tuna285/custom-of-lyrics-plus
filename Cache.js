@@ -121,6 +121,16 @@ const CacheManager = {
         console.log('[Cache] Cache cleared');
     },
 
+    // Delete a specific cache entry by exact key
+    delete(key) {
+        const existed = this._cache.has(key);
+        if (existed) {
+            this._cache.delete(key);
+            this._schedulePersist();
+        }
+        return existed;
+    },
+
     // Clear cache entries for a specific URI
     clearByUri(uri) {
         const keysToDelete = [];

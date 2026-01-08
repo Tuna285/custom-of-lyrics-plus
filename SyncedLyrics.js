@@ -117,14 +117,21 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
 
 
 
+        // Capture trailing note timing before removing
+        let lastNoteStartTime = null;
         while (merged.length > 0) {
             const last = merged[merged.length - 1];
             // Check both text and originalText for trailing notes
             if (isNoteLineObject(last)) {
+                lastNoteStartTime = last.startTime; // Save timing before removal
                 merged.pop();
             } else {
                 break;
             }
+        }
+        // Extend the last real line's duration to cover removed trailing notes
+        if (lastNoteStartTime && merged.length > 0) {
+            merged[merged.length - 1].extendedEndTime = lastNoteStartTime;
         }
 
         return merged;
@@ -165,6 +172,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
                 className: "lyrics-lyricsContainer-SyncedLyrics",
                 style: {
                     "--offset": `${offset}px`,
+                    "--lyric-position": CONFIG.visual["lyric-position"] ?? 50,
                 },
                 key: lyricsId,
             },
@@ -380,14 +388,21 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
             merged.push(current);
         }
 
+        // Capture trailing note timing before removing
+        let lastNoteStartTime = null;
         while (merged.length > 0) {
             const last = merged[merged.length - 1];
             // Check both text and originalText for trailing notes
             if (isNoteLineObject(last)) {
+                lastNoteStartTime = last.startTime; // Save timing before removal
                 merged.pop();
             } else {
                 break;
             }
+        }
+        // Extend the last real line's duration to cover removed trailing notes
+        if (lastNoteStartTime && merged.length > 0) {
+            merged[merged.length - 1].extendedEndTime = lastNoteStartTime;
         }
 
         return merged;

@@ -1,3 +1,5 @@
+
+
 const ButtonSVG = ({ icon, active = true, onClick }) => {
 	return react.createElement(
 		"button",
@@ -108,6 +110,8 @@ const ConfigAdjust = ({ name, defaultValue, step, min, max, onChange = () => { }
 	const [value, setValue] = useState(defaultValue);
 	function adjust(dir) {
 		let temp = value + dir * step;
+		// Fix floating point errors
+		temp = Math.round(temp * 100) / 100;
 		if (temp < min) temp = min; else if (temp > max) temp = max;
 		setValue(temp); onChange(temp);
 	}
@@ -120,6 +124,66 @@ const ConfigAdjust = ({ name, defaultValue, step, min, max, onChange = () => { }
 		)
 	);
 };
+
+// ConfigRange: Draggable range slider input with number display
+const ConfigRange = ({ name, defaultValue, min = 0, max = 100, step = 5, onChange = () => { } }) => {
+	// Ensure we always have a valid number, default to middle of range
+	const initialValue = (defaultValue !== undefined && !isNaN(Number(defaultValue))) 
+		? Number(defaultValue) 
+		: Math.round((min + max) / 2);
+	const [value, setValue] = useState(initialValue);
+	
+	const handleSliderChange = (e) => {
+		const newVal = Number(e.target.value);
+		setValue(newVal);
+		onChange(newVal);
+	};
+	
+	const handleInputChange = (e) => {
+		let newVal = Number(e.target.value);
+		if (isNaN(newVal)) newVal = initialValue;
+		if (newVal < min) newVal = min;
+		if (newVal > max) newVal = max;
+		setValue(newVal);
+		onChange(newVal);
+	};
+	
+	return react.createElement("div", { className: "setting-row" },
+		react.createElement("label", { className: "col description" }, name),
+		react.createElement("div", { className: "col action", style: { display: "flex", alignItems: "center", gap: "8px" } },
+			react.createElement("input", {
+				type: "range",
+				className: "lyrics-range-slider",
+				min,
+				max,
+				step,
+				value,
+				onChange: handleSliderChange,
+			}),
+			react.createElement("input", {
+				type: "number",
+				className: "lyrics-range-number",
+				min,
+				max,
+				step,
+				value,
+				onChange: handleInputChange,
+				style: { 
+					width: "55px", 
+					textAlign: "center",
+					padding: "4px",
+					background: "rgba(255,255,255,0.1)",
+					border: "1px solid rgba(255,255,255,0.2)",
+					borderRadius: "4px",
+					color: "inherit"
+				}
+			}),
+			react.createElement("span", { style: { opacity: 0.7 } }, "%")
+		)
+	);
+};
+
+
 
 const ConfigHotkey = ({ name, defaultValue, onChange = () => { } }) => {
 	const [value, setValue] = useState(defaultValue);
@@ -250,44 +314,45 @@ const CollapsibleSection = ({ title, defaultOpen = true, children }) => {
 };
 
 const ConfigHelper = () => {
-	const [activeTab, setActiveTab] = useState("General");
-	const tabs = ["General", "Translation", "Providers", "Background", "Advanced"];
+	const [activeTab, setActiveTab] = useState("general");
+	const tabKeys = ["general", "translation", "providers", "background", "advanced"];
 
 	// General Settings
 	const generalSettings = [
-		{ desc: "Playbar button", key: "playbar-button", info: "Replace Spotify's lyrics button with Lyrics Plus.", type: ConfigSlider },
-		{ desc: "Global delay", info: "Offset (in ms) across all tracks.", key: "global-delay", type: ConfigAdjust, min: -10000, max: 10000, step: 250 },
-		{ desc: "Font size", info: "(or Ctrl + Mouse scroll in main app)", key: "font-size", type: ConfigAdjust, min: fontSizeLimit.min, max: fontSizeLimit.max, step: fontSizeLimit.step },
-		{ desc: "Alignment", key: "alignment", type: ConfigSelection, options: { left: "Left", center: "Center", right: "Right" } },
-		{ desc: "Fullscreen hotkey", key: "fullscreen-key", type: ConfigHotkey },
+		{ desc: getText("settings.language.label"), key: "ui-language", info: getText("settings.language.desc"), type: ConfigSelection, options: { "en": "English", "vi": "Tiếng Việt" }, onChange: (name, value) => { CONFIG.visual[name] = value; ConfigUtils.setPersisted(`${APP_NAME}:visual:${name}`, value); Spicetify.PopupModal.hide(); setTimeout(() => openConfig(), 100); } },
+		{ desc: getText("settings.playbarButton.label"), key: "playbar-button", info: getText("settings.playbarButton.desc"), type: ConfigSlider },
+		{ desc: getText("settings.globalDelay.label"), info: getText("settings.globalDelay.desc"), key: "global-delay", type: ConfigAdjust, min: -10000, max: 10000, step: 250 },
+		{ desc: getText("settings.fontSize.label"), info: getText("settings.fontSize.desc"), key: "font-size", type: ConfigAdjust, min: fontSizeLimit.min, max: fontSizeLimit.max, step: fontSizeLimit.step },
+		{ desc: getText("settings.alignment.label"), key: "alignment", type: ConfigSelection, options: { left: getText("settings.alignment.options.left"), center: getText("settings.alignment.options.center"), right: getText("settings.alignment.options.right") } },
+		{ desc: getText("settings.fullscreenKey.label"), key: "fullscreen-key", type: ConfigHotkey },
 	];
 
 	const syncedSettings = [
-		{ desc: "Compact synced: Lines before", key: "lines-before", type: ConfigSelection, options: [0, 1, 2, 3, 4] },
-		{ desc: "Compact synced: Lines after", key: "lines-after", type: ConfigSelection, options: [0, 1, 2, 3, 4] },
-		{ desc: "Compact synced: Fade-out blur", key: "fade-blur", type: ConfigSlider },
+		{ desc: getText("settings.linesBefore.label"), key: "lines-before", type: ConfigSelection, options: [0, 1, 2, 3, 4] },
+		{ desc: getText("settings.linesAfter.label"), key: "lines-after", type: ConfigSelection, options: [0, 1, 2, 3, 4] },
+		{ desc: getText("settings.fadeBlur.label"), key: "fade-blur", type: ConfigSlider },
 	];
 
 	const unsyncedSettings = [
-		{ desc: "Unsynced: Smart auto-scroll", info: "Automatically scroll unsynced lyrics based on song progress. Pauses for 5 seconds when you manually scroll.", key: "unsynced-auto-scroll", type: ConfigSlider },
+		{ desc: getText("settings.unsyncedAutoScroll.label"), info: getText("settings.unsyncedAutoScroll.desc"), key: "unsynced-auto-scroll", type: ConfigSlider },
 	];
 
 	// Translation Settings
 	const translationSettings = [
-		{ desc: "API Mode", key: "gemini:api-mode", type: ConfigSelection, options: { "official": "Official (API Key)", "proxy": "ProxyPal (Free)" }, info: "Choose between official Google API (requires API key) or ProxyPal for free access." },
+		{ desc: getText("settings.apiMode.label"), key: "gemini:api-mode", type: ConfigSelection, options: { "official": getText("settings.apiMode.options.official"), "proxy": getText("settings.apiMode.options.proxy") }, info: getText("settings.apiMode.desc") },
 
 		// Official Settings
-		{ desc: "Gemini, Gemma API Key (Display Mode 1)", key: "gemini-api-key", type: ConfigInput, info: "Gemini, Gemma API for Display Mode 1.", when: () => CONFIG.visual["gemini:api-mode"] !== "proxy" },
-		{ desc: "Gemini, Gemma API Key (Display Mode 2)", key: "gemini-api-key-romaji", type: ConfigInput, info: "Gemini, Gemma API for Display Mode 2 (Romaji, Romaja, Pinyin modes), leave blank if you only use 1 API.", when: () => CONFIG.visual["gemini:api-mode"] !== "proxy" },
+		{ desc: getText("settings.geminiApiKey.label"), key: "gemini-api-key", type: ConfigInput, info: getText("settings.geminiApiKey.desc"), when: () => CONFIG.visual["gemini:api-mode"] !== "proxy" },
+		{ desc: getText("settings.geminiApiKeyRomaji.label"), key: "gemini-api-key-romaji", type: ConfigInput, info: getText("settings.geminiApiKeyRomaji.desc"), when: () => CONFIG.visual["gemini:api-mode"] !== "proxy" },
 
 		// Proxy Settings
-		{ desc: "Proxy Model", key: "gemini:proxy-model", type: ConfigSelection, options: { "gemini-2.5-flash": "Gemini 2.5 Flash (Default)", "gemini-2.5-pro": "Gemini 2.5 Pro", "gemini-3-flash-preview": "Gemini 3 Flash Preview", "gemini-3-pro-preview": "Gemini 3 Pro Preview", "gemini-2.0-flash": "Gemini 2.0 Flash", "gemma-3-27b-it": "Gemma 3 27B" }, info: "Model to use with ProxyPal", when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
-		{ desc: "Proxy API Key", key: "gemini:proxy-api-key", type: ConfigInput, info: "API Key (default: proxypal-local).", when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
-		{ desc: "Proxy Endpoint", key: "gemini:proxy-endpoint", type: ConfigInput, info: "Full Proxy URL (default: http://localhost:8317/v1/chat/completions).", when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
+		{ desc: getText("settings.proxyModel.label"), key: "gemini:proxy-model", type: ConfigSelection, options: { "gemini-2.5-flash": "Gemini 2.5 Flash (Default)", "gemini-2.5-pro": "Gemini 2.5 Pro", "gemini-3-flash-preview": "Gemini 3 Flash Preview", "gemini-3-pro-preview": "Gemini 3 Pro Preview", "gemini-2.0-flash": "Gemini 2.0 Flash", "gemma-3-27b-it": "Gemma 3 27B" }, info: getText("settings.proxyModel.desc"), when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
+		{ desc: getText("settings.proxyApiKey.label"), key: "gemini:proxy-api-key", type: ConfigInput, info: getText("settings.proxyApiKey.desc"), when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
+		{ desc: getText("settings.proxyEndpoint.label"), key: "gemini:proxy-endpoint", type: ConfigInput, info: getText("settings.proxyEndpoint.desc"), when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
 
 		// Common Settings
-		{ desc: "Pre-translation", key: "pre-translation", type: ConfigSlider, info: "Automatically translate lyrics when a song starts playing." },
-		{ desc: "Disable Queue (Parallel Requests)", key: "gemini:disable-queue", type: ConfigSlider, info: "Process all translation requests in parallel without queuing. May hit rate limits faster but translates quicker." },
+		{ desc: getText("settings.preTranslation.label"), key: "pre-translation", type: ConfigSlider, info: getText("settings.preTranslation.desc") },
+		{ desc: getText("settings.disableQueue.label"), key: "gemini:disable-queue", type: ConfigSlider, info: getText("settings.disableQueue.desc") },
 	];
 
 	// Callback - persist all settings to both storages
@@ -316,19 +381,19 @@ const ConfigHelper = () => {
 
 	let content;
 	switch (activeTab) {
-		case "General":
+		case "general":
 			content = react.createElement("div", null,
-				react.createElement(CollapsibleSection, { title: "Display & Controls" }, react.createElement(OptionList, { items: generalSettings, onChange })),
-				react.createElement(CollapsibleSection, { title: "Synced Lyrics Options" }, react.createElement(OptionList, { items: syncedSettings, onChange })),
-				react.createElement(CollapsibleSection, { title: "Unsynced Lyrics Options" }, react.createElement(OptionList, { items: unsyncedSettings, onChange }))
+				react.createElement(CollapsibleSection, { title: getText("sections.displayControls") }, react.createElement(OptionList, { items: generalSettings, onChange })),
+				react.createElement(CollapsibleSection, { title: getText("sections.syncedOptions") }, react.createElement(OptionList, { items: syncedSettings, onChange })),
+				react.createElement(CollapsibleSection, { title: getText("sections.unsyncedOptions") }, react.createElement(OptionList, { items: unsyncedSettings, onChange }))
 			);
 			break;
-		case "Translation":
-			content = react.createElement(CollapsibleSection, { title: "Gemini, Gemma API" }, react.createElement(OptionList, { items: translationSettings, onChange }));
+		case "translation":
+			content = react.createElement(CollapsibleSection, { title: getText("sections.geminiApi") }, react.createElement(OptionList, { items: translationSettings, onChange }));
 			break;
-		case "Providers":
+		case "providers":
 			content = react.createElement("div", null,
-				react.createElement(CollapsibleSection, { title: "Service Order & Toggle" },
+				react.createElement(CollapsibleSection, { title: getText("sections.serviceOrder") },
 					react.createElement(ServiceList, {
 						itemsList: CONFIG.providersOrder,
 						onListChange: (list) => { CONFIG.providersOrder = list; localStorage.setItem(`${APP_NAME}:services-order`, JSON.stringify(list)); reloadLyrics?.(); },
@@ -338,39 +403,39 @@ const ConfigHelper = () => {
 				)
 			);
 			break;
-		case "Background":
+		case "background":
 			const bgSettings = [
-				{ desc: "Transparent Background", key: "transparent-background", type: ConfigSlider, info: "ON: Transparent background (shows Spicetify theme). OFF: Solid color from album art." },
-				{ desc: "Noise overlay", key: "noise", type: ConfigSlider },
-				{ desc: "Background brightness", key: "background-brightness", type: ConfigAdjust, min: 0, max: 100, step: 10 },
+				{ desc: getText("settings.transparentBackground.label"), key: "transparent-background", type: ConfigSlider, info: getText("settings.transparentBackground.desc") },
+				{ desc: getText("settings.noise.label"), key: "noise", type: ConfigSlider },
+				{ desc: getText("settings.backgroundBrightness.label"), key: "background-brightness", type: ConfigAdjust, min: 0, max: 100, step: 10 },
 			];
 			content = react.createElement(OptionList, { items: bgSettings, onChange });
 			break;
-		case "Advanced":
+		case "advanced":
 			const advSettings = [
-				{ desc: "Debug Mode", key: "debug-mode", info: "Enable detailed console logging for troubleshooting. Shows lyrics processing, translation requests, and timing info.", type: ConfigSlider },
-				{ desc: "Text convertion: Japanese Detection threshold (Advanced)", info: "Checks if whenever Kana is dominant in lyrics...", key: "ja-detect-threshold", type: ConfigAdjust, min: thresholdSizeLimit.min, max: thresholdSizeLimit.max, step: thresholdSizeLimit.step },
-				{ desc: "Text convertion: Tradition-Simplified Detection threshold (Advanced)", info: "Checks if whenever Traditional or Simplified is dominant...", key: "hans-detect-threshold", type: ConfigAdjust, min: thresholdSizeLimit.min, max: thresholdSizeLimit.max, step: thresholdSizeLimit.step },
-				{ desc: "Musixmatch Translation Language.", info: "Choose the language you want to translate the lyrics to...", key: "musixmatch-translation-language", type: ConfigSelection, options: languageOptions },
-				{ desc: "Clear Memory Cache", info: "Loaded lyrics are cached in memory...", key: "clear-memore-cache", text: "Clear memory cache", type: ConfigButton, onChange: () => reloadLyrics?.() },
+				{ desc: getText("settings.debugMode.label"), key: "debug-mode", info: getText("settings.debugMode.desc"), type: ConfigSlider },
+				{ desc: getText("settings.jaDetectThreshold.label"), info: getText("settings.jaDetectThreshold.desc"), key: "ja-detect-threshold", type: ConfigAdjust, min: thresholdSizeLimit.min, max: thresholdSizeLimit.max, step: thresholdSizeLimit.step },
+				{ desc: getText("settings.hansDetectThreshold.label"), info: getText("settings.hansDetectThreshold.desc"), key: "hans-detect-threshold", type: ConfigAdjust, min: thresholdSizeLimit.min, max: thresholdSizeLimit.max, step: thresholdSizeLimit.step },
+				{ desc: getText("settings.musixmatchLanguage.label"), info: getText("settings.musixmatchLanguage.desc"), key: "musixmatch-translation-language", type: ConfigSelection, options: languageOptions },
+				{ desc: getText("settings.clearMemoryCache.label"), info: getText("settings.clearMemoryCache.desc"), key: "clear-memore-cache", text: getText("settings.clearMemoryCache.button"), type: ConfigButton, onChange: () => reloadLyrics?.() },
 			];
 			content = react.createElement("div", null,
 				react.createElement(OptionList, { items: advSettings, onChange }),
-				react.createElement("h2", { style: { marginTop: 20 } }, "CORS Proxy Template"),
-				react.createElement("span", { dangerouslySetInnerHTML: { __html: "Use this to bypass CORS restrictions. Replace the URL with your cors proxy server of your choice. <code>{url}</code> will be replaced with the request URL." } }),
+				react.createElement("h2", { style: { marginTop: 20 } }, getText("sections.corsProxy")),
+				react.createElement("span", { dangerouslySetInnerHTML: { __html: getText("settings.corsProxyDesc") } }),
 				react.createElement(corsProxyTemplate),
-				react.createElement("span", { dangerouslySetInnerHTML: { __html: "Spotify will reload its webview after applying. Leave empty to restore default: <code>https://cors-proxy.spicetify.app/{url}</code>" } })
+				react.createElement("span", { dangerouslySetInnerHTML: { __html: getText("settings.corsProxyDefault") } })
 			);
 			break;
 	}
 
 	return react.createElement("div", { style: { display: "flex", flexDirection: "column", height: "100%" } },
 		react.createElement("div", { className: "config-tabs" },
-			tabs.map(tab => react.createElement("div", {
-				className: `config-tab ${activeTab === tab ? "active" : ""}`,
-				onClick: () => setActiveTab(tab)
-			}, tab))
-		),
+			tabKeys.map(tabKey => react.createElement("div", {
+				className: `config-tab ${activeTab === tabKey ? "active" : ""}`,
+				onClick: () => setActiveTab(tabKey)
+			}, getText(`tabs.${tabKey}`))
+		)),
 		react.createElement("div", { className: "config-content" }, content)
 	);
 };

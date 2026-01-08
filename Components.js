@@ -12,12 +12,12 @@ const CreditFooter = react.memo(({ provider, copyright }) => {
     if (provider === "local" || !provider) return null;
 
     const credit = useMemo(() => {
-        const credits = [Spicetify.Locale.get("web-player.lyrics.providedBy", provider)];
+        const credits = [getText("ui.providedBy", { provider })];
         if (copyright) {
             credits.push(...copyright.split("\n"));
         }
         return credits.join(" • ");
-    }, [provider, copyright]);
+    }, [provider, copyright, CONFIG.visual["ui-language"]]);
 
     return react.createElement(
         "p",
@@ -390,7 +390,7 @@ const LoadingIcon = react.createElement(
 );
 
 // Translation status indicator - shows translating, success, or error states
-const TranslatingIndicator = react.memo(({ isVisible, status, text = "Translating..." }) => {
+const TranslatingIndicator = react.memo(({ isVisible, status, text = getText("ui.translating") }) => {
     // Show if translating or has a status to display
     if (!isVisible && !status) return null;
 

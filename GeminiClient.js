@@ -161,6 +161,25 @@ const GeminiClient = {
         let raw = String(text || "").trim();
         raw = raw.replace(/```[a-z]*\n?/gim, "").replace(/```/g, "").trim();
 
+        // Priority 0: Parse compact tag format (e.g., <1>content</1>)
+        const compactPattern = /<(\d+)>(.*?)<\/\1>/gs;
+        const compactMatches = [...raw.matchAll(compactPattern)];
+        if (compactMatches.length > 0) {
+            const result = [];
+            for (const match of compactMatches) {
+                const idx = parseInt(match[1], 10) - 1;
+                result[idx] = match[2].trim();
+            }
+            // Fill any gaps with empty strings
+            for (let i = 0; i < result.length; i++) {
+                if (result[i] === undefined) result[i] = '';
+            }
+            if (result.length > 0) {
+                console.log(`[Lyrics+] Parsed ${result.length} lines via Compact Tags`);
+                return { vi: result, phonetic: result.join('\n') };
+            }
+        }
+
         // Priority 1: Parse numbered list format (e.g., "1. line1\n2. line2")
         const hasNumberedLines = /^\d+\.\s*/m.test(raw);
         if (hasNumberedLines) {

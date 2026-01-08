@@ -2,8 +2,8 @@ const kuroshiroPath = "https://cdn.jsdelivr.net/npm/kuroshiro@1.2.0/dist/kuroshi
 const kuromojiPath = "https://cdn.jsdelivr.net/npm/kuroshiro-analyzer-kuromoji@1.1.0/dist/kuroshiro-analyzer-kuromoji.min.js";
 const aromanize = "https://cdn.jsdelivr.net/npm/aromanize@0.1.5/aromanize.min.js";
 const openCCPath = "https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.min.js";
-const pinyinProPath = "https://cdn.jsdelivr.net/npm/pinyin-pro@3.19.7/dist/index.min.js";
-const tinyPinyinPath = "https://cdn.jsdelivr.net/npm/tiny-pinyin/dist/tiny-pinyin.min.js";
+const pinyinProPath = "https://unpkg.com/pinyin-pro"; // UMD, exposes window.pinyinPro
+// Note: tiny-pinyin removed because it uses CommonJS require() which doesn't work in browser
 
 const dictPath = "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict";
 
@@ -66,8 +66,11 @@ class Translator {
 				case "ko": await this.includeExternal(aromanize); break;
 				case "zh":
 					await this.includeExternal(openCCPath);
-					this.includeExternal(pinyinProPath).catch(() => { });
-					this.includeExternal(tinyPinyinPath).catch(() => { });
+					// Load pinyin-pro (UMD), await with timeout
+					await Promise.race([
+						this.includeExternal(pinyinProPath),
+						new Promise(resolve => setTimeout(resolve, 5000)) // 5s timeout
+					]);
 					break;
 			}
 		} catch (error) { console.error(`Failed to load externals for ${langCode}`, error); throw error; }
@@ -153,6 +156,23 @@ class Translator {
 		await this.awaitFinished("zh");
 		const converter = this.OpenCC.Converter({ from: from, to: target });
 		return converter(text);
+	}
+
+
+	async convertToPinyin(text, options = {}) {
+		await this.awaitFinished("zh");
+		// pinyin-pro exposes `window.pinyinPro` when loaded via script tag
+		if (typeof window.pinyinPro !== 'undefined' && typeof window.pinyinPro.pinyin === 'function') {
+			try {
+				// pinyin-pro.pinyin(text, { toneType: 'mark' }) returns pinyin with tone marks
+				return window.pinyinPro.pinyin(text, { toneType: 'mark', type: 'string', ...options });
+			} catch (e) {
+				console.warn("[Translator] pinyin-pro failed:", e);
+			}
+		}
+		// If library is not loaded, return original text and show warning
+		console.warn("[Translator] pinyin-pro not available. Check if unpkg.com is accessible.");
+		return text;
 	}
 
 	async loadPinyinPro() {

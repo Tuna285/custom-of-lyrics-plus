@@ -63,10 +63,11 @@ class LyricsContainer extends react.Component {
 			isFullscreen: false,
 			isFADMode: false,
 			isCached: false,
-			language: null,
-			isTranslating: false,
-			translationStatus: null, // { type: 'success'|'error', text: string }
-		};
+		language: null,
+		isTranslating: false,
+		translationStatus: null, // { type: 'success'|'error', text: string }
+		videoBackground: null, // { video_id: string, sync_offset: number, title: string, has_subtitles: boolean }
+	};
 		this.currentTrackUri = "";
 		this.nextTrackUri = "";
 		this.availableModes = [];
@@ -87,12 +88,469 @@ class LyricsContainer extends react.Component {
 		this.lastProcessedUri = null;
 		this.lastProcessedMode = null;
 
-		//Pre-translation state
-		this.pretranslatedUri = null;
-		this.pretranslateInterval = null;
+	//Pre-translation state
+	this.pretranslatedUri = null;
+	this.pretranslateInterval = null;
+}
+
+async fetchVideoBackgroundWithLyrics(track, lyrics = []) {
+	const info = this.infoFromTrack(track);
+	if (!info) return;
+
+	// Prevent duplicate API calls for same track
+	if (this.lastVideoFetchUri === info.uri) {
+		console.log("[Lyrics+] Skipping duplicate video fetch for:", info.uri);
+		return;
+	}
+	this.lastVideoFetchUri = info.uri;
+
+	const serverUrl = CONFIG.visual["video-background-server"] || "http://localhost:8000";
+	console.log("[Lyrics+] Fetching from Server URL:", serverUrl);
+	
+	// Prepare payload
+	const firstLyricTime = lyrics?.[0]?.startTime || 0;
+	const lyricsSnippet = lyrics.slice(0, 5).map(l => ({
+		text: l.text,
+		time: l.startTime
+	}));
+
+	const payload = {
+		track: info.title,
+		artist: info.artist,
+		duration: Math.round(info.duration),
+		firstLyricTime: Math.round(firstLyricTime),
+		lyrics: lyricsSnippet
+	};
+
+	console.log("[Lyrics+] Sending sync request with lyrics snippet:", lyricsSnippet.length, "lines");
+
+	try {
+		const res = await fetch(`${serverUrl}/sync`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(payload)
+		});
+		
+		if (res.ok) {
+			const data = await res.json();
+			if (data.video_id) {
+				this.setState({
+					videoBackground: {
+						video_id: data.video_id,
+						sync_offset: data.sync_offset || 0,
+						title: data.title,
+						has_subtitles: data.has_subtitles
+					}
+				});
+				console.log("[Lyrics+] Video Background Set:", data.title, "| Offset:", data.sync_offset, "| FirstLyric:", firstLyricTime);
+				return;
+			}
+		}
+	} catch (e) {
+		console.warn("[Lyrics+] Failed to fetch video background:", e);
+	}
+	this.setState({ videoBackground: null });
+}
+
+openVideoSettingsModal() {
+	const react = Spicetify.React;
+	const currentVideo = this.state.videoBackground?.video_id || "";
+	const serverOffsetValue = this.state.videoBackground?.sync_offset || 0;
+	const track = Spicetify.Player.data.item;
+	const info = this.infoFromTrack(track);
+	
+	if (!info) {
+		Spicetify.showNotification(getText("notifications.noTrack"), true, 2000);
+		return;
 	}
 
-	infoFromTrack(track) {
+	const serverUrl = CONFIG.visual["video-background-server"] || "http://localhost:8000";
+	
+	// Store reference to 'this' for use in callbacks
+	const self = this;
+
+	// Modal content component (show immediately, load videos inside)
+	const ModalContent = () => {
+		const [baseOffset, setBaseOffset] = react.useState(serverOffsetValue); // Absolute offset
+		const [nudge, setNudge] = react.useState(0); // Relative adjustment from slider
+		const [sliderTouched, setSliderTouched] = react.useState(false); // Track if user manually adjusted offset
+		const [videoId, setVideoId] = react.useState(currentVideo);
+		const [manualInput, setManualInput] = react.useState("");
+		const [topVideos, setTopVideos] = react.useState([]);
+		const [isLoading, setIsLoading] = react.useState(true);
+
+		react.useEffect(() => {
+			(async () => {
+				try {
+					const res = await fetch(`${serverUrl}/search?track=${encodeURIComponent(info.title)}&artist=${encodeURIComponent(info.artist)}&limit=3`);
+					if (res.ok) {
+						const data = await res.json();
+						setTopVideos(data.results || []);
+					}
+				} catch (e) {
+					console.warn("[Lyrics+] Failed to fetch top videos:", e);
+				}
+				setIsLoading(false);
+			})();
+		}, []);
+
+		return react.createElement("div", { 
+			style: { 
+				padding: "20px", 
+				maxWidth: "500px",
+				color: "#fff"
+			} 
+		},
+			// Current Track Info
+			react.createElement("div", {
+				style: {
+					marginBottom: "20px",
+					padding: "15px",
+					background: "rgba(255,255,255,0.05)",
+					borderRadius: "8px",
+					display: "flex",
+					alignItems: "center",
+					gap: "15px"
+				}
+			},
+				info.image && react.createElement("img", {
+					src: info.image,
+					style: {
+						width: "60px",
+						height: "60px",
+						borderRadius: "4px",
+						objectFit: "cover"
+					}
+				}),
+				react.createElement("div", { style: { flex: 1 } },
+					react.createElement("div", { 
+						style: { fontWeight: "bold", fontSize: "14px", marginBottom: "4px" } 
+					}, info.title),
+					react.createElement("div", { 
+						style: { fontSize: "12px", color: "#aaa" } 
+					}, info.artist)
+				)
+			),
+
+			// Top Videos Section (if available)
+			topVideos.length > 0 && react.createElement("div", {
+				style: { marginBottom: "20px" }
+			},
+				react.createElement("div", {
+					style: {
+						fontSize: "13px",
+						fontWeight: "bold",
+						marginBottom: "10px",
+						color: "var(--spice-button)"
+					}
+				}, getText("videoModal.topVideos")),
+				...topVideos.map((video, idx) => 
+					react.createElement("div", {
+						key: video.video_id,
+						onClick: () => {
+							setVideoId(video.video_id);
+							setSliderTouched(false); // Reset manual override so auto-sync works
+						},
+						style: {
+							padding: "10px",
+							marginBottom: "8px",
+							background: videoId === video.video_id ? "rgba(var(--spice-rgb-button), 0.2)" : "rgba(255,255,255,0.05)",
+							border: videoId === video.video_id ? "1px solid var(--spice-button)" : "1px solid transparent",
+							borderRadius: "6px",
+							cursor: "pointer",
+							display: "flex",
+							alignItems: "center",
+							gap: "10px",
+							transition: "all 0.2s"
+						},
+						onMouseEnter: (e) => {
+							if (videoId !== video.video_id) {
+								e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+							}
+						},
+						onMouseLeave: (e) => {
+							if (videoId !== video.video_id) {
+								e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+							}
+						}
+					},
+						react.createElement("img", {
+							src: `https://img.youtube.com/vi/${video.video_id}/default.jpg`,
+							style: {
+								width: "80px",
+								height: "60px",
+								borderRadius: "4px",
+								objectFit: "cover"
+							}
+						}),
+						react.createElement("div", { style: { flex: 1 } },
+							react.createElement("div", {
+								style: {
+									fontSize: "13px",
+									fontWeight: "500",
+									marginBottom: "4px"
+								}
+							}, video.title || `Video ${idx + 1}`),
+							react.createElement("div", {
+								style: {
+									fontSize: "11px",
+									color: "#aaa"
+								}
+							}, `${getText("videoModal.score")}: ${video.score ? (video.score * 100).toFixed(0) : 'N/A'}%`)
+						),
+						videoId === video.video_id && react.createElement("div", {
+							style: {
+								color: "var(--spice-button)",
+								fontSize: "18px"
+							}
+						}, "✓")
+					)
+				)
+			),
+
+			// Manual Input Section (always show)
+			react.createElement("div", {
+				style: { marginBottom: "20px" }
+			},
+				react.createElement("label", { 
+					style: { 
+						display: "block", 
+						marginBottom: "8px", 
+						fontSize: "13px",
+						fontWeight: "bold",
+						color: "var(--spice-button)"
+					} 
+				}, getText("videoModal.inputId")),
+				react.createElement("input", {
+					type: "text",
+					placeholder: getText("videoModal.placeholder"),
+					value: manualInput || videoId,
+					onChange: (e) => {
+						const val = e.target.value.trim();
+						setManualInput(val);
+						// Auto-extract video ID
+						const urlMatch = val.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+						if (urlMatch) {
+							setVideoId(urlMatch[1]);
+						} else if (val.length === 11 && /^[a-zA-Z0-9_-]{11}$/.test(val)) {
+							setVideoId(val);
+						}
+					},
+					style: { 
+						width: "100%", 
+						padding: "10px", 
+						borderRadius: "6px", 
+						border: "1px solid #555", 
+						background: "#222", 
+						color: "#fff",
+						fontSize: "13px"
+					}
+				}),
+				videoId && videoId !== manualInput && react.createElement("div", {
+					style: {
+						marginTop: "8px",
+						padding: "8px",
+						background: "rgba(29,185,84,0.1)",
+						borderRadius: "4px",
+						fontSize: "11px",
+						color: "#1db954"
+					}
+				}, `✓ ${getText("videoModal.detectedId")}: ${videoId}`)
+			),
+
+				react.createElement("div", { 
+					style: { marginBottom: "25px" } 
+				},
+					react.createElement("div", {
+						style: {
+							display: "flex",
+							justifyContent: "space-between",
+							alignItems: "center",
+							marginBottom: "10px"
+						}
+					},
+						react.createElement("div", {
+							style: {
+								display: "flex",
+								alignItems: "center",
+								gap: "10px"
+							}
+						},
+							react.createElement("label", { 
+								style: { 
+									fontSize: "13px",
+									fontWeight: "bold",
+									margin: 0
+								} 
+							}, getText("videoModal.totalOffset")),
+							react.createElement("input", {
+								type: "number",
+								step: "0.1",
+								value: parseFloat((baseOffset + nudge).toFixed(2)),
+								onChange: (e) => {
+									setBaseOffset(parseFloat(e.target.value) || 0);
+									setNudge(0);
+									setSliderTouched(true);
+								},
+								style: {
+									width: "80px",
+									padding: "4px",
+									borderRadius: "4px",
+									border: "1px solid #555",
+									background: "var(--spice-card)",
+									color: "var(--spice-text)",
+									fontSize: "13px",
+									fontWeight: "bold",
+									textAlign: "center"
+								}
+							}),
+							react.createElement("span", { style: { fontSize: "12px", color: "#888" } }, "s")
+						)
+					),
+
+					react.createElement("input", {
+						type: "range",
+						min: "-10",
+						max: "10",
+						step: "0.1",
+						value: nudge,
+						onChange: (e) => {
+							setNudge(parseFloat(e.target.value));
+							setSliderTouched(true);
+						},
+						style: {
+							width: "100%",
+							height: "6px",
+							borderRadius: "3px",
+							outline: "none",
+							background: `linear-gradient(to right, var(--spice-button) 0%, var(--spice-button) ${((nudge + 10) / 20) * 100}%, #555 ${((nudge + 10) / 20) * 100}%, #555 100%)`,
+							marginBottom: "5px"
+						}
+					}),
+					react.createElement("div", {
+						style: {
+							display: "flex",
+							justifyContent: "space-between",
+							fontSize: "10px",
+							color: "#888"
+						}
+					},
+						react.createElement("span", null, "-10s"),
+						react.createElement("span", null, "+10s")
+					)
+				),
+
+			// Action Buttons
+			react.createElement("div", { 
+				style: { 
+					display: "flex", 
+					gap: "10px" 
+				} 
+			},
+			react.createElement("button", {
+				onClick: () => {
+					if (!videoId || videoId.length !== 11) {
+						Spicetify.showNotification(getText("notifications.invalidId"), true, 2000);
+						return;
+					}
+					
+					self.setState({
+						videoBackground: {
+							video_id: videoId,
+							sync_offset: baseOffset + nudge,
+							title: getText("videoModal.manualVideo"),
+							has_subtitles: false
+						}
+					});
+					self.lastVideoFetchUri = null;
+					Spicetify.PopupModal.hide();
+					Spicetify.showNotification(`✓ ${getText("notifications.videoSet", { videoId })}`, false, 2000);
+
+					// Fetch and Sync with Server
+					try {
+						console.log("[Lyrics+] Syncing video. VideoId:", videoId, "SliderTouched:", sliderTouched, "Offset:", baseOffset + nudge);
+						
+						// Call /sync with manual_video_id and manual_offset
+						fetch(`${serverUrl}/sync`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({
+								artist: info.artist,
+								track: info.title,
+								duration: track.duration_ms || 0,
+								firstLyricTime: 0,
+								lyrics: null,
+								manual_video_id: videoId,
+								manual_offset: baseOffset + nudge, // Send final calculated offset
+								force_manual_offset: sliderTouched // Only force if user touched controls
+							})
+						}).then(res => res.json()).then(data => {
+							if (data.status === "success") {
+								console.log("[Lyrics+] Manual video synced:", data);
+								// Update state with synced data
+								self.setState({
+									videoBackground: {
+										video_id: data.video_id,
+										sync_offset: data.sync_offset,
+										title: data.title,
+										has_subtitles: data.has_subtitles || false
+									}
+								});
+								Spicetify.showNotification(`✓ ${getText("notifications.videoSynced", { videoId: data.video_id, offset: data.sync_offset.toFixed(2) })}`, false, 3000);
+							} else {
+								console.warn("[Lyrics+] Sync failed:", data);
+								Spicetify.showNotification(getText("notifications.syncFailed"), true, 2000);
+							}
+						}).catch(err => {
+							console.error("[Lyrics+] Sync error:", err);
+							Spicetify.showNotification(getText("notifications.syncError"), true, 2000);
+						});
+					} catch (e) {
+						console.warn("[Lyrics+] Error syncing manual video:", e);
+					}
+				},
+					style: { 
+						flex: 1, 
+						padding: "12px", 
+						borderRadius: "6px", 
+						background: "var(--spice-button)", 
+						color: "#fff", 
+						border: "none",
+						cursor: "pointer",
+						fontWeight: "bold",
+						fontSize: "14px"
+					}
+				}, getText("videoModal.apply")),
+			react.createElement("button", {
+				className: "btn",
+				onClick: () => {
+					self.lastVideoFetchUri = null;
+					self.setState({ videoBackground: null });
+					Spicetify.PopupModal.hide();
+					Spicetify.showNotification(getText("notifications.videoReset"), false, 2000);
+					
+					// Force re-fetch immediately
+					const track = Spicetify.Player.data.item;
+					const lyrics = self.state.currentLyrics || [];
+					self.fetchVideoBackgroundWithLyrics(track, lyrics);
+				},
+				style: { 
+					flex: 1
+				}
+			}, getText("videoModal.reset"))
+			)
+		);
+	};
+
+	Spicetify.PopupModal.display({
+		title: getText("videoModal.title"),
+		content: react.createElement(ModalContent)
+	});
+}
+
+infoFromTrack(track) {
 		const meta = track?.metadata;
 		if (!meta) {
 			return null;
@@ -348,10 +806,14 @@ class LyricsContainer extends react.Component {
 				...(tempState.hk && { hk: tempState.hk }),
 				...(tempState.tw && { tw: tempState.tw }),
 				...(tempState.musixmatchTranslation && { musixmatchTranslation: tempState.musixmatchTranslation }),
-				...(tempState.neteaseTranslation && { neteaseTranslation: tempState.neteaseTranslation }),
-			});
-			return;
+			...(tempState.neteaseTranslation && { neteaseTranslation: tempState.neteaseTranslation }),
+		});
+		// Fetch video background AFTER lyrics loaded so firstLyricTime is accurate
+		if (CONFIG.visual["video-background"]) {
+			this.fetchVideoBackgroundWithLyrics(track, tempState.synced || []);
 		}
+		return;
+	}
 
 		//Preserve cached translations when not changing songs
 		// CRITICAL: Same fix as above - preserve Gemini translations if they exist
@@ -372,13 +834,20 @@ class LyricsContainer extends react.Component {
 			...(tempState.cn && { cn: tempState.cn }),
 			...(tempState.hk && { hk: tempState.hk }),
 			...(tempState.tw && { tw: tempState.tw }),
-			...(tempState.musixmatchTranslation && { musixmatchTranslation: tempState.musixmatchTranslation }),
-			...(tempState.neteaseTranslation && { neteaseTranslation: tempState.neteaseTranslation }),
-		});
+		...(tempState.musixmatchTranslation && { musixmatchTranslation: tempState.musixmatchTranslation }),
+		...(tempState.neteaseTranslation && { neteaseTranslation: tempState.neteaseTranslation }),
+	});
+	if (CONFIG.visual["video-background"]) {
+		this.fetchVideoBackgroundWithLyrics(track, tempState.synced || []);
 	}
+}
 
 	lyricsSource(lyricsState, mode) {
 		if (!lyricsState) return;
+
+		// Timestamp to verify if this request is still the active one
+		const requestTimestamp = Date.now();
+		this.activeRequestTimestamp = requestTimestamp;
 
 		let lyrics = lyricsState[CONFIG.modes[mode]];
 		//Fallback: if the preferred mode has no lyrics, use any available lyrics
@@ -449,6 +918,7 @@ class LyricsContainer extends react.Component {
 		const displayMode2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
 
 		this.language = originalLanguage;
+		this.modeKey = modeKey; // Save for reset button to use
 		this.displayMode = displayMode1; // Keep for legacy compatibility
 		this.displayMode2 = displayMode2;
 
@@ -482,6 +952,24 @@ class LyricsContainer extends react.Component {
 		if (!this._dmResults[currentUri]) {
 			this._dmResults[currentUri] = { mode1: null, mode2: null };
 		}
+
+		// Settings change detection: If styleKey or pronounKey changed, force re-fetch
+		// but keep displaying old translation until new one arrives
+		const currentStyleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
+		const currentPronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
+		const settingsChanged = this._lastStyleKey !== null && this._lastPronounKey !== null &&
+			(this._lastStyleKey !== currentStyleKey || this._lastPronounKey !== currentPronounKey);
+		
+		if (settingsChanged && this._dmResults[currentUri]) {
+			// Clear cached results for this URI to force re-fetch with new settings
+			// Old translation continues to display via currentLyrics until new arrives
+			this._dmResults[currentUri] = { mode1: null, mode2: null };
+			console.log(`[Lyrics+] Settings changed (${this._lastStyleKey}/${this._lastPronounKey} → ${currentStyleKey}/${currentPronounKey}), re-fetching...`);
+		}
+		
+		// Update tracking for next call
+		this._lastStyleKey = currentStyleKey;
+		this._lastPronounKey = currentPronounKey;
 
 		// Synchronous cache preload: Check localStorage for cached translations BEFORE async calls
 		// This ensures cached translations display immediately without waiting for Promise.then()
@@ -526,8 +1014,8 @@ class LyricsContainer extends react.Component {
 		});
 
 		const updateCombinedLyrics = (force = false) => {
-			// Guard clause to prevent race conditions from previous songs
-			if (this.state.uri !== uri) {
+			// Guard clause to prevent race conditions from previous songs or requests
+			if (this.state.uri !== uri || this.activeRequestTimestamp !== requestTimestamp) {
 				return;
 			}
 
@@ -548,11 +1036,29 @@ class LyricsContainer extends react.Component {
 		// Check if we already have cached results
 		const { mode1: cachedMode1, mode2: cachedMode2 } = getResults();
 
-		// If we have cached results, show them immediately and skip API calls
-		if (cachedMode1 || cachedMode2) {
+		// Debug logging for cache check
+		if (window.lyricsPlusDebug) {
+			console.log("[Lyrics+] lyricsSource debug:", {
+				displayMode1, displayMode2,
+				cachedMode1: !!cachedMode1, cachedMode2: !!cachedMode2,
+				currentUri
+			});
+		}
+
+		// If we have cached results, show them immediately
+		// IMPORTANT: Only return early if ALL active modes are cached
+		// Otherwise proceed to fetch the missing ones
+		const activeMode1 = displayMode1 && displayMode1 !== "none";
+		const activeMode2 = displayMode2 && displayMode2 !== "none";
+		const missingMode1 = activeMode1 && !cachedMode1;
+		const missingMode2 = activeMode2 && !cachedMode2;
+
+		if ((cachedMode1 || cachedMode2)) {
 			updateCombinedLyrics(true);
-			// Important: Don't call processMode again if we already have cache
-			// This prevents race conditions that could overwrite the displayed cache
+		}
+
+		if (!missingMode1 && !missingMode2) {
+			// All active modes are cached, no need to fetch
 			return;
 		}
 
@@ -565,8 +1071,8 @@ class LyricsContainer extends react.Component {
 		const promise2 = processMode(displayMode2, lyrics);
 
 		promise1.then(result => {
-			// Early exit if track changed while translating
-			if (this.state.uri !== uri) return;
+			// Early exit if track changed while translating or request is stale
+			if (this.state.uri !== uri || this.activeRequestTimestamp !== requestTimestamp) return;
 			if (this._dmResults?.[currentUri]) this._dmResults[currentUri].mode1 = result;
 			updateCombinedLyrics(true); // Force update with new result
 		}).catch(error => {
@@ -576,8 +1082,8 @@ class LyricsContainer extends react.Component {
 		});
 
 		promise2.then(result => {
-			// Early exit if track changed while translating
-			if (this.state.uri !== uri) return;
+			// Early exit if track changed while translating or request is stale
+			if (this.state.uri !== uri || this.activeRequestTimestamp !== requestTimestamp) return;
 			if (this._dmResults?.[currentUri]) this._dmResults[currentUri].mode2 = result;
 			updateCombinedLyrics(true); // Force update with new result
 		}).catch(error => {
@@ -687,8 +1193,12 @@ class LyricsContainer extends react.Component {
 		// Process each line to determine what to display
 		const processedLyrics = originalLyrics.map((line, i) => {
 			const originalText = line?.text || '';
-			let translation1 = mode1?.[i]?.text || '';
-			let translation2 = mode2?.[i]?.text || '';
+			// Handle both object format {text: "..."} and string format "..."
+			const rawTrans1 = mode1?.[i];
+			const rawTrans2 = mode2?.[i];
+			
+			let translation1 = (typeof rawTrans1 === 'string' ? rawTrans1 : rawTrans1?.text) || '';
+			let translation2 = (typeof rawTrans2 === 'string' ? rawTrans2 : rawTrans2?.text) || '';
 
 			// If original is a note/placeholder line, never show sub-lines
 			if (isNoteLine(originalText)) {
@@ -825,7 +1335,7 @@ class LyricsContainer extends react.Component {
 					if (duration && !silent) {
 						this.setState({
 							isTranslating: false,
-							translationStatus: { type: 'success', text: `Translated in ${duration}ms` }
+							translationStatus: { type: 'success', text: getText("notifications.translatedIn", { duration }) }
 						});
 						// Auto-hide success message after 3 seconds
 						setTimeout(() => {
@@ -902,7 +1412,7 @@ class LyricsContainer extends react.Component {
 					if (!silent) {
 						this.setState({
 							isTranslating: false,
-							translationStatus: { type: 'error', text: err.message || 'Translation failed' }
+							translationStatus: { type: 'error', text: err.message || getText("notifications.translationFailed") }
 						});
 						// Auto-hide error after 5 seconds
 						setTimeout(() => {
@@ -916,18 +1426,36 @@ class LyricsContainer extends react.Component {
 
 	getTraditionalConversion(lyricsState, lyrics, language, displayMode) {
 		return new Promise((resolve, reject) => {
-			if (!Array.isArray(lyrics)) return reject(new Error("Invalid lyrics format for conversion."));
+			// Debug logging
+			if (window.lyricsPlusDebug) {
+				console.log("[Lyrics+] getTraditionalConversion called:", { language, displayMode, lyricsCount: lyrics?.length, uri: lyricsState?.uri?.split(':').pop() });
+			}
+
+			if (!Array.isArray(lyrics)) {
+				if (window.lyricsPlusDebug) console.log("[Lyrics+] getTraditionalConversion - REJECTED: lyrics is not array");
+				return reject(new Error("Invalid lyrics format for conversion."));
+			}
 
 			const cacheKey = `${lyricsState.uri}:trad:${language}:${displayMode}`;
 			const cached = CacheManager.get(cacheKey);
-			if (cached) return resolve(cached);
+			if (cached) {
+				if (window.lyricsPlusDebug) console.log("[Lyrics+] getTraditionalConversion - CACHE HIT, returning cached");
+				// Handle legacy cache format (string array)
+				if (Array.isArray(cached) && cached.length > 0 && typeof cached[0] === 'string') {
+					return resolve(cached.map(t => ({ text: t })));
+				}
+				return resolve(cached);
+			}
 
 			// De-duplicate concurrent calls per (uri, language, mode)
 			this._inflightTrad = this._inflightTrad || new Map();
 			const inflightKey = `${lyricsState.uri}:trad:${language}:${displayMode}`;
 			if (this._inflightTrad.has(inflightKey)) {
+				if (window.lyricsPlusDebug) console.log("[Lyrics+] getTraditionalConversion - INFLIGHT HIT, waiting for existing request");
 				return this._inflightTrad.get(inflightKey).then(resolve).catch(reject);
 			}
+
+			if (window.lyricsPlusDebug) console.log("[Lyrics+] getTraditionalConversion - Proceeding to translateLyrics");
 
 			// Show pending notification if conversion takes longer than 3s
 			const pendingTimer = setTimeout(() => {
@@ -942,8 +1470,15 @@ class LyricsContainer extends react.Component {
 			const inflightPromise = this.translateLyrics(language, lyrics, displayMode)
 				.then((translated) => {
 					if (translated !== undefined && translated !== null) {
-						CacheManager.set(cacheKey, translated);
-						return translated;
+						// Standardize format: Convert array of strings to array of objects {text: "..."}
+						// consistent with Gemini response format for optimizeTranslations
+						let formattedResult = translated;
+						if (Array.isArray(translated) && translated.length > 0 && typeof translated[0] === 'string') {
+							formattedResult = translated.map(t => ({ text: t }));
+						}
+
+						CacheManager.set(cacheKey, formattedResult);
+						return formattedResult;
 					}
 					throw new Error("Empty result from conversion.");
 				})
@@ -1021,6 +1556,11 @@ class LyricsContainer extends react.Component {
 	}
 
 	async translateLyrics(language, lyrics, targetConvert) {
+		// Debug logging
+		if (window.lyricsPlusDebug) {
+			console.log("[Lyrics+] translateLyrics called:", { language, targetConvert, lyricsCount: lyrics?.length });
+		}
+
 		if (!language || !Array.isArray(lyrics) || String(targetConvert).startsWith("gemini")) {
 			return lyrics;
 		}
@@ -1227,38 +1767,95 @@ class LyricsContainer extends react.Component {
 		return cachedUris.includes(uri);
 	}
 
-	resetTranslationCache(uri) {
-		// Clear translation cache for this URI (in-memory)
-		const clearedCount = CacheManager.clearByUri(uri);
-
-		// Clear persistent localStorage cache (local-lyrics)
-		this.deleteLocalLyrics(uri);
-
-		// Clear persistent Gemini cache from localStorage
+	/**
+	 * Reset translation cache for a URI
+	 * @param {string} uri - Spotify track URI
+	 * @param {string[]|null} modesToClear - Optional specific modes to clear (e.g., ["gemini_vi", "gemini_romaji"]).
+	 *                                       If null, clears ALL cache for the URI.
+	 */
+	resetTranslationCache(uri, modesToClear = null) {
+		const styleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
+		const pronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
+		
+		let clearedCount = 0;
 		let geminiClearedCount = 0;
-		try {
-			const persistKey = `${APP_NAME}:gemini-cache`;
-			const persistedCache = JSON.parse(localStorage.getItem(persistKey)) || {};
-			const keysToDelete = Object.keys(persistedCache).filter(key => key.includes(uri));
-			keysToDelete.forEach(key => {
-				delete persistedCache[key];
-				geminiClearedCount++;
+		
+		if (modesToClear && modesToClear.length > 0) {
+			// Selective clear: only specified modes
+			modesToClear.forEach(mode => {
+				if (!mode || mode === "none") return;
+				const cacheKey = `${uri}:${mode}:${styleKey}:${pronounKey}`;
+				if (CacheManager.delete(cacheKey)) clearedCount++;
 			});
-			localStorage.setItem(persistKey, JSON.stringify(persistedCache));
-		} catch (e) {
-			console.warn("[Lyrics+] Failed to clear persisted Gemini cache:", e);
-		}
-
-		// Clear progressive results for this track
-		if (this._dmResults && this._dmResults[uri]) {
-			delete this._dmResults[uri];
+			
+			// Clear from persistent localStorage (gemini-cache)
+			try {
+				const persistKey = `${APP_NAME}:gemini-cache`;
+				const persistedCache = JSON.parse(localStorage.getItem(persistKey)) || {};
+				modesToClear.forEach(mode => {
+					if (!mode || mode === "none") return;
+					const cacheKey = `${uri}:${mode}:${styleKey}:${pronounKey}`;
+					if (persistedCache[cacheKey]) {
+						delete persistedCache[cacheKey];
+						geminiClearedCount++;
+					}
+				});
+				localStorage.setItem(persistKey, JSON.stringify(persistedCache));
+			} catch (e) {
+				console.warn("[Lyrics+] Failed to clear persisted Gemini cache:", e);
+			}
+			
+			// Clear only the specified modes from _dmResults
+			if (this._dmResults && this._dmResults[uri]) {
+				// Use saved modeKey from lyricsSource() for correct CONFIG lookup
+				const mKey = this.modeKey || "gemini";
+				const currentMode1 = CONFIG.visual[`translation-mode:${mKey}`];
+				const currentMode2 = CONFIG.visual[`translation-mode-2:${mKey}`];
+				
+				modesToClear.forEach(mode => {
+					if (mode === currentMode1) this._dmResults[uri].mode1 = null;
+					if (mode === currentMode2) this._dmResults[uri].mode2 = null;
+				});
+			}
+			
+			// Clear currentLyrics state to force UI refresh showing original lyrics
+			// This ensures the translation lines disappear immediately while re-fetching
+			this.setState({ currentLyrics: null });
+		} else {
+			// Full clear: all translations for this URI (original behavior)
+			clearedCount = CacheManager.clearByUri(uri);
+			this.deleteLocalLyrics(uri);
+			
+			// Clear ALL Gemini cache entries for this URI
+			try {
+				const persistKey = `${APP_NAME}:gemini-cache`;
+				const persistedCache = JSON.parse(localStorage.getItem(persistKey)) || {};
+				const keysToDelete = Object.keys(persistedCache).filter(key => key.includes(uri));
+				keysToDelete.forEach(key => {
+					delete persistedCache[key];
+					geminiClearedCount++;
+				});
+				localStorage.setItem(persistKey, JSON.stringify(persistedCache));
+			} catch (e) {
+				console.warn("[Lyrics+] Failed to clear persisted Gemini cache:", e);
+			}
+			
+			// Clear all progressive results for this track
+			if (this._dmResults && this._dmResults[uri]) {
+				delete this._dmResults[uri];
+			}
 		}
 
 		// Clear inflight Gemini requests for this track
 		if (this._inflightGemini) {
 			const keysToDelete = [];
 			for (const [key] of this._inflightGemini) {
-				if (key.includes(uri)) {
+				if (modesToClear) {
+					// Selective: only if mode matches
+					if (modesToClear.some(mode => key.includes(`:${mode}:`))) {
+						keysToDelete.push(key);
+					}
+				} else if (key.includes(uri)) {
 					keysToDelete.push(key);
 				}
 			}
@@ -1271,33 +1868,33 @@ class LyricsContainer extends react.Component {
 			this.state.cn || this.state.hk || this.state.tw ||
 			this.state.musixmatchTranslation || this.state.neteaseTranslation;
 
-		// Reset translation states
-		this.setState({
-			romaji: null,
-			furigana: null,
-			hiragana: null,
-			katakana: null,
-			hangul: null,
-			romaja: null,
-			cn: null,
-			hk: null,
-			tw: null,
-			musixmatchTranslation: null,
-			neteaseTranslation: null,
-		});
+		// Only reset full translation states if doing full clear
+		if (!modesToClear) {
+			this.setState({
+				romaji: null,
+				furigana: null,
+				hiragana: null,
+				katakana: null,
+				hangul: null,
+				romaja: null,
+				cn: null,
+				hk: null,
+				tw: null,
+				musixmatchTranslation: null,
+				neteaseTranslation: null,
+			});
+		}
 
 		// Force re-process lyrics with current display modes
 		const currentMode = this.getCurrentMode();
 		this.lyricsSource(this.state, currentMode);
 
 		const totalCleared = clearedCount + geminiClearedCount;
-		if (totalCleared > 0) {
-			Spicetify.showNotification(`✓ Cleared ${totalCleared} translation cache entries`, false, 2000);
-		} else if (hasTranslations) {
-			Spicetify.showNotification("✓ Translation state reset", false, 2000);
-		} else {
-			Spicetify.showNotification("✓ Translation cache cleared (no entries found)", false, 2000);
-		}
+		// Show status in TranslatingIndicator instead of popup notification
+		const statusText = (totalCleared > 0 || modesToClear) ? "Re-translating..." : "Cache cleared";
+		this.setState({ translationStatus: { type: 'success', text: statusText } });
+		// Auto-clear status after 1.5s
+		setTimeout(() => this.setState({ translationStatus: null }), 1500);
 	}
 
 	processLyricsFromFile(event) {
@@ -1588,11 +2185,20 @@ class LyricsContainer extends react.Component {
 			const isEnabled = !this.state.isFullscreen;
 			if (isEnabled) {
 				document.body.append(this.fullscreenContainer);
-				document.documentElement.requestFullscreen();
+				document.documentElement.requestFullscreen().catch((e) => {
+					console.warn("[Lyrics+] Failed to enter fullscreen:", e);
+					// Revert state if request fails
+					this.setState({ isFullscreen: false });
+					this.fullscreenContainer.remove();
+				});
 				this.mousetrap.bind("esc", this.toggleFullscreen);
 			} else {
 				this.fullscreenContainer.remove();
-				document.exitFullscreen();
+				// Check if we are actually in fullscreen before trying to exit
+				// This prevents the "Document not active" error when ESC key already exited native fullscreen
+				if (document.fullscreenElement) {
+					document.exitFullscreen().catch((e) => console.warn("[Lyrics+] Failed to exit fullscreen:", e));
+				}
 				this.mousetrap.unbind("esc");
 			}
 
@@ -1663,14 +2269,23 @@ class LyricsContainer extends react.Component {
 			};
 		}
 
-		this.styleVariables = {
-			...this.styleVariables,
-			"--lyrics-align-text": CONFIG.visual.alignment,
-			"--lyrics-font-size": `${CONFIG.visual["font-size"]}px`,
-			"--animation-tempo": this.state.tempo,
-		};
+	this.styleVariables = {
+		...this.styleVariables,
+		"--lyrics-align-text": CONFIG.visual.alignment,
+		"--lyrics-font-size": `${CONFIG.visual["font-size"]}px`,
+		"--animation-tempo": this.state.tempo,
+		"--video-blur": `${CONFIG.visual["video-background-blur"]}px`,
+		"--video-dim": `${CONFIG.visual["video-background-dim"]}%`,
+	};
 
-		this.mousetrap.reset();
+	if (CONFIG.visual["video-background"]) {
+		// If video is enabled, make background semi-transparent if it was solid
+		if (!CONFIG.visual["transparent-background"]) {
+			this.styleVariables["--lyrics-color-background"] = "rgba(0, 0, 0, 0.5)";
+		}
+	}
+
+	this.mousetrap.reset();
 		this.mousetrap.bind(CONFIG.visual["fullscreen-key"], this.toggleFullscreen);
 	}
 
@@ -1748,7 +2363,10 @@ class LyricsContainer extends react.Component {
 		let showTranslationButton;
 
 		// Get current display modes to track changes
-		const originalLanguage = this.provideLanguageCode(this.state.currentLyrics);
+		// CRITICAL: Detect language directly from original raw lyrics to ensure CJK menu persists after Gemini translation.
+		// Do NOT use provideLanguageCode here as it may return cached/stale language that was reset.
+		const originalLyrics = this.state.synced || this.state.unsynced;
+		const originalLanguage = originalLyrics ? Utils.detectLanguage(originalLyrics) : null;
 		const friendlyLanguage = originalLanguage && new Intl.DisplayNames(["en"], { type: "language" }).of(originalLanguage.split("-")[0])?.toLowerCase();
 
 		// For Gemini mode, use generic keys if no specific language detected
@@ -1833,7 +2451,7 @@ class LyricsContainer extends react.Component {
 					{
 						className: "lyrics-lyricsContainer-LyricsUnavailableMessage",
 					},
-					this.state.isLoading ? LoadingIcon : "(• _ • )"
+					this.state.isLoading ? LoadingIcon : "(。_。)"
 				)
 			);
 		}
@@ -1844,25 +2462,38 @@ class LyricsContainer extends react.Component {
 			"div",
 			{
 				className: `lyrics-lyricsContainer-LyricsContainer${CONFIG.visual["fade-blur"] ? " blur-enabled" : ""}${fadLyricsContainer ? " fad-enabled" : ""
-					}`,
+					}${this.state.videoBackground && CONFIG.visual["video-background"] ? " video-bg-active" : ""}`,
 				style: this.styleVariables,
 				ref: (el) => {
 					if (!el) return;
 					el.onmousewheel = this.onFontSizeChange;
 				},
 			},
-			react.createElement("div", {
-				id: "lyrics-plus-gradient-background",
-				style: backgroundStyle,
-			}),
-			react.createElement("div", {
-				className: "lyrics-lyricsContainer-LyricsBackground",
-			}),
+		react.createElement("div", {
+			id: "lyrics-plus-gradient-background",
+			style: backgroundStyle,
+		}),
+		// Video Background (using YT.Player API)
+		this.state.videoBackground && CONFIG.visual["video-background"] && window.VideoBackground && react.createElement(window.VideoBackground, {
+			trackUri: this.state.uri,
+			brightness: CONFIG.visual["video-background-dim"],
+			blurAmount: CONFIG.visual["video-background-blur"],
+			scale: CONFIG.visual["video-background-scale"],
+			videoInfo: this.state.videoBackground
+		}),
+		this.state.provider !== "local" && react.createElement(CreditFooter, {
+			provider: this.state.provider,
+			copyright: this.state.copyright,
+			currentLang: CONFIG.visual["ui-language"]
+		}),
+		react.createElement("div", {
+			className: "lyrics-lyricsContainer-LyricsBackground",
+		}),
 			// Translation in progress indicator
 			react.createElement(TranslatingIndicator, {
 				isVisible: this.state.isTranslating,
 				status: this.state.translationStatus,
-				text: "Translating..."
+				currentLang: CONFIG.visual["ui-language"]
 			}),
 			react.createElement(
 				"div",
@@ -1872,7 +2503,7 @@ class LyricsContainer extends react.Component {
 				// Pre-translation Indicator
 				this.state.preTranslated && react.createElement(
 					Spicetify.ReactComponent.TooltipWrapper,
-					{ label: "Next song pre-translated" },
+					{ label: getText("tooltips.preTransNext") },
 					react.createElement("div", {
 						className: "lyrics-config-button",
 						style: { cursor: "default", color: "var(--spice-button)" }
@@ -1888,30 +2519,47 @@ class LyricsContainer extends react.Component {
 						musixmatch: this.state.musixmatchTranslation !== null,
 						netease: this.state.neteaseTranslation !== null,
 					},
+					currentLang: CONFIG.visual["ui-language"]
 				}),
-				react.createElement(AdjustmentsMenu, { mode }),
+				react.createElement(AdjustmentsMenu, { mode, currentLang: CONFIG.visual["ui-language"] }),
+				// Video Background Settings Button
+				CONFIG.visual["video-background"] && react.createElement(
+					Spicetify.ReactComponent.TooltipWrapper,
+					{ label: getText("tooltips.videoSettings") },
+					react.createElement("button", {
+						className: "lyrics-config-button",
+						onClick: () => {
+							this.openVideoSettingsModal();
+						},
+						style: { color: "var(--spice-button)" }
+					}, react.createElement("svg", {
+						width: 16, height: 16, viewBox: "0 0 16 16", fill: "currentColor",
+						dangerouslySetInnerHTML: { __html: '<path d="M14.5 13.5h-13A.5.5 0 011 13V3a.5.5 0 01.5-.5h13a.5.5 0 01.5.5v10a.5.5 0 01-.5.5zM2 12h12V4H2v8z"/><path d="M6 6l4 2-4 2V6z"/>' }
+					}))
+				),
 				react.createElement(
 					Spicetify.ReactComponent.TooltipWrapper,
 					{
-						label: this.state.isCached ? "Lyrics cached" : "Cache lyrics",
+						label: this.state.isCached ? getText("tooltips.lyricsCached") : getText("tooltips.cacheLyrics"),
 					},
 					react.createElement(
 						"button",
 						{
 							className: "lyrics-config-button",
+							style: { color: "var(--spice-button)" },
 							onClick: () => {
 								const { synced, unsynced, karaoke, genius } = this.state;
 								if (!synced && !unsynced && !karaoke && !genius) {
-									Spicetify.showNotification("No lyrics available to cache", true, 2000);
+									Spicetify.showNotification(getText("notifications.noLyricsCache"), true, 2000);
 									return;
 								}
 
 								if (this.state.isCached) {
 									this.deleteLocalLyrics(this.currentTrackUri);
-									Spicetify.showNotification("✓ Lyrics cache deleted", false, 2000);
+									Spicetify.showNotification(`✓ ${getText("notifications.cacheDeleted")}`, false, 2000);
 								} else {
 									this.saveLocalLyrics(this.currentTrackUri, { synced, unsynced, karaoke, genius });
-									Spicetify.showNotification("✓ Lyrics cached successfully", false, 2000);
+									Spicetify.showNotification(`✓ ${getText("notifications.cacheSuccess")}`, false, 2000);
 								}
 							},
 						},
@@ -1929,12 +2577,13 @@ class LyricsContainer extends react.Component {
 				react.createElement(
 					Spicetify.ReactComponent.TooltipWrapper,
 					{
-						label: "Load lyrics from file",
+						label: getText("tooltips.loadFile"),
 					},
 					react.createElement(
 						"button",
 						{
 							className: "lyrics-config-button",
+							style: { color: "var(--spice-button)" },
 							onClick: () => {
 								this.fileInputRef.current.click();
 							},
@@ -1978,14 +2627,22 @@ class LyricsContainer extends react.Component {
 				react.createElement(
 					Spicetify.ReactComponent.TooltipWrapper,
 					{
-						label: "Reset translation cache",
+						label: getText("tooltips.resetCache"),
 					},
 					react.createElement(
 						"button",
 						{
 							className: "lyrics-config-button",
+							style: { color: "var(--spice-button)" },
 							onClick: () => {
-								this.resetTranslationCache(this.currentTrackUri);
+								// Use saved modeKey from lyricsSource() - this is the correct key for CONFIG lookup
+								const modeKey = this.modeKey || "gemini";
+								const mode1 = CONFIG.visual[`translation-mode:${modeKey}`];
+								const mode2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
+								const modesToClear = [mode1, mode2].filter(m => m && m !== "none");
+								
+								console.log(`[Lyrics+] Clearing cache for modes:`, modesToClear, `(modeKey: ${modeKey})`);
+								this.resetTranslationCache(this.currentTrackUri, modesToClear.length > 0 ? modesToClear : null);
 							},
 						},
 						react.createElement("svg", {
@@ -2004,12 +2661,13 @@ class LyricsContainer extends react.Component {
 				react.createElement(
 					Spicetify.ReactComponent.TooltipWrapper,
 					{
-						label: "Open Settings",
+						label: getText("tooltips.openSettings"),
 					},
 					react.createElement(
 						"button",
 						{
 							className: "lyrics-config-button",
+							style: { color: "var(--spice-button)" },
 							onClick: () => {
 								openConfig();
 							},
