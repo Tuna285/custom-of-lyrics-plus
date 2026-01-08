@@ -51,6 +51,9 @@ $filesToDownload = @(
     "Components.js",
     "ProviderLRCLIB.js",
     "ProviderMusixmatch.js",
+    "I18n.js",
+    "LangEN.js",
+    "LangVI.js",
     "ProviderNetease.js",
     "ProviderGenius.js",
     "Providers.js",
@@ -67,15 +70,6 @@ $filesToDownload = @(
     "LICENSE",
     "install.ps1",
     "uninstall.ps1"
-)
-
-# Asset files (in assets/ folder)
-$assetsToDownload = @(
-    "preview.gif",
-    "chinese_conversion.png",
-    "japanese_conversion.png",
-    "korean_conversion.png",
-    "manual_download.png"
 )
 
 # [0/6] Close Spotify to prevent file lock issues
@@ -159,14 +153,13 @@ while (-not $removed -and $retryCount -lt $maxRetries) {
 }
 
 New-Item -ItemType Directory -Path $appDir -Force | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $appDir "assets") -Force | Out-Null
 Write-Host "  [OK] Created: $appDir" -ForegroundColor Green
 
 # [4/6] Download files
 Write-Host "[4/6] Downloading files..." -ForegroundColor Yellow
+Write-Host "  Downloading..." -ForegroundColor DarkGray
 
 $downloadedCount = 0
-$totalFiles = $filesToDownload.Count + $assetsToDownload.Count
 
 foreach ($file in $filesToDownload) {
     $url = "$baseUrl/$file"
@@ -174,25 +167,9 @@ foreach ($file in $filesToDownload) {
     try {
         Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing -ErrorAction Stop
         $downloadedCount++
-        $percent = [math]::Round(($downloadedCount / $totalFiles) * 100)
-        Write-Host "  [$percent%] Downloaded: $file" -ForegroundColor DarkGray
     }
     catch {
-        Write-Host "  [WARN] Failed to download: $file (optional)" -ForegroundColor DarkYellow
-    }
-}
-
-foreach ($asset in $assetsToDownload) {
-    $url = "$baseUrl/assets/$asset"
-    $dest = Join-Path $appDir "assets\$asset"
-    try {
-        Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing -ErrorAction Stop
-        $downloadedCount++
-        $percent = [math]::Round(($downloadedCount / $totalFiles) * 100)
-        Write-Host "  [$percent%] Downloaded: assets/$asset" -ForegroundColor DarkGray
-    }
-    catch {
-        Write-Host "  [WARN] Failed to download: assets/$asset (optional)" -ForegroundColor DarkYellow
+        Write-Host "  [WARN] Failed: $file" -ForegroundColor DarkYellow
     }
 }
 

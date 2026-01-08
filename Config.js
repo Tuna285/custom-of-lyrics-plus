@@ -90,12 +90,12 @@ const UpdateChecker = {
     VERSION_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/version.json",
     RAW_BASE_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main",
     INSTALL_COMMAND: "iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/install.ps1 | iex",
-    CURRENT_VERSION: "1.2.6",
+    CURRENT_VERSION: "1.2.7",
     CHECK_INTERVAL: 0,
 
     // List of files to download for update
     UPDATE_FILES: [
-        "index.js", "style.css", "manifest.json", "Utils.js", "Config.js", "Cache.js",
+        "index.js", "style.css", "manifest.json", "Utils.js", "Config.js", "Cache.js", "I18n.js", "LangEN.js", "LangVI.js",
         "Prompts.js", "GeminiClient.js", "Translator.js", "Components.js",
         "ProviderLRCLIB.js", "ProviderMusixmatch.js", "ProviderNetease.js",
         "ProviderGenius.js", "Providers.js", "SyncedLyrics.js", "UnsyncedLyrics.js",
@@ -398,6 +398,7 @@ const GENIUS = 3;
 const CONFIG = {
     visual: {
         "debug-mode": ConfigUtils.getPersisted("lyrics-plus:visual:debug-mode") === "true",
+        "ui-language": ConfigUtils.getPersisted("lyrics-plus:visual:ui-language") || "en",
         "playbar-button": ConfigUtils.getPersisted("lyrics-plus:visual:playbar-button") === "true",
         colorful: ConfigUtils.getPersisted("lyrics-plus:visual:colorful") === "true",
         "gradient-background": ConfigUtils.getPersisted("lyrics-plus:visual:gradient-background") === "true",
@@ -412,6 +413,7 @@ const CONFIG = {
         "lines-before": ConfigUtils.getPersisted("lyrics-plus:visual:lines-before") || "0",
         "lines-after": ConfigUtils.getPersisted("lyrics-plus:visual:lines-after") || "2",
         "font-size": ConfigUtils.getPersisted("lyrics-plus:visual:font-size") || "32",
+        "lyric-position": Number(ConfigUtils.getPersisted("lyrics-plus:visual:lyric-position")) || 50,
         "translate:translated-lyrics-source": ConfigUtils.getPersisted("lyrics-plus:visual:translate:translated-lyrics-source") || "geminiVi",
         "translate:display-mode": ConfigUtils.getPersisted("lyrics-plus:visual:translate:display-mode") || "replace",
         "translate:detect-language-override": ConfigUtils.getPersisted("lyrics-plus:visual:translate:detect-language-override") || "off",
@@ -443,6 +445,13 @@ const CONFIG = {
         "pre-translation": ConfigUtils.getPersisted("lyrics-plus:visual:pre-translation") !== "false",
         "global-delay": Number(ConfigUtils.getPersisted("lyrics-plus:visual:global-delay")) || 0,
         delay: 0,
+        // TODO: Video Background feature is WIP - change to ConfigUtils.get(...) when ready
+        "video-background": false, // DISABLED - Feature not ready for release
+        "video-background-server": localStorage.getItem("lyrics-plus:visual:video-background-server") || "http://localhost:8000",
+        "video-background-blur": Number(localStorage.getItem("lyrics-plus:visual:video-background-blur")) || 0,
+        "video-background-dim": Number(localStorage.getItem("lyrics-plus:visual:video-background-dim")) || 50,
+        "video-host": localStorage.getItem("lyrics-plus:visual:video-host") || "www.youtube.com",
+        "video-background-scale": Number(localStorage.getItem("lyrics-plus:visual:video-background-scale")) || 1.0,
     },
     providers: {
         lrclib: {
@@ -481,6 +490,10 @@ const CONFIG = {
     modes: ["synced", "unsynced", "genius"],
     locked: localStorage.getItem("lyrics-plus:lock-mode") || "-1",
 };
+
+CONFIG.visual["video-background-blur"] = Number.parseInt(CONFIG.visual["video-background-blur"]);
+CONFIG.visual["video-background-dim"] = Number.parseInt(CONFIG.visual["video-background-dim"]);
+
 
 try {
     CONFIG.providersOrder = JSON.parse(CONFIG.providersOrder);

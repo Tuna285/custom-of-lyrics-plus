@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.7] - 2026-01-08
+
+### Added
+
+- **Vietnamese Language Support**: Full interface translation is now available! (Đã hỗ trợ hoàn toàn Tiếng Việt 🇻🇳).
+
+### Fixed / Improved
+
+- **Localization Engine**: Implemented `I18n.js` for better performance and future language support.
+- **Cache Logic**: Resetting translation cache now only affects active Display Modes.
+- **Cache Persistence**: Cached translations are now preserved when changing Style or Pronoun settings.
+- **General**: Added and improved various minor functions for better stability.
+
 ## [1.2.6] - 2026-01-05
 
 ### Fixed

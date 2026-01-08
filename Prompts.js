@@ -28,15 +28,21 @@ const Prompts = {
     buildGemma3Prompt({ artist, title, text, styleKey = 'smart_adaptive', pronounKey = 'default', wantSmartPhonetic = false }) {
         const lines = text.split('\n');
         const lineCount = lines.length;
-        // Numbered list format for better line anchoring (prevents shifting)
-        const numberedInput = lines.map((l, i) => `${i + 1}. ${l}`).join('\n');
+        // Compact tag format for strict line anchoring (prevents merging/shifting)
+        const taggedInput = lines.map((l, i) => `<${i + 1}>${l}</${i + 1}>`).join('\n');
 
         if (wantSmartPhonetic) {
             return `Task: Phonetic Transcription (Karaoke System).
 Total lines: ${lineCount}
 
+OUTPUT FORMAT:
+<1>[romanized line 1]</1>
+<2>[romanized line 2]</2>
+...
+<${lineCount}>[romanized line ${lineCount}]</${lineCount}>
+
 Rules:
-1. Output a NUMBERED LIST matching input line numbers exactly.
+1. Output EXACTLY ${lineCount} numbered tags from <1> to <${lineCount}>.
 2. Transcription Standards:
    - Japanese: Hepburn Romaji with macrons (ā, ē, ī, ō, ū). Example: "東京" → "tōkyō"
    - Korean: Revised Romanization with word spacing. Example: "사랑해요" → "sarang haeyo"
@@ -44,18 +50,19 @@ Rules:
 3. Keep punctuation/English unchanged.
 4. Romanize sound effects (e.g., "Ah" not "Tiếng hét").
 5. All lowercase, NO capitalization.
-6. Numbers → romanized words: "2000" → "ni-sen" (JP), "i-cheon" (KR), "liǎngqiān" (CN)
+6. Empty input → empty tag: <5></5>
+7. Mirror quotation marks (「」, "", '') EXACTLY. Do NOT auto-close unclosed quotes.
 
 Input (${lineCount} lines):
-${numberedInput}
+${taggedInput}
 
-Output (${lineCount} lines, numbered 1-${lineCount}):`;
+Output (${lineCount} tags):`;
         }
 
         const STYLE_DESC = {
             "smart_adaptive": {
                 name: "Smart Adaptive",
-                description: "Natural Vietnamese. Complete sentences. Focus on grammatical smoothness without altering the original meaning.",
+                description: "Natural Vietnamese. You may REPHRASE metaphors/idioms to fit the context (e.g., 'plastic voice' → 'giọng hát vô hồn', NOT 'giọng nhựa'). Prioritize EMOTIONAL IMPACT over literal accuracy while keeping the original meaning.",
             },
             "poetic_standard": {
                 name: "Poetic & Romantic",
@@ -84,7 +91,14 @@ Output (${lineCount} lines, numbered 1-${lineCount}):`;
 
         let pronoun = "AUTO: Prefer neutral phrasing. If pronoun needed, keep consistent throughout.";
         if (pronounKey !== 'default' && PRONOUN_MODES[pronounKey]) {
-            pronoun = `FORCE pronouns: "${PRONOUN_MODES[pronounKey].value}".`;
+            const pair = PRONOUN_MODES[pronounKey].value.split(" - ");
+            const first = pair[0]; // e.g., "Anh"
+            const second = pair[1]; // e.g., "Em"
+            pronoun = `PRONOUN LOCK (MANDATORY):
+- First person (I/me/my) → "${first}"
+- Second person (you/your) → "${second}"
+- Example: "I love you" → "${first} yêu ${second}"
+- DO NOT swap or use any other pronouns. This is a hard rule.`;
         }
 
         return `You are a Vietnamese Lyrics Adapter.
@@ -93,40 +107,41 @@ Style: ${style}
 Pronoun: ${pronoun}
 
 CRITICAL: LINE-BY-LINE MAPPING
-- Input has ${lineCount} numbered lines (1-${lineCount})
-- Output MUST have exactly ${lineCount} numbered lines
-- Line N input → Line N output. NEVER merge, split, or shift lines.
+- Input has ${lineCount} lines in <N>...</N> tags
+- Output MUST have exactly ${lineCount} matching tags
+- <N> input → <N> output. NEVER merge, split, or skip lines.
 
-OUTPUT FORMAT (NUMBERED LIST):
-1. [Vietnamese translation of line 1]
-2. [Vietnamese translation of line 2]
+OUTPUT FORMAT:
+<1>[Vietnamese translation of line 1]</1>
+<2>[Vietnamese translation of line 2]</2>
 ...
-${lineCount}. [Vietnamese translation of line ${lineCount}]
+<${lineCount}>[Vietnamese translation of line ${lineCount}]</${lineCount}>
 
 RULES:
-1) Empty input line → empty output (just the number, e.g., "5. ")
+1) Empty input → empty tag: <5></5>
 2) Keep tags as-is: [Intro], [Chorus], (Instrumental)
 3) Keep English phrases unchanged. Translate CJK to Vietnamese.
-4) Map emotional interjections (e.g., 嗚呼, 呜呼, 아) to "Ah". Do NOT use archaic words like "Than ôi" or "Ôi". Keep vocal sounds (Yeah, La la, Oh) unchanged.
+4) Map emotional interjections (嗚呼, 呜呼, 아) to "Ah". Do NOT use "Than ôi" or "Ôi".
 5) NO hallucination: Don't add imagery, emotions, or details not in source.
-6) NO conversational fillers. Do NOT say "Here is the translation". Start directly with "1. ".
-7) STRICTLY preserve line count. If line 5 is empty input, output "5. " (empty).
+6) Start directly with <1>. NO preamble text.
+7) STRICTLY output ${lineCount} tags from <1> to <${lineCount}>.
+8) Mirror quotation marks (「」, "", '') EXACTLY. Do NOT auto-close unclosed quotes.
 
 EXAMPLE (3-line input):
 Input:
-1. 君を愛してる
-2. 
-3. I love you
+<1>君を愛してる</1>
+<2></2>
+<3>I love you</3>
 
 Output:
-1. Anh yêu em
-2. 
-3. I love you
+<1>Anh yêu em</1>
+<2></2>
+<3>I love you</3>
 
 Input (${lineCount} lines):
-${numberedInput}
+${taggedInput}
 
-Output (${lineCount} lines):`;
+Output (${lineCount} tags):`;
     },
 
     buildMinimalFallbackPrompt({ artist, title, text }) {
@@ -231,14 +246,20 @@ Based on Step 1, select **ONE** primary pronoun pair and **STICK TO IT** for the
 
 `;
         } else if (pronounKey && PRONOUN_MODES[pronounKey]?.value) {
+            const pair = PRONOUN_MODES[pronounKey].value.split(" - ");
+            const first = pair[0]; // e.g., "Anh"
+            const second = pair[1]; // e.g., "Em"
             pronounSection = `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔒 PRONOUN OVERRIDE (MANDATORY - HIGHEST PRIORITY) 🔒
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-You MUST use pronouns: "${PRONOUN_MODES[pronounKey].value}" for ALL ${lineCount} lines.
-- If monologue (no second person), use only the first pronoun from the pair.
-- This overrides ALL other pronoun suggestions.
+PRONOUN LOCK (MANDATORY):
+- First person (I/me/my) → "${first}"
+- Second person (you/your) → "${second}"
+- Example: "I love you" → "${first} yêu ${second}"
+- DO NOT swap or use any other pronouns. This is a hard rule.
+- If monologue (no second person), use only "${first}".
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 `;
@@ -314,7 +335,8 @@ ${lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}
 4. Empty lines → empty string "".
 5. All lowercase. NO capitalization.
 6. Keep punctuation and English unchanged.
-7. Number translation: Convert numbers to romanized words (2000 → "ni-sen" JP, "i-cheon" KR, "liǎngqiān" CN).`,
+7. Number translation: Convert numbers to romanized words (2000 → "ni-sen" JP, "i-cheon" KR, "liǎngqiān" CN).
+8. Mirror quotation marks (「」, "", '') EXACTLY. Do NOT auto-close unclosed quotes.`,
 
             user: `Romanize lyrics for: "${artist} - ${title}"
 
