@@ -32,9 +32,7 @@ When editing code in this project, follow this risk classification system:
 - Database schema modifications
 - Validation: ✓ Impact analysis complete, ✓ Migration path documented, ✓ Alternatives provided
 
-### PROTOCOL RULES
-
-**Rule 1: Show Diffs**
+### PROTOCOL RULES\r\n\r\n**Rule 0: No Push Policy**\r\nAI agent is strictly forbidden from using `git push`. Task is limited to `git commit` only. Push must be performed manually by the user.\r\n\r\n**Rule 1: Show Diffs**
 Always provide diff format for Type B/C:
 
 ```
