@@ -58,6 +58,7 @@ $filesToDownload = @(
     "utils/Config.js",
     "services/IDBCache.js",
     "utils/Cache.js",
+    "utils/TranslationUtils.js",
     "services/UpdateService.js",
     "components/VideoManager.js",
     "utils/Prompts.js",
