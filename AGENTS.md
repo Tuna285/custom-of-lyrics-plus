@@ -122,3 +122,31 @@ Since there is no compilation step, "building" involves applying the changes to 
 
 - Gemini API: Safety filters may block songs with sensitive lyrics
 - Spicetify API: May break on Spotify client updates
+
+## Future Roadmap (2026 Strategy)
+
+### Phase 1: Stabilization & Feature Governance (Current)
+
+**Goal:** Develop features safely without major refactoring.
+
+- **Rules:**
+  - Logic MUST go to `services/` or `utils/`.
+  - `index.js` acts as an assembler, using `setState` only for UI updates.
+  - New modules MUST register via `window.LyricsPlus.register()`.
+  - **No Magic Strings:** Define config keys/events in `types.d.ts` first.
+
+### Phase 2: UI Component Extraction (When Needed)
+
+**Goal:** Reduce `render()` complexity using **Container/Presentational Pattern**.
+
+- **Strategy:**
+  1. Extract small, stateless parts first (e.g., `LyricsLine`, `TranslationButton`).
+  2. Use Pure Functional Components receiving `props` (data + callbacks).
+  3. Avoid passing `this` context.
+- **Retrying VideoSettingsModal:**
+  - **Step A:** Extract View ONLY (`VideoModalView.js`) - accepts props, returns JSX. No state logic.
+  - **Step B:** Once View is stable, move state logic to a Service/Hook.
+
+### Phase 3: State Management (Long-term/Optional)
+
+- Move state out of `index.js` to a Store pattern if debugging becomes unmanageable.
