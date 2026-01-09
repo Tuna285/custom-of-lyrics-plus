@@ -110,5 +110,9 @@ const TranslationUtils = {
     }
 };
 
-// Expose to global scope
-window.TranslationUtils = TranslationUtils;
+// Register in namespace (also exposes to global scope for backward compatibility)
+if (window.LyricsPlus?.register) {
+    window.LyricsPlus.register('TranslationUtils', TranslationUtils);
+} else {
+    window.TranslationUtils = TranslationUtils;
+}

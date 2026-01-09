@@ -228,5 +228,9 @@ const LyricsFetcher = {
     }
 };
 
-// Expose to global scope for other modules
-window.LyricsFetcher = LyricsFetcher;
+// Register in namespace (also exposes to global scope for backward compatibility)
+if (window.LyricsPlus?.register) {
+    window.LyricsPlus.register('LyricsFetcher', LyricsFetcher);
+} else {
+    window.LyricsFetcher = LyricsFetcher;
+}
