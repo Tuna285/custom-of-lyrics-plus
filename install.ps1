@@ -61,6 +61,7 @@ $filesToDownload = @(
     "services/UpdateService.js",
     "components/VideoManager.js",
     "utils/Prompts.js",
+    "services/LyricsFetcher.js",
     "services/GeminiClient.js",
     "services/Translator.js",
     "components/Components.js",

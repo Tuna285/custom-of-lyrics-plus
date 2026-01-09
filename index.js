@@ -990,30 +990,47 @@ infoFromTrack(track) {
 		const optimizedOriginal = this.optimizeTranslations(lyrics, null, null);
 		this.setState({ currentLyrics: Array.isArray(optimizedOriginal) ? optimizedOriginal : [] });
 
-		// Start both requests, but don't wait for both to finish to update UI
-		const promise1 = processMode(displayMode1, lyrics);
-		const promise2 = processMode(displayMode2, lyrics);
+		// Staggered parallel execution: Phonetic starts first, Translation starts 500ms later
+		// This avoids API contention while keeping total time close to parallel
+		const isMode1Phonetic = String(displayMode1).includes('romaji') || String(displayMode1).includes('pinyin') || String(displayMode1).includes('romaja');
+		const isMode2Phonetic = String(displayMode2).includes('romaji') || String(displayMode2).includes('pinyin') || String(displayMode2).includes('romaja');
 
-		promise1.then(result => {
-			// Early exit if track changed while translating or request is stale
+		// Determine which mode is Phonetic (should start first) and which is Translation (delayed)
+		let firstMode, secondMode, firstModeKey, secondModeKey;
+		if (isMode2Phonetic && !isMode1Phonetic) {
+			firstMode = displayMode2; secondMode = displayMode1;
+			firstModeKey = 'mode2'; secondModeKey = 'mode1';
+		} else if (isMode1Phonetic && !isMode2Phonetic) {
+			firstMode = displayMode1; secondMode = displayMode2;
+			firstModeKey = 'mode1'; secondModeKey = 'mode2';
+		} else {
+			// Both same type or neither Phonetic - just use order as-is
+			firstMode = displayMode1; secondMode = displayMode2;
+			firstModeKey = 'mode1'; secondModeKey = 'mode2';
+		}
+
+		// Start first request immediately (non-blocking)
+		const promise1 = processMode(firstMode, lyrics).then(result => {
 			if (this.state.uri !== uri || this.activeRequestTimestamp !== requestTimestamp) return;
-			if (this._dmResults?.[currentUri]) this._dmResults[currentUri].mode1 = result;
-			updateCombinedLyrics(true); // Force update with new result
+			if (this._dmResults?.[currentUri]) this._dmResults[currentUri][firstModeKey] = result;
+			updateCombinedLyrics(true);
 		}).catch(error => {
 			if (this.state.uri !== uri) return;
-			console.warn("Display Mode 1 translation failed:", error.message);
+			console.warn(`Display ${firstModeKey} failed:`, error.message);
 			updateCombinedLyrics(true);
 		});
 
-		promise2.then(result => {
-			// Early exit if track changed while translating or request is stale
-			if (this.state.uri !== uri || this.activeRequestTimestamp !== requestTimestamp) return;
-			if (this._dmResults?.[currentUri]) this._dmResults[currentUri].mode2 = result;
-			updateCombinedLyrics(true); // Force update with new result
-		}).catch(error => {
-			if (this.state.uri !== uri) return;
-			console.warn("Display Mode 2 translation failed:", error.message);
-			updateCombinedLyrics(true);
+		// Delay 500ms then start second request (staggered to avoid API contention)
+		const promise2 = new Promise(resolve => setTimeout(resolve, 500)).then(() => {
+			return processMode(secondMode, lyrics).then(result => {
+				if (this.state.uri !== uri || this.activeRequestTimestamp !== requestTimestamp) return;
+				if (this._dmResults?.[currentUri]) this._dmResults[currentUri][secondModeKey] = result;
+				updateCombinedLyrics(true);
+			}).catch(error => {
+				if (this.state.uri !== uri) return;
+				console.warn(`Display ${secondModeKey} failed:`, error.message);
+				updateCombinedLyrics(true);
+			});
 		});
 
 		// Auto-save cache after all translations complete
@@ -1047,7 +1064,6 @@ infoFromTrack(track) {
 				provider: lyricsState.provider,
 				copyright: lyricsState.copyright,
 				uri: uri,
-				// Include all translation data from state
 				romaji: this.state.romaji,
 				furigana: this.state.furigana,
 				hiragana: this.state.hiragana,
