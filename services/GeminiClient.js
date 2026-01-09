@@ -266,7 +266,7 @@ const GeminiClient = {
                     { role: "system", content: proxyPrompt.system },
                     { role: "user", content: proxyPrompt.user }
                 ],
-                temperature: 1.0,
+                temperature: 1,
                 max_tokens: 4000,
                 response_format: { type: "json_object" }
             };
@@ -285,8 +285,7 @@ const GeminiClient = {
             body = {
                 contents: [{ parts: [{ text: gemma3Prompt }] }],
                 generationConfig: {
-                    temperature: 0.5,  // Lower temp = more deterministic, less line shifting
-                    topP: 0.95,
+                    temperature: 0.7,  
                     topK: 40,
                     maxOutputTokens: 3000
                 },

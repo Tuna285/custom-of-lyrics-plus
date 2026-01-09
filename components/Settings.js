@@ -346,7 +346,7 @@ const ConfigHelper = () => {
 		{ desc: getText("settings.geminiApiKeyRomaji.label"), key: "gemini-api-key-romaji", type: ConfigInput, info: getText("settings.geminiApiKeyRomaji.desc"), when: () => CONFIG.visual["gemini:api-mode"] !== "proxy" },
 
 		// Proxy Settings
-		{ desc: getText("settings.proxyModel.label"), key: "gemini:proxy-model", type: ConfigSelection, options: { "gemini-2.5-flash": "Gemini 2.5 Flash (Default)", "gemini-2.5-pro": "Gemini 2.5 Pro", "gemini-3-flash-preview": "Gemini 3 Flash Preview", "gemini-3-pro-preview": "Gemini 3 Pro Preview", "gemini-2.0-flash": "Gemini 2.0 Flash", "gemma-3-27b-it": "Gemma 3 27B" }, info: getText("settings.proxyModel.desc"), when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
+		{ desc: getText("settings.proxyModel.label"), key: "gemini:proxy-model", type: ConfigSelection, options: { "gemini-2.5-flash": "Gemini 2.5 Flash (Default)", "gemini-2.5-pro": "Gemini 2.5 Pro", "gemini-3-flash-preview": "Gemini 3 Flash Preview", "gemini-3-pro-preview": "Gemini 3 Pro Preview" }, info: getText("settings.proxyModel.desc"), when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
 		{ desc: getText("settings.proxyApiKey.label"), key: "gemini:proxy-api-key", type: ConfigInput, info: getText("settings.proxyApiKey.desc"), when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
 		{ desc: getText("settings.proxyEndpoint.label"), key: "gemini:proxy-endpoint", type: ConfigInput, info: getText("settings.proxyEndpoint.desc"), when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
 
