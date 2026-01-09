@@ -13,6 +13,29 @@ const LyricsFetcher = {
      */
     _lastTempoRequest: 0,
     _inflightTempo: new Map(),
+    
+    /**
+     * Request tracking to prevent stale responses
+     * @private
+     */
+    _currentRequestUri: null,
+    
+    /**
+     * Set current request URI - call before starting requests
+     * @param {string} uri
+     */
+    setCurrentRequest(uri) {
+        this._currentRequestUri = uri;
+    },
+    
+    /**
+     * Check if request is still valid (not stale)
+     * @param {string} uri
+     * @returns {boolean}
+     */
+    isRequestValid(uri) {
+        return this._currentRequestUri === uri;
+    },
 
     /**
      * Extract track info from Spicetify track object
@@ -55,6 +78,11 @@ const LyricsFetcher = {
             vibrant = 8747370; // Default fallback color
         }
 
+        // Check if request is still valid before returning
+        if (!this.isRequestValid(uri)) {
+            return null; // Let caller handle stale result
+        }
+
         return {
             background: Utils.convertIntToRGB(vibrant),
             inactive: Utils.convertIntToRGB(vibrant, 3),
@@ -87,7 +115,10 @@ const LyricsFetcher = {
                     const promise = (async () => {
                         try {
                             const res = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features/${uri.split(":")[2]}`);
-                            CacheManager.set(cacheKey, res);
+                            // Only cache if request is still valid (track hasn't changed)
+                            if (this.isRequestValid(uri)) {
+                                CacheManager.set(cacheKey, res);
+                            }
                             return res;
                         } catch (e) {
                             // Cache default to prevent spamming
@@ -130,6 +161,11 @@ const LyricsFetcher = {
         const currentMode = CONFIG.modes[mode] || "";
         let finalData = { ...emptyState, uri: trackInfo.uri };
         
+        // Early exit if request already stale
+        if (!this.isRequestValid(trackInfo.uri)) {
+            return { ...emptyState, uri: trackInfo.uri, stale: true };
+        }
+        
         for (const id of CONFIG.providersOrder) {
             const service = CONFIG.providers[id];
             const spotifyVersion = Spicetify.Platform.version;
@@ -144,6 +180,11 @@ const LyricsFetcher = {
             } catch (e) {
                 console.error(e);
                 continue;
+            }
+            
+            // Check if request is still valid after each provider call
+            if (!this.isRequestValid(trackInfo.uri)) {
+                return { ...emptyState, uri: trackInfo.uri, stale: true };
             }
 
             if (data.error || (!data.karaoke && !data.synced && !data.unsynced && !data.genius)) continue;

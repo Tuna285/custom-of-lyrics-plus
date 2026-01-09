@@ -506,7 +506,8 @@ infoFromTrack(track) {
 	async fetchColors(uri) {
 		// Delegate to LyricsFetcher, then update state
 		const colors = await LyricsFetcher.fetchColors(uri);
-		this.setState({ colors });
+		// Only update if request still valid (colors not null)
+		if (colors) this.setState({ colors });
 	}
 
 	async fetchTempo(uri) {
@@ -526,6 +527,9 @@ infoFromTrack(track) {
 			this.setState({ error: "No track info" });
 			return;
 		}
+
+		// Track current request to prevent stale responses
+		LyricsFetcher.setCurrentRequest(info.uri);
 
 		//Keep artist/title for prompts
 		this.setState({ artist: info.artist, title: info.title });
