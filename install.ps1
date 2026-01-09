@@ -49,6 +49,7 @@ $filesToDownload = @(
     "LICENSE",
     "install.ps1",
     "uninstall.ps1",
+    "utils/Namespace.js",
     "i18n/LangEN.js",
     "i18n/LangVI.js",
     "i18n/I18n.js",
