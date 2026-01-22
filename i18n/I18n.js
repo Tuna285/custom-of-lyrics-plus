@@ -14,7 +14,18 @@ window.getText = (path, replacements = {}) => {
 	let value = lang;
 	for (const key of keys) {
 		value = value?.[key];
-		if (value === undefined) return path; // Fallback to key if not found
+		if (value === undefined) {
+			// Fallback to English if current language is not English
+			if (lang !== window.LANG_EN) {
+				let enValue = window.LANG_EN;
+				for (const enKey of keys) {
+					enValue = enValue?.[enKey];
+					if (enValue === undefined) break;
+				}
+				if (enValue !== undefined) return enValue;
+			}
+			return path;
+		}
 	}
 	// Handle replacements like {duration}, {lines}
 	if (typeof value === "string" && Object.keys(replacements).length > 0) {

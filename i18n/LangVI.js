@@ -112,6 +112,18 @@ window.LANG_VI = {
     "backgroundBrightness": {
       "label": "Độ sáng nền"
     },
+    "videoBackground": {
+      "label": "Video Background",
+      "desc": "Bật hình nền bằng video."
+    },
+    "videoBackgroundScale": {
+      "label": "Tỷ lệ Video",
+      "desc": "Mức độ phóng to (mặc định 1.1x)"
+    },
+    "videoBackgroundDim": {
+      "label": "Độ sáng Video",
+      "desc": "Điều chỉnh độ sáng video (0-100)"
+    },
     "debugMode": {
       "label": "Chế độ Debug",
       "desc": "Hiện log chi tiết trong Console để sửa lỗi."
@@ -240,7 +252,6 @@ window.LANG_VI = {
     "loadFile": "Nhập file local (.lrc)",
     "resetCache": "Xóa cache dịch",
     "openSettings": "Mở Cài đặt",
-    "openSettings": "Mở Cài đặt",
     "preTransNext": "Bài tiếp theo đã được dịch trước",
     "copy": "Sao chép"
   },
@@ -254,7 +265,8 @@ window.LANG_VI = {
     "reset": "Reset/Reload",
     "manualVideo": "Video Thủ công",
     "score": "Độ khớp",
-    "detectedId": "ID tìm thấy"
+    "detectedId": "ID tìm thấy",
+    "currentVideo": "Video hiện tại"
   },
   "modal": {
     "title": "Cài đặt Lyrics Plus"
