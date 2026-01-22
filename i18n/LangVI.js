@@ -171,7 +171,8 @@ window.LANG_VI = {
     "videoReset": "Video reset - đang tải lại...",
     "noLyricsCache": "Không có lời để lưu (Cache)",
     "cacheDeleted": "Đã xóa cache lời bài hát",
-    "cacheSuccess": "Đã lưu cache lời bài hát thành công"
+    "cacheSuccess": "Đã lưu cache lời bài hát thành công",
+    "copied": "Đã sao chép: {text}"
   },
   "contextMenu": {
     "provider": "Nguồn dịch",
@@ -239,14 +240,16 @@ window.LANG_VI = {
     "loadFile": "Nhập file local (.lrc)",
     "resetCache": "Xóa cache dịch",
     "openSettings": "Mở Cài đặt",
-    "preTransNext": "Bài tiếp theo đã được dịch trước"
+    "openSettings": "Mở Cài đặt",
+    "preTransNext": "Bài tiếp theo đã được dịch trước",
+    "copy": "Sao chép"
   },
   "videoModal": {
     "title": "Cài đặt Video Background",
     "topVideos": "Top Video Phù hợp",
     "inputId": "YouTube Video ID hoặc URL:",
     "placeholder": "Ví dụ: dQw4w9WgXcQ hoặc https://youtube.com/...",
-    "totalOffset": "Total Offset:",
+    "totalOffset": "Điều chỉnh Offset:",
     "apply": "Áp dụng",
     "reset": "Reset/Reload",
     "manualVideo": "Video Thủ công",

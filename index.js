@@ -9,6 +9,12 @@ const { useState, useEffect, useCallback, useMemo, useRef } = react;
 const reactDOM = Spicetify.ReactDOM;
 const spotifyVersion = Spicetify.Platform.version;
 
+// Initialize Netease Provider
+if (window.ProviderNetease) {
+	window.ProviderNetease.setWorkerUrl(CONFIG.visual["netease-worker-url"]);
+}
+
+
 function render() {
 	// Check for updates silently on startup (once per 24h)
 	setTimeout(() => UpdateService.checkForUpdates(true), 3000);
@@ -93,24 +99,47 @@ class LyricsContainer extends react.Component {
 	this.pretranslateInterval = null;
 }
 
-async fetchVideoBackgroundWithLyrics(track, lyrics = []) {
-	const info = this.infoFromTrack(track);
-	if (!info) return;
+	async fetchVideoBackgroundWithLyrics(track, lyrics = []) {
+        console.log(`[LyricsPlus] fetchVideoBackgroundWithLyrics called for: ${track?.metadata?.title}`);
+		const info = this.infoFromTrack(track);
+        if (!info) {
+             console.warn("[LyricsPlus] infoFromTrack returned null");
+             return;
+        }
 
-	// Delegate to VideoManager (Strangler Fig - Reroute)
-	const videoData = await VideoManager.fetchVideoForTrack(info, lyrics);
-	
-	if (videoData) {
-		this.setState({ videoBackground: videoData });
-	} else {
-		this.setState({ videoBackground: null });
+        // Mark this URI as the current active video request
+        // If another request comes in, it will overwrite this value
+        this._lastVideoRequestUri = info.uri;
+
+        // PRE-EMPTIVE CLEAR: Stop showing previous video immediately if track changed
+        if (this.state.videoBackground && this.state.videoBackground.uri !== info.uri) {
+             // Show loading indicator instantly
+             this.setState({ videoBackground: { loading: true, uri: info.uri } }); 
+        }
+
+		// Delegate to VideoManager (ivLyrics Client-Only)
+		const videoData = await VideoManager.fetchVideoForTrack(info);
+        console.log("[LyricsPlus] VideoManager returned:", videoData);
+		
+        // RACE CONDITION FIX: Check if a newer request has started
+        // If _lastVideoRequestUri was overwritten by a newer request, ignore this stale response
+        if (this._lastVideoRequestUri !== info.uri) {
+            console.log(`[LyricsPlus] Ignored stale video response for: ${info.title}`);
+            return; // Don't update state with stale data
+        }
+
+		if (videoData) {
+			this.setState({ videoBackground: videoData });
+		} else {
+			// Explicitly clear video if none found (fixes persistence bug)
+			this.setState({ videoBackground: null });
+		}
 	}
-}
 
 openVideoSettingsModal() {
 	const react = Spicetify.React;
 	const currentVideo = this.state.videoBackground?.video_id || "";
-	const serverOffsetValue = this.state.videoBackground?.sync_offset || 0;
+	const currentOffset = this.state.videoBackground?.sync_offset || 0;
 	const track = Spicetify.Player.data.item;
 	const info = this.infoFromTrack(track);
 	
@@ -118,55 +147,40 @@ openVideoSettingsModal() {
 		Spicetify.showNotification(getText("notifications.noTrack"), true, 2000);
 		return;
 	}
-
-	const serverUrl = CONFIG.visual["video-background-server"] || "http://localhost:8000";
 	
 	// Store reference to 'this' for use in callbacks
 	const self = this;
 
-	// Modal content component (show immediately, load videos inside)
+	// Modal content component (simplified - no server search)
 	const ModalContent = () => {
-		const [baseOffset, setBaseOffset] = react.useState(serverOffsetValue); // Absolute offset
-		const [nudge, setNudge] = react.useState(0); // Relative adjustment from slider
-		const [sliderTouched, setSliderTouched] = react.useState(false); // Track if user manually adjusted offset
+		const [offset, setOffset] = react.useState(currentOffset);
 		const [videoId, setVideoId] = react.useState(currentVideo);
 		const [manualInput, setManualInput] = react.useState("");
-		const [topVideos, setTopVideos] = react.useState([]);
-		const [isLoading, setIsLoading] = react.useState(true);
-
-		react.useEffect(() => {
-			(async () => {
-				// Delegate to VideoManager (Strangler Fig - Reroute)
-				const results = await VideoManager.searchVideos(info, 3);
-				setTopVideos(results);
-				setIsLoading(false);
-			})();
-		}, []);
 
 		return react.createElement("div", { 
 			style: { 
-				padding: "20px", 
-				maxWidth: "500px",
+				padding: "10px", 
+				maxWidth: "450px",
 				color: "#fff"
 			} 
 		},
 			// Current Track Info
 			react.createElement("div", {
 				style: {
-					marginBottom: "20px",
-					padding: "15px",
+					marginBottom: "10px",
+					padding: "8px",
 					background: "rgba(255,255,255,0.05)",
-					borderRadius: "8px",
+					borderRadius: "6px",
 					display: "flex",
 					alignItems: "center",
-					gap: "15px"
+					gap: "10px"
 				}
 			},
 				info.image && react.createElement("img", {
 					src: info.image,
 					style: {
-						width: "60px",
-						height: "60px",
+						width: "40px",
+						height: "40px",
 						borderRadius: "4px",
 						objectFit: "cover"
 					}
@@ -178,94 +192,41 @@ openVideoSettingsModal() {
 					react.createElement("div", { 
 						style: { fontSize: "12px", color: "#aaa" } 
 					}, info.artist)
-				)
-			),
-
-			// Top Videos Section (if available)
-			topVideos.length > 0 && react.createElement("div", {
-				style: { marginBottom: "20px" }
-			},
-				react.createElement("div", {
-					style: {
-						fontSize: "13px",
-						fontWeight: "bold",
-						marginBottom: "10px",
-						color: "var(--spice-button)"
-					}
-				}, getText("videoModal.topVideos")),
-				...topVideos.map((video, idx) => 
-					react.createElement("div", {
-						key: video.video_id,
-						onClick: () => {
-							setVideoId(video.video_id);
-							setSliderTouched(false); // Reset manual override so auto-sync works
-						},
+				),
+				// Copy Button
+				react.createElement(Spicetify.ReactComponent.TooltipWrapper, { label: getText("tooltips.copy") || "Copy to search" },
+					react.createElement("button", {
+						className: "lyrics-config-button",
 						style: {
-							padding: "10px",
-							marginBottom: "8px",
-							background: videoId === video.video_id ? "rgba(var(--spice-rgb-button), 0.2)" : "rgba(255,255,255,0.05)",
-							border: videoId === video.video_id ? "1px solid var(--spice-button)" : "1px solid transparent",
-							borderRadius: "6px",
+							background: "transparent",
+							border: "none",
+							color: "#aaa",
 							cursor: "pointer",
-							display: "flex",
-							alignItems: "center",
-							gap: "10px",
-							transition: "all 0.2s"
+							padding: "5px",
+							marginLeft: "5px"
 						},
-						onMouseEnter: (e) => {
-							if (videoId !== video.video_id) {
-								e.currentTarget.style.background = "rgba(255,255,255,0.1)";
-							}
-						},
-						onMouseLeave: (e) => {
-							if (videoId !== video.video_id) {
-								e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-							}
+						onClick: () => {
+							const textToCopy = `${info.artist} - ${info.title}`;
+							Spicetify.Platform.ClipboardAPI.copy(textToCopy);
+							const msg = getText("notifications.copied").replace("{text}", textToCopy);
+							Spicetify.showNotification(msg);
 						}
-					},
-						react.createElement("img", {
-							src: `https://img.youtube.com/vi/${video.video_id}/default.jpg`,
-							style: {
-								width: "80px",
-								height: "60px",
-								borderRadius: "4px",
-								objectFit: "cover"
-							}
-						}),
-						react.createElement("div", { style: { flex: 1 } },
-							react.createElement("div", {
-								style: {
-									fontSize: "13px",
-									fontWeight: "500",
-									marginBottom: "4px"
-								}
-							}, video.title || `Video ${idx + 1}`),
-							react.createElement("div", {
-								style: {
-									fontSize: "11px",
-									color: "#aaa"
-								}
-							}, `${getText("videoModal.score")}: ${video.score ? (video.score * 100).toFixed(0) : 'N/A'}%`)
-						),
-						videoId === video.video_id && react.createElement("div", {
-							style: {
-								color: "var(--spice-button)",
-								fontSize: "18px"
-							}
-						}, "✓")
-					)
+					}, react.createElement("svg", {
+						width: 16, height: 16, viewBox: "0 0 16 16", fill: "currentColor",
+						dangerouslySetInnerHTML: { __html: '<path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>' }
+					}))
 				)
 			),
 
-			// Manual Input Section (always show)
+			// Manual Input Section
 			react.createElement("div", {
-				style: { marginBottom: "20px" }
+				style: { marginBottom: "10px" }
 			},
 				react.createElement("label", { 
 					style: { 
 						display: "block", 
-						marginBottom: "8px", 
-						fontSize: "13px",
+						marginBottom: "5px", 
+						fontSize: "12px",
 						fontWeight: "bold",
 						color: "var(--spice-button)"
 					} 
@@ -277,7 +238,7 @@ openVideoSettingsModal() {
 					onChange: (e) => {
 						const val = e.target.value.trim();
 						setManualInput(val);
-						// Auto-extract video ID
+						// Auto-extract video ID from URL or direct ID
 						const urlMatch = val.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
 						if (urlMatch) {
 							setVideoId(urlMatch[1]);
@@ -287,8 +248,8 @@ openVideoSettingsModal() {
 					},
 					style: { 
 						width: "100%", 
-						padding: "10px", 
-						borderRadius: "6px", 
+						padding: "6px 10px", 
+						borderRadius: "4px", 
 						border: "1px solid #555", 
 						background: "#222", 
 						color: "#fff",
@@ -307,87 +268,73 @@ openVideoSettingsModal() {
 				}, `✓ ${getText("videoModal.detectedId")}: ${videoId}`)
 			),
 
-				react.createElement("div", { 
-					style: { marginBottom: "25px" } 
+			// Offset adjustment
+			react.createElement("div", { 
+				style: { marginBottom: "5px" } 
+			},
+				react.createElement("div", {
+					style: {
+						display: "flex",
+						justifyContent: "space-between",
+						alignItems: "center",
+						marginBottom: "5px"
+					}
 				},
+					react.createElement("label", { 
+						style: { 
+							fontSize: "13px",
+							fontWeight: "bold"
+						} 
+					}, getText("videoModal.totalOffset")),
 					react.createElement("div", {
-						style: {
-							display: "flex",
-							justifyContent: "space-between",
-							alignItems: "center",
-							marginBottom: "10px"
-						}
+						style: { display: "flex", alignItems: "center", gap: "5px" }
 					},
-						react.createElement("div", {
+						react.createElement("input", {
+							type: "number",
+							step: "0.1",
+							value: offset,
+							onChange: (e) => setOffset(parseFloat(e.target.value) || 0),
 							style: {
-								display: "flex",
-								alignItems: "center",
-								gap: "10px"
+								width: "80px",
+								padding: "4px",
+								borderRadius: "4px",
+								border: "1px solid #555",
+								background: "var(--spice-card)",
+								color: "var(--spice-text)",
+								fontSize: "13px",
+								textAlign: "center"
 							}
-						},
-							react.createElement("label", { 
-								style: { 
-									fontSize: "13px",
-									fontWeight: "bold",
-									margin: 0
-								} 
-							}, getText("videoModal.totalOffset")),
-							react.createElement("input", {
-								type: "number",
-								step: "0.1",
-								value: parseFloat((baseOffset + nudge).toFixed(2)),
-								onChange: (e) => {
-									setBaseOffset(parseFloat(e.target.value) || 0);
-									setNudge(0);
-									setSliderTouched(true);
-								},
-								style: {
-									width: "80px",
-									padding: "4px",
-									borderRadius: "4px",
-									border: "1px solid #555",
-									background: "var(--spice-card)",
-									color: "var(--spice-text)",
-									fontSize: "13px",
-									fontWeight: "bold",
-									textAlign: "center"
-								}
-							}),
-							react.createElement("span", { style: { fontSize: "12px", color: "#888" } }, "s")
-						)
-					),
-
-					react.createElement("input", {
-						type: "range",
-						min: "-10",
-						max: "10",
-						step: "0.1",
-						value: nudge,
-						onChange: (e) => {
-							setNudge(parseFloat(e.target.value));
-							setSliderTouched(true);
-						},
-						style: {
-							width: "100%",
-							height: "6px",
-							borderRadius: "3px",
-							outline: "none",
-							background: `linear-gradient(to right, var(--spice-button) 0%, var(--spice-button) ${((nudge + 10) / 20) * 100}%, #555 ${((nudge + 10) / 20) * 100}%, #555 100%)`,
-							marginBottom: "5px"
-						}
-					}),
-					react.createElement("div", {
-						style: {
-							display: "flex",
-							justifyContent: "space-between",
-							fontSize: "10px",
-							color: "#888"
-						}
-					},
-						react.createElement("span", null, "-10s"),
-						react.createElement("span", null, "+10s")
+						}),
+						react.createElement("span", { style: { fontSize: "12px", color: "#888" } }, "s")
 					)
 				),
+				react.createElement("input", {
+					type: "range",
+					min: "-30",
+					max: "30",
+					step: "0.5",
+					value: offset,
+					onChange: (e) => setOffset(parseFloat(e.target.value)),
+					style: {
+						width: "100%",
+						height: "6px",
+						borderRadius: "3px"
+					}
+				}),
+				react.createElement("div", {
+					style: {
+						display: "flex",
+						justifyContent: "space-between",
+						fontSize: "10px",
+						color: "#888",
+						marginTop: "2px"
+					}
+				},
+					react.createElement("span", null, "-30s"),
+					react.createElement("span", null, "0"),
+					react.createElement("span", null, "+30s")
+				)
+			),
 
 			// Action Buttons
 			react.createElement("div", { 
@@ -396,98 +343,60 @@ openVideoSettingsModal() {
 					gap: "10px" 
 				} 
 			},
-			react.createElement("button", {
-				onClick: () => {
-					if (!videoId || videoId.length !== 11) {
-						Spicetify.showNotification(getText("notifications.invalidId"), true, 2000);
-						return;
-					}
-					
-					self.setState({
-						videoBackground: {
-							video_id: videoId,
-							sync_offset: baseOffset + nudge,
-							title: getText("videoModal.manualVideo"),
-							has_subtitles: false
+				react.createElement("button", {
+					onClick: () => {
+						if (!videoId || videoId.length !== 11) {
+							Spicetify.showNotification(getText("notifications.invalidId"), true, 2000);
+							return;
 						}
-					});
-					self.lastVideoFetchUri = null;
-					Spicetify.PopupModal.hide();
-					Spicetify.showNotification(`✓ ${getText("notifications.videoSet", { videoId })}`, false, 2000);
-
-					// TODO: Migrate to VideoManager.syncManualVideo() - Strangler Fig Phase 2a
-				// Fetch and Sync with Server
-					try {
-						console.log("[Lyrics+] Syncing video. VideoId:", videoId, "SliderTouched:", sliderTouched, "Offset:", baseOffset + nudge);
 						
-						// Call /sync with manual_video_id and manual_offset
-						fetch(`${serverUrl}/sync`, {
-							method: 'POST',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify({
-								artist: info.artist,
-								track: info.title,
-								duration: track.duration_ms || 0,
-								firstLyricTime: 0,
-								lyrics: null,
-								manual_video_id: videoId,
-								manual_offset: baseOffset + nudge, // Send final calculated offset
-								force_manual_offset: sliderTouched // Only force if user touched controls
-							})
-						}).then(res => res.json()).then(data => {
-							if (data.status === "success") {
-								console.log("[Lyrics+] Manual video synced:", data);
-								// Update state with synced data
-								self.setState({
-									videoBackground: {
-										video_id: data.video_id,
-										sync_offset: data.sync_offset,
-										title: data.title,
-										has_subtitles: data.has_subtitles || false
-									}
-								});
-								Spicetify.showNotification(`✓ ${getText("notifications.videoSynced", { videoId: data.video_id, offset: data.sync_offset.toFixed(2) })}`, false, 3000);
-							} else {
-								console.warn("[Lyrics+] Sync failed:", data);
-								Spicetify.showNotification(getText("notifications.syncFailed"), true, 2000);
-							}
-						}).catch(err => {
-							console.error("[Lyrics+] Sync error:", err);
-							Spicetify.showNotification(getText("notifications.syncError"), true, 2000);
-						});
-					} catch (e) {
-						console.warn("[Lyrics+] Error syncing manual video:", e);
-					}
-				},
+						// Use simplified client-only setManualVideo
+						const result = VideoManager.setManualVideo(info, videoId, offset);
+						if (result) {
+							self.setState({ videoBackground: result });
+							// Save offset AND manual video ID to IndexedDB for persistence
+							VideoManager.saveOffset(info.uri, offset);
+							VideoManager.saveManualVideo(info.uri, videoId);
+							Spicetify.showNotification(`✓ Video set: ${videoId} (saved)`, false, 2000);
+						}
+						Spicetify.PopupModal.hide();
+					},
 					style: { 
 						flex: 1, 
-						padding: "12px", 
+						padding: "8px", 
 						borderRadius: "6px", 
 						background: "var(--spice-button)", 
 						color: "#fff", 
 						border: "none",
 						cursor: "pointer",
 						fontWeight: "bold",
-						fontSize: "14px"
+						fontSize: "13px"
 					}
 				}, getText("videoModal.apply")),
-			react.createElement("button", {
-				className: "btn",
-				onClick: () => {
-					VideoManager.reset(); // Use VideoManager instead of direct access
-					self.setState({ videoBackground: null });
-					Spicetify.PopupModal.hide();
-					Spicetify.showNotification(getText("notifications.videoReset"), false, 2000);
-					
-					// Force re-fetch immediately
-					const track = Spicetify.Player.data.item;
-					const lyrics = self.state.currentLyrics || [];
-					self.fetchVideoBackgroundWithLyrics(track, lyrics);
-				},
-				style: { 
-					flex: 1
-				}
-			}, getText("videoModal.reset"))
+				react.createElement("button", {
+					onClick: () => {
+						// Simple client-only reset
+						VideoManager.reset();
+						self.setState({ videoBackground: null });
+						Spicetify.PopupModal.hide();
+						Spicetify.showNotification(getText("notifications.videoReset"), false, 2000);
+						
+						// Force re-fetch from ivLyrics
+						const track = Spicetify.Player.data.item;
+						self.fetchVideoBackgroundWithLyrics(track);
+					},
+					style: { 
+						flex: 1,
+						padding: "8px", 
+						borderRadius: "6px", 
+						background: "#444", 
+						color: "#fff", 
+						border: "none",
+						cursor: "pointer",
+						fontWeight: "bold",
+						fontSize: "13px"
+					}
+				}, getText("videoModal.reset"))
 			)
 		);
 	};
@@ -541,25 +450,86 @@ infoFromTrack(track) {
 		this.fetchTempo(info.uri);
 		this.resetDelay();
 
-	let tempState;
-		//If lyrics are cached in L1 RAM (sync check)
+		// Start video background fetch in parallel (no await - independent of lyrics)
+		if (CONFIG.visual["video-background"]) {
+			this.fetchVideoBackgroundWithLyrics(track).catch(e => 
+				console.warn("[LyricsPlus] Video background fetch failed:", e)
+			);
+		}
+
+		let tempState;
+		
+		// === L1 RAM Cache Check (Sync, Fast) ===
 		const l1Cached = CacheManager.getSync(info.uri);
-		if ((mode === -1 && l1Cached) || l1Cached?.[CONFIG.modes?.[mode]]) {
+		
+		// L1 contains full lyrics data if present, not mode-specific
+		// Simply check if L1 has valid content for this URI
+		if (l1Cached && (l1Cached.synced?.length > 0 || l1Cached.unsynced?.length > 0 || l1Cached.genius?.length > 0)) {
+			console.log(`[Lyrics+] L1 Cache HIT for: ${info.uri.split(':').pop()}`);
 			tempState = { ...l1Cached, isCached };
 			if (l1Cached?.mode) {
 				this.state.explicitMode = l1Cached.mode;
 				tempState = { ...tempState, mode: l1Cached.mode };
 			}
 		} else {
-			// Check L2 IndexedDB cache before going to network
+			// === L2 IndexedDB Cache Check (Async, Persistent) ===
 			const l2Cached = await CacheManager.get(info.uri);
-			if (l2Cached && (l2Cached.synced || l2Cached.unsynced || l2Cached.genius)) {
-				console.log(`[Lyrics+] L2 Cache HIT for: ${info.uri.split(':').pop()}`);
-				// Restore to L1 for faster subsequent access
-				CacheManager.set(info.uri, l2Cached, false); // L1 only, already in L2
-				tempState = { ...l2Cached, isCached: true };
+			
+			// Check for actual content (not empty arrays)
+			const hasSynced = l2Cached?.synced?.length > 0;
+			const hasUnsynced = l2Cached?.unsynced?.length > 0;
+			const hasGenius = l2Cached?.genius?.length > 0;
+			const hasContent = hasSynced || hasUnsynced || hasGenius;
+
+			// === Level Hierarchy Decision ===
+			// Level 3: Synced (Max) → Use cache immediately
+			// Level 2: Unsynced → Check if upgrade is needed (once per session)
+			// Level 1: None → Fetch from network
+			
+			let shouldFetch = false;
+			
+			if (hasContent) {
+				if (hasSynced) {
+					// Level 3: Max quality, use cache
+					console.log(`[Lyrics+] L2 Cache HIT (Synced) for: ${info.uri.split(':').pop()}`);
+					CacheManager.set(info.uri, l2Cached, false); // Promote to L1
+					tempState = { ...l2Cached, isCached: true };
+				} else if (hasUnsynced || hasGenius) {
+					// Level 2: Check if we already tried upgrading this session
+					const upgradeAttempted = l2Cached._upgradeAttempted;
+					
+					if (upgradeAttempted) {
+						// Already tried this session, use cached result
+						console.log(`[Lyrics+] L2 Cache HIT (Unsynced - Upgrade already attempted) for: ${info.uri.split(':').pop()}`);
+						CacheManager.set(info.uri, l2Cached, false); // Promote to L1
+						tempState = { ...l2Cached, isCached: true };
+					} else {
+						// First time this session, check if better providers exist
+						const syncCapableProviders = ["musixmatch", "spotify"];
+						const enabledSyncProviders = syncCapableProviders.filter(p => CONFIG.providers[p]?.on);
+						
+						if (enabledSyncProviders.length > 0) {
+							console.log(`[Lyrics+] Smart Cache: Attempting upgrade from Unsynced (${l2Cached.provider})`);
+							shouldFetch = true;
+							// Mark as attempted BEFORE fetching to prevent loops
+							l2Cached._upgradeAttempted = true;
+							CacheManager.set(info.uri, l2Cached, true); // Update L2 with flag
+						} else {
+							// No better providers, use cache
+							console.log(`[Lyrics+] L2 Cache HIT (Unsynced - No sync providers) for: ${info.uri.split(':').pop()}`);
+							CacheManager.set(info.uri, l2Cached, false);
+							tempState = { ...l2Cached, isCached: true };
+						}
+					}
+				}
 			} else {
-				//Save current mode before loading to maintain UI consistency
+				// Level 1: No content in cache
+				shouldFetch = true;
+			}
+			
+			// === Network Fetch ===
+			if (shouldFetch) {
+				console.log(`[Lyrics+] Fetching from network...`);
 				const currentMode = this.getCurrentMode();
 				this.lastModeBeforeLoading = currentMode !== -1 ? currentMode : SYNCED;
 				this.setState({ ...emptyState, isLoading: true, isCached: false });
@@ -567,20 +537,19 @@ infoFromTrack(track) {
 				try {
 					const resp = await this.tryServices(info, mode);
 
-					// Critical check: Ensure we are still on the same track before updating state
+					// Critical: Ensure we are still on the same track
 					if (info.uri !== this.currentTrackUri) return;
 
 					if (resp.provider) {
-						// Cache lyrics to L1 and L2
+						// Mark upgrade as attempted for this session
+						resp._upgradeAttempted = true;
+						// Cache to L1 and L2
 						CacheManager.set(resp.uri, resp);
-						//Auto-save to localStorage (persistent)
 						this.saveLocalLyrics(resp.uri, resp);
 					}
 
-					// Logic for manual cache to localStorage
 					isCached = this.lyricsSaved(resp.uri);
 
-					// Handle rapid track skipping to prevent setting wrong lyrics
 					if (resp.uri === this.currentTrackUri) {
 						tempState = { ...resp, isLoading: false, isCached };
 					} else {
@@ -593,8 +562,23 @@ infoFromTrack(track) {
 				}
 			}
 		}
+		
+		// === Sanitization (Always run) ===
+		// Fix for persistent duplicate copyright in old cache
+		if (tempState?.copyright && tempState?.provider) {
+			const providerName = tempState.provider;
+			const duplicatePattern = new RegExp(`(synced|unsynced)?\\s*lyrics provided by ${providerName}`, 'i');
+			
+			const lines = tempState.copyright.split('\n');
+			const cleanLines = lines.filter(line => !duplicatePattern.test(line));
+			
+			if (cleanLines.length !== lines.length) {
+				tempState.copyright = cleanLines.join('\n').trim();
+			}
+		}
 
 		if (!tempState) return;
+
 
 		// Final safety check
 		if (info.uri !== this.currentTrackUri) return;
@@ -643,10 +627,9 @@ infoFromTrack(track) {
 			}
 
 			// Reset state and apply, preserving cached translations if any
-			// Set currentLyrics immediately with original lyrics so UI renders while translation runs
-			// CRITICAL: If currentLyrics already has Gemini translations from lyricsSource(), preserve them!
+			// Preserve existing Gemini translations if available to prevent UI flicker
 			const initialCurrentLyrics = this.state.currentLyrics?.length > 0 && this.state.currentLyrics?.some(l => l.text || l.text2)
-				? this.state.currentLyrics  // Preserve Gemini translations if they exist
+				? this.state.currentLyrics
 				: (tempState.currentLyrics || tempState.synced || tempState.unsynced || []);
 			
 			this.setState({
@@ -676,18 +659,16 @@ infoFromTrack(track) {
 				...(tempState.tw && { tw: tempState.tw }),
 				...(tempState.musixmatchTranslation && { musixmatchTranslation: tempState.musixmatchTranslation }),
 			...(tempState.neteaseTranslation && { neteaseTranslation: tempState.neteaseTranslation }),
+			// Preserve videoBackground state to avoid reloading
+			videoBackground: this.state.videoBackground,
 		});
-		// Fetch video background AFTER lyrics loaded so firstLyricTime is accurate
-		if (CONFIG.visual["video-background"]) {
-			this.fetchVideoBackgroundWithLyrics(track, tempState.synced || []);
-		}
+		// Video background is fetched independently in parallel
 		return;
 	}
 
-		//Preserve cached translations when not changing songs
-		// CRITICAL: Same fix as above - preserve Gemini translations if they exist
+		// Preserve cached translations when not changing songs
 		const initialCurrentLyrics2 = this.state.currentLyrics?.length > 0 && this.state.currentLyrics?.some(l => l.text || l.text2)
-			? this.state.currentLyrics  // Preserve Gemini translations if they exist
+			? this.state.currentLyrics
 			: (tempState.currentLyrics || tempState.synced || tempState.unsynced || []);
 		
 		this.setState({
@@ -705,10 +686,10 @@ infoFromTrack(track) {
 			...(tempState.tw && { tw: tempState.tw }),
 		...(tempState.musixmatchTranslation && { musixmatchTranslation: tempState.musixmatchTranslation }),
 		...(tempState.neteaseTranslation && { neteaseTranslation: tempState.neteaseTranslation }),
+		// Preserve videoBackground state
+		videoBackground: this.state.videoBackground,
 	});
-	if (CONFIG.visual["video-background"]) {
-		this.fetchVideoBackgroundWithLyrics(track, tempState.synced || []);
-	}
+	// Video background is fetched independently in parallel
 }
 
 	async lyricsSource(lyricsState, mode) {
@@ -854,6 +835,13 @@ infoFromTrack(track) {
 
 			this.state.explicitMode = this.state.lockMode;
 			this.currentTrackUri = queue.current.uri;
+			
+			// Pre-emptive clear: If not in L1 cache, clear lyrics immediately to prevent showing old song's lyrics
+			// This addresses "Lyrics don't switch" by ensuring at least a blank slate while fetching
+			if (!CacheManager.getSync(queue.current.uri)) {
+				this.setState({ currentLyrics: [] });
+			}
+
 			this.fetchLyrics(queue.current, this.state.explicitMode);
 			this.viewPort.scrollTo(0, 0);
 
@@ -2233,6 +2221,9 @@ infoFromTrack(track) {
 		}
 
 		if (!activeItem) {
+			// If video background is active and NOT loading, hide the kaomoji to show the video clearly
+			const showKaomoji = !this.state.videoBackground || this.state.isLoading;
+			
 			activeItem = react.createElement(
 				"div",
 				{
@@ -2243,7 +2234,7 @@ infoFromTrack(track) {
 					{
 						className: "lyrics-lyricsContainer-LyricsUnavailableMessage",
 					},
-					this.state.isLoading ? LoadingIcon : "(。_。)"
+					this.state.isLoading ? LoadingIcon : (showKaomoji ? "(。_。)" : "")
 				)
 			);
 		}

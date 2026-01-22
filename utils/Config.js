@@ -143,8 +143,8 @@ const CONFIG = {
         "pre-translation": ConfigUtils.getPersisted("lyrics-plus:visual:pre-translation") !== "false",
         "global-delay": Number(ConfigUtils.getPersisted("lyrics-plus:visual:global-delay")) || 0,
         delay: 0,
-        // TODO: Video Background feature is WIP - change to ConfigUtils.get(...) when ready
-        "video-background": false, // DISABLED - Feature not ready for release
+        "netease-worker-url": ConfigUtils.getPersisted("lyrics-plus:visual:netease-worker-url") || "https://netease-worker.tuan4651050308.workers.dev",
+        "video-background": ConfigUtils.get("lyrics-plus:visual:video-background", false),
         "video-background-server": localStorage.getItem("lyrics-plus:visual:video-background-server") || "http://localhost:8000",
         "video-background-blur": Number(localStorage.getItem("lyrics-plus:visual:video-background-blur")) || 0,
         "video-background-dim": Number(localStorage.getItem("lyrics-plus:visual:video-background-dim")) || 50,
@@ -168,16 +168,6 @@ const CONFIG = {
             desc: "Lyrics sourced from official Spotify API.",
             modes: [SYNCED, UNSYNCED],
         },
-        netease: {
-            on: ConfigUtils.get("lyrics-plus:provider:netease:on", false),
-            desc: "Crowdsourced lyrics provider ran by Chinese developers and users.",
-            modes: [SYNCED, UNSYNCED],
-        },
-        genius: {
-            on: Spicetify.Platform.version >= "1.2.31" ? false : ConfigUtils.get("lyrics-plus:provider:genius:on"),
-            desc: "Provide unsynced lyrics with insights from artists themselves. Genius is disabled and cannot be used as a provider on <code>1.2.31</code> and higher.",
-            modes: [GENIUS],
-        },
         local: {
             on: ConfigUtils.get("lyrics-plus:provider:local:on"),
             desc: "Provide lyrics from cache/local files loaded from previous Spotify sessions.",
@@ -185,7 +175,7 @@ const CONFIG = {
         },
     },
     providersOrder: localStorage.getItem("lyrics-plus:services-order"),
-    modes: ["synced", "unsynced", "genius"],
+    modes: ["synced", "unsynced"],
     locked: localStorage.getItem("lyrics-plus:lock-mode") || "-1",
 };
 
@@ -220,6 +210,8 @@ const emptyState = {
     genius: null,
     genius2: null,
     currentLyrics: null,
+    visualizerGranularity: "medium", // low, medium, high
+    neteaseWorkerUrl: "https://netease-worker.tuan4651050308.workers.dev",
     preTranslated: false,
 };
 

@@ -13,26 +13,26 @@
 /* NOTE: Spicetify doesn't support @import, so tokens are inlined below */
 
 :root {
-    /* Z-INDEX HIERARCHY */
-    --z-background: 0;
-    --z-content: 10;
-    --z-controls: 100;
-    --z-elevated: 200;
-    --z-overlay: 999;
-    --z-modal: 9999;
-    --z-critical: 99999;
-    
-    /* ANIMATION TIMING */
-    --transition-fast: 0.15s ease;
-    --transition-normal: 0.25s ease;
-    --transition-slow: 0.4s ease;
-    
-    /* SPACING */
-    --spacing-xs: 4px;
-    --spacing-sm: 8px;
-    --spacing-md: 16px;
-    --spacing-lg: 24px;
-    --spacing-xl: 32px;
+  /* Z-INDEX HIERARCHY */
+  --z-background: 0;
+  --z-content: 10;
+  --z-controls: 100;
+  --z-elevated: 200;
+  --z-overlay: 999;
+  --z-modal: 9999;
+  --z-critical: 99999;
+
+  /* ANIMATION TIMING */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+  --transition-slow: 0.4s ease;
+
+  /* SPACING */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
 }
 @media (min-width: 768px) {
   .container {
@@ -252,9 +252,10 @@
 
 /* Video Background Active - Enhanced text visibility for bright videos */
 .video-bg-active .lyrics-lyricsContainer-LyricsLine {
-  /* Dark outline shadow for better contrast on bright videos */
-  text-shadow: 0 0 8px rgba(0, 0, 0, 0.9), 0 0 16px rgba(0, 0, 0, 0.6),
-    0 2px 4px rgba(0, 0, 0, 0.9), 0 0 32px rgba(0, 0, 0, 0.4);
+  /* Dark outline shadow removed for inactive lines as per user request */
+  /* text-shadow: 0 0 8px rgba(0, 0, 0, 0.9), 0 0 16px rgba(0, 0, 0, 0.6),
+    0 2px 4px rgba(0, 0, 0, 0.9), 0 0 32px rgba(0, 0, 0, 0.4); */
+  text-shadow: none;
 }
 
 /* Video BG: Active line keeps its glow but with added dark outline */

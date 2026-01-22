@@ -157,15 +157,25 @@ const LyricsFetcher = {
      * @param {number} mode - Lyric mode (-1 for auto)
      * @returns {Promise<LyricsData>}
      */
+    /**
+     * Try all enabled providers to fetch lyrics using Level Hierarchy
+     * Level 3: Synced/Karaoke (Stop immediately)
+     * Level 2: Unsynced (Store as fallback, continue)
+     * Level 1: None (Ignore)
+     * 
+     * @param {TrackInfo} trackInfo 
+     * @param {number} mode 
+     * @returns {Promise<LyricsData>}
+     */
     async tryServices(trackInfo, mode = -1) {
         const currentMode = CONFIG.modes[mode] || "";
-        let finalData = { ...emptyState, uri: trackInfo.uri };
-        
+        let bestResult = null; // Stores Level 2 (Unsynced) result
+
         // Early exit if request already stale
         if (!this.isRequestValid(trackInfo.uri)) {
             return { ...emptyState, uri: trackInfo.uri, stale: true };
         }
-        
+
         for (const id of CONFIG.providersOrder) {
             const service = CONFIG.providers[id];
             const spotifyVersion = Spicetify.Platform.version;
@@ -176,9 +186,16 @@ const LyricsFetcher = {
 
             let data;
             try {
-                data = await Providers[id](trackInfo);
+                // Timeout per provider (5s) to prevent slow providers from blocking
+                const PROVIDER_TIMEOUT = 5000;
+                data = await Promise.race([
+                    Providers[id](trackInfo),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error(`Provider ${id} timeout`)), PROVIDER_TIMEOUT)
+                    )
+                ]);
             } catch (e) {
-                console.error(e);
+                console.warn(`[Lyrics+] Provider ${id} failed:`, e.message);
                 continue;
             }
             
@@ -187,44 +204,57 @@ const LyricsFetcher = {
                 return { ...emptyState, uri: trackInfo.uri, stale: true };
             }
 
+            // Level 1: Skip invalid result (None)
             if (data.error || (!data.karaoke && !data.synced && !data.unsynced && !data.genius)) continue;
-            if (mode === -1) {
-                finalData = data;
+
+            // Prepare result function to avoid repetition
+            const prepareResult = (resultData) => {
+                 // Clone to avoid mutating original source if cached/shared
+                const finalData = { ...resultData, uri: trackInfo.uri };
+
+                // Add copyright/provider info
+                // Note: CreditFooter in UI already adds "Provided by [Provider]", so we don't need to add it here.
+                // We only pass through the actual copyright string from the provider.
+                if (resultData.provider !== "local" && resultData.provider) {
+                    finalData.copyright = resultData.copyright || "";
+                }
+
+                // Musixmatch translation fix
+                if (finalData.musixmatchTranslation && typeof finalData.musixmatchTranslation[0].startTime === "undefined" && finalData.synced) {
+                    finalData.musixmatchTranslation = finalData.synced.map((line) => ({
+                        ...line,
+                        text: finalData.musixmatchTranslation.find((l) => Utils.processLyrics(l?.originalText || "") === Utils.processLyrics(line?.text || ""))?.text ?? (line?.text || ""),
+                    }));
+                }
+                
                 return finalData;
+            };
+
+            // Level 3: Synced or Karaoke
+            if (data.synced || data.karaoke) {
+                // If we are looking for specific mode 'unsynced', this might technically be a mismatch, 
+                // but usually we prefer better data. 
+                // However, if mode != -1, we rely on the service.modes check above.
+                
+                return prepareResult(data); // Found Max Level -> Return immediately (Winner Takes All)
             }
 
-            if (!data[currentMode]) {
-                for (const key in data) {
-                    if (!finalData[key]) {
-                        finalData[key] = data[key];
-                    }
-                }
-                continue;
+            // Level 2: Unsynced or Genius
+            // If we don't have a bestResult yet, store this as our candidate.
+            // We trust CONFIG.providersOrder, so the first Unsynced provider is preferred 
+            // over later Unsynced ones (unless we find a Synced one later).
+            if ((data.unsynced || data.genius) && !bestResult) {
+                bestResult = prepareResult(data);
+                // Continue loop to search for Level 3...
             }
-
-            for (const key in data) {
-                if (!finalData[key]) {
-                    finalData[key] = data[key];
-                }
-            }
-
-            if (data.provider !== "local" && finalData.provider && finalData.provider !== data.provider) {
-                const styledMode = currentMode.charAt(0).toUpperCase() + currentMode.slice(1);
-                finalData.copyright = `${styledMode} lyrics provided by ${data.provider}\n${finalData.copyright || ""}`.trim();
-            }
-
-            if (finalData.musixmatchTranslation && typeof finalData.musixmatchTranslation[0].startTime === "undefined" && finalData.synced) {
-                finalData.musixmatchTranslation = finalData.synced.map((line) => ({
-                    ...line,
-                    text:
-                        finalData.musixmatchTranslation.find((l) => Utils.processLyrics(l?.originalText || "") === Utils.processLyrics(line?.text || ""))?.text ?? (line?.text || ""),
-                }));
-            }
-
-            return finalData;
         }
 
-        return finalData;
+        // End of Loop: Return best result found, or empty state if nothing found (Level 1)
+        if (bestResult) {
+            return bestResult;
+        }
+
+        return { ...emptyState, uri: trackInfo.uri };
     }
 };
 

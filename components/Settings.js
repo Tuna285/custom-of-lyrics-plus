@@ -17,19 +17,40 @@ const SwapButton = ({ icon, disabled, onClick }) => {
 };
 
 const CacheButton = () => {
-	let lyrics = {};
-	try {
-		const localLyrics = JSON.parse(localStorage.getItem("lyrics-plus:local-lyrics"));
-		if (!localLyrics || typeof localLyrics !== "object") throw "";
-		lyrics = localLyrics;
-	} catch { lyrics = {}; }
+	const [count, setCount] = useState(0);
+	const [isLoading, setIsLoading] = useState(false);
 
-	const [count, setCount] = useState(Object.keys(lyrics).length);
-	const text = count ? "Clear all cached lyrics" : "No cached lyrics";
+	useEffect(() => {
+		try {
+			// Use cached-uris as a proxy for count since IDB count is async and expensive
+			const cachedUris = JSON.parse(localStorage.getItem("lyrics-plus:cached-uris") || "[]");
+			setCount(cachedUris.length);
+		} catch {
+			setCount(0);
+		}
+	}, []);
+
+	const clearCache = async () => {
+		setIsLoading(true);
+		try {
+			await CacheManager.clear();
+			localStorage.removeItem("lyrics-plus:local-lyrics");
+			localStorage.removeItem("lyrics-plus:cached-uris"); // Clear count proxy
+			setCount(0);
+			Spicetify.showNotification("All lyrics cache cleared!", false, 2000);
+		} catch (e) {
+			console.error("Failed to clear cache:", e);
+			Spicetify.showNotification("Failed to clear cache", true, 2000);
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	const text = isLoading ? "Clearing..." : (count > 0 ? `Clear (${count}) cached lyrics` : "No cached lyrics");
 
 	return react.createElement(
 		"button",
-		{ className: "btn", onClick: () => { localStorage.removeItem("lyrics-plus:local-lyrics"); setCount(0); }, disabled: !count },
+		{ className: "btn", onClick: clearCache, disabled: isLoading || count === 0 },
 		text
 	);
 };
@@ -237,7 +258,19 @@ const ServiceOption = ({ item, onToggle, onSwap, isFirst = false, isLast = false
 			)
 		),
 		react.createElement("span", { dangerouslySetInnerHTML: { __html: item.desc } }),
-		item.token !== undefined && react.createElement("input", { placeholder: `Place your ${item.name} token here`, value: token, onChange: (event) => setTokenCallback(event.target.value) })
+		item.token !== undefined && react.createElement("input", { placeholder: `Place your ${item.name} token here`, value: token, onChange: (event) => setTokenCallback(event.target.value) }),
+		item.name === "netease" && react.createElement("input", { 
+			placeholder: "Cloudflare Worker URL (e.g., https://...)", 
+			value: CONFIG.visual["netease-worker-url"], 
+			onChange: (e) => {
+				const val = e.target.value;
+				CONFIG.visual["netease-worker-url"] = val;
+				ConfigUtils.setPersisted("lyrics-plus:visual:netease-worker-url", val);
+				// Update provider instance if it exists
+				if (window.ProviderNetease) window.ProviderNetease.setWorkerUrl(val);
+			},
+			style: { marginTop: "5px", width: "100%" }
+		})
 	);
 };
 
@@ -405,6 +438,9 @@ const ConfigHelper = () => {
 			break;
 		case "background":
 			const bgSettings = [
+				{ desc: getText("settings.videoBackground.label"), key: "video-background", type: ConfigSlider, info: getText("settings.videoBackground.desc") },
+				{ desc: getText("settings.videoBackgroundScale.label"), key: "video-background-scale", type: ConfigAdjust, min: 1, max: 2, step: 0.1, defaultValue: 1.1 },
+				{ desc: getText("settings.videoBackgroundDim.label"), key: "video-background-dim", type: ConfigAdjust, min: 0, max: 100, step: 10, defaultValue: 50 },
 				{ desc: getText("settings.transparentBackground.label"), key: "transparent-background", type: ConfigSlider, info: getText("settings.transparentBackground.desc") },
 				{ desc: getText("settings.noise.label"), key: "noise", type: ConfigSlider },
 				{ desc: getText("settings.backgroundBrightness.label"), key: "background-brightness", type: ConfigAdjust, min: 0, max: 100, step: 10 },
@@ -543,3 +579,5 @@ function openConfig() {
 		isLarge: true,
 	});
 }
+
+window.openConfig = openConfig;

@@ -143,6 +143,13 @@ Since there is no compilation step, "building" involves applying the changes to 
   1. Extract small, stateless parts first (e.g., `LyricsLine`, `TranslationButton`).
   2. Use Pure Functional Components receiving `props` (data + callbacks).
   3. Avoid passing `this` context.
+- **Localization**: All UI components must use `I18n` for text.
+- **Lyric Providers**:
+  - `ProviderMusixmatch`: Primary synced lyrics source.
+  - `ProviderLRCLIB`: Community lyrics database.
+  - `ProviderNetease`: ⚠️ **DEPRECATED** - API dead.
+  - `ProviderGenius`: ⚠️ **DEPRECATED** - API dead.
+- **Service Layer**:
 - **Retrying VideoSettingsModal:**
   - **Step A:** Extract View ONLY (`VideoModalView.js`) - accepts props, returns JSX. No state logic.
   - **Step B:** Once View is stable, move state logic to a Service/Hook.

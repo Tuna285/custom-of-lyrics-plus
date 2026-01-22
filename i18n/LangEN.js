@@ -111,6 +111,18 @@ window.LANG_EN = {
     "backgroundBrightness": {
       "label": "Background brightness"
     },
+    "videoBackground": {
+      "label": "Video Background",
+      "desc": "Enable synchronized YouTube video background."
+    },
+    "videoBackgroundScale": {
+      "label": "Video Scale",
+      "desc": "Zoom level (1.1x default)"
+    },
+    "videoBackgroundDim": {
+      "label": "Video Brightness",
+      "desc": "Adjust video brightness (0-100)"
+    },
     "debugMode": {
       "label": "Debug Mode",
       "desc": "Enable detailed console logging for troubleshooting. Shows lyrics processing, translation requests, and timing info."
@@ -170,7 +182,8 @@ window.LANG_EN = {
     "videoReset": "Video reset - fetching...",
     "noLyricsCache": "No lyrics available to cache",
     "cacheDeleted": "Lyrics cache deleted",
-    "cacheSuccess": "Lyrics cached successfully"
+    "cacheSuccess": "Lyrics cached successfully",
+    "copied": "Copied: {text}"
   },
   "contextMenu": {
     "provider": "Translation Provider",
@@ -238,7 +251,9 @@ window.LANG_EN = {
     "loadFile": "Load lyrics from file",
     "resetCache": "Reset translation cache",
     "openSettings": "Open Settings",
-    "preTransNext": "Next song pre-translated"
+    "openSettings": "Open Settings",
+    "preTransNext": "Next song pre-translated",
+    "copy": "Copy to clipboard"
   },
   "videoModal": {
     "title": "Video Background Settings",
@@ -250,7 +265,8 @@ window.LANG_EN = {
     "reset": "Reset/Reload",
     "manualVideo": "Manual Video",
     "score": "Score",
-    "detectedId": "Detected ID"
+    "detectedId": "Detected ID",
+    "currentVideo": "Current video"
   },
   "modal": {
     "title": "Lyrics Plus Settings"
