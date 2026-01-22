@@ -9,12 +9,8 @@ const { useState, useEffect, useCallback, useMemo, useRef } = react;
 const reactDOM = Spicetify.ReactDOM;
 const spotifyVersion = Spicetify.Platform.version;
 
-// Initialize Netease Provider
-if (window.ProviderNetease) {
-	window.ProviderNetease.setWorkerUrl(CONFIG.visual["netease-worker-url"]);
-}
 
-
+// Initialize App
 function render() {
 	// Check for updates silently on startup (once per 24h)
 	setTimeout(() => UpdateService.checkForUpdates(true), 3000);

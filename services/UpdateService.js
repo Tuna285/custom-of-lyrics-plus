@@ -4,18 +4,18 @@ const UpdateService = {
     VERSION_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/version.json",
     RAW_BASE_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main",
     INSTALL_COMMAND: "iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/install.ps1 | iex",
-    CURRENT_VERSION: "1.2.7",
+    CURRENT_VERSION: "1.3.0",
     CHECK_INTERVAL: 0,
 
-    // List of files to download for update
     UPDATE_FILES: [
-        "index.js", "style.css", "manifest.json", "Utils.js", "Config.js", "Cache.js", "I18n.js", "LangEN.js", "LangVI.js",
-        "Prompts.js", "GeminiClient.js", "Translator.js", "Components.js",
-        "ProviderLRCLIB.js", "ProviderMusixmatch.js", "ProviderNetease.js",
-        "ProviderGenius.js", "Providers.js", "SyncedLyrics.js", "UnsyncedLyrics.js",
-        "TabBar.js", "Settings.js", "OptionsMenu.js", "PlaybarButton.js", "version.json",
-        // New modules
-        "parsers/LRCParser.js", "services/UpdateService.js"
+        "index.js", "style.css", "manifest.json", "version.json", "types.d.ts", "variables.css",
+        "utils/Namespace.js", "utils/Utils.js", "utils/Config.js", "utils/Cache.js", "utils/Prompts.js", "utils/TranslationUtils.js",
+        "i18n/I18n.js", "i18n/LangEN.js", "i18n/LangVI.js",
+        "parsers/LRCParser.js",
+        "services/AdBlocker.js", "services/IDBCache.js", "services/LyricsFetcher.js", "services/GeminiClient.js", "services/Translator.js", "services/UpdateService.js",
+        "components/Components.js", "components/SyncedLyrics.js", "components/UnsyncedLyrics.js", "components/TabBar.js", "components/Settings.js", "components/OptionsMenu.js", "components/PlaybarButton.js", "components/VideoBackground.js", "components/VideoManager.js",
+        "providers/ProviderLRCLIB.js", "providers/ProviderMusixmatch.js", "providers/Providers.js",
+        "assets/preview.gif"
     ],
 
     async checkForUpdates(silent = false) {

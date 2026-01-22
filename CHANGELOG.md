@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-01-23
+
+### Added
+
+- **Client-side Video Migration**: Optimized Video Background search to run directly on the client using `ivLyrics`, removing the dependency on external Python servers.
+- **Improved Video UX**: Added a "Loading video..." indicator that appears immediately when switching tracks, replacing the dark screen/lingering video.
+
+### Fixed / Improved
+
+- **Video Persistence**: Fixed multiple bugs where the previous video would linger or fail to clear when the next song had no video or during retries.
+- **Manifest Synchronization**: Performed a full audit and synchronized `manifest.json`, `install.ps1`, and `UpdateService.js` with the physical file system for 100% accuracy.
+- **Update Logic**: Fixed broken file paths in `UpdateService.js` that prevented automatic updates from working correctly.
+- **Cleanup**: Removed legacy initialization code and deleted deprecated or missing provider references (`Netease`, `Genius`, `Krc`).
+- **Memory Management**: Added robust React `useEffect` cleanup logic to `VideoBackground` to ensure player destruction on unmount.
+
 ## [1.2.7] - 2026-01-08
 
 ### Added
