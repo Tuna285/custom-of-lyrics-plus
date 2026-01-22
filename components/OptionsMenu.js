@@ -122,7 +122,7 @@ function openOptionsModal(title, items, onChange, eventType = null) {
 		react.createElement("style", {
 			dangerouslySetInnerHTML: {
 				__html: `
-#${APP_NAME}-config-container { padding: 12px 16px; }
+#${APP_NAME}-config-container { padding: 0 16px; }
 #${APP_NAME}-config-container .setting-row {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) auto;

@@ -522,7 +522,7 @@ function openConfig() {
 .config-tabs {
 	display: flex;
 	border-bottom: 1px solid rgba(255,255,255,.1);
-	margin: 0 -20px 16px;
+	margin: 0 0 16px;
 	padding: 0 20px;
 	overflow-x: auto;
 }

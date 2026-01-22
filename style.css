@@ -540,13 +540,6 @@ div.lyrics-tabBar-headerItemLink {
 /** Setting menu */
 /** Setting menu - Modern UI */
 #lyrics-plus-config-container {
-  background-color: rgba(var(--spice-rgb-main), 0.85) !important;
-  backdrop-filter: blur(24px) !important;
-  -webkit-backdrop-filter: blur(24px) !important;
-  border-radius: 16px !important;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.05) !important;
-  padding: 24px !important;
   color: var(--spice-text);
   max-height: 80vh;
   overflow-y: auto;
