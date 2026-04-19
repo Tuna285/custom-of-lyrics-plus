@@ -5,7 +5,7 @@
 > A personalized version of **Lyrics Plus** for Spicetify, rebuilt to focus on high-quality lyric translation, ideal for Vietnamese users. Connects to any OpenAI-compatible LLM endpoint — Google Gemini/Gemma, OpenRouter, OpenAI, DeepSeek, Anthropic Claude, or local Ollama.
 
 > [!NOTE]
-> **Currently, the translation feature only supports Vietnamese (Tiếng Việt).** Support for other languages may be added in future updates.
+> **Currently, the translation feature only supports Vietnamese (Tiếng Việt).** Support for other languages may be added in future updates if requested.
 
 <img width="800" height="800" alt="image" src="https://github.com/user-attachments/assets/32e85501-567d-4896-a7e4-bb4b098a30a6" />
 
