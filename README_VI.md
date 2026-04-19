@@ -6,7 +6,7 @@
 
 > [!NOTE] > **Hiện tại, tính năng dịch chỉ hỗ trợ tiếng Việt.** Hỗ trợ cho các ngôn ngữ khác có thể được thêm vào trong các bản cập nhật tương lai.
 
-Preview
+<img width="800" height="800" alt="image" src="https://github.com/user-attachments/assets/85c46ce0-1614-4bfd-bc04-7b3311f4da02" />
 
 ---
 
@@ -28,7 +28,10 @@ Kết nối tới mọi endpoint LLM tương thích OpenAI (Google Gemini/Gemma,
 
 | Tiếng Nhật → Romaji | Tiếng Hàn → Romaja | Tiếng Trung → Pinyin |
 | ------------------- | ------------------ | -------------------- |
-|                     |                    |                      |
+|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/4a92cb84-d500-42c8-9b81-d5b69ba42bcd" />|<img width="1919" height="1018" alt="image" src="https://github.com/user-attachments/assets/d4031fc0-8b10-4d8e-914d-1bfd9b83b52c" />|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/f9a03765-0460-428e-8d66-1ec374fc7194" />|
+
+
+
 
 
 ### 2. Mini Lyrics trong Picture-in-Picture
@@ -37,7 +40,9 @@ Inject lời bài hát đồng bộ trực tiếp vào mini player Picture-in-Pi
 
 ### 3. Nền video động
 
-Tự động lấy video music YouTube làm nền động cho trang lyrics (qua ivLyrics). Tùy chỉnh scale, dim, blur — kết hợp đẹp với chế độ trong suốt và mọi theme Spicetify.
+Tự động lấy MV YouTube làm nền động cho trang lyrics. Tùy chỉnh scale, dim, blur — kết hợp đẹp với chế độ trong suốt và mọi theme Spicetify.
+
+<img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/09398d0a-3e98-467a-80ef-6e58d492f811" />
 
 ### 4. Giao diện hiện đại & Trải nghiệm tối ưu
 
@@ -79,6 +84,9 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 2. Sao chép thư mục `lyrics-plus` vào thư mục CustomApps của Spicetify:
   - **Windows:** `%LocalAppData%\spicetify\CustomApps`
   - **MacOS/Linux:** `~/.config/spicetify/CustomApps`
+  - 
+<img width="498" height="367" alt="image" src="https://github.com/user-attachments/assets/2fa346e4-97f4-43f3-a803-4456ee5623f8" />
+
 3. Mở terminal:
   ```bash
    spicetify config custom_apps lyrics-plus
