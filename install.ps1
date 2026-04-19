@@ -52,6 +52,10 @@ $filesToDownload = @(
     "install.ps1",
     "uninstall.ps1",
     "assets/preview.gif",
+    "assets/japanese_conversion.png",
+    "assets/korean_conversion.png",
+    "assets/chinese_conversion.png",
+    "assets/manual_download.png",
     "utils/Namespace.js",
     "i18n/LangEN.js",
     "i18n/LangVI.js",
@@ -79,6 +83,7 @@ $filesToDownload = @(
     "components/Settings.js",
     "components/OptionsMenu.js",
     "components/PlaybarButton.js",
+    "components/MiniLyrics.js",
     "components/VideoBackground.js"
 )
 
@@ -229,7 +234,7 @@ Write-Host ""
 Write-Host "  Next steps:" -ForegroundColor Yellow
 Write-Host "    1. Start Spotify" -ForegroundColor White
 Write-Host "    2. Click the lyrics icon in the sidebar" -ForegroundColor White
-Write-Host "    3. Configure your Gemini API key in settings" -ForegroundColor White
+Write-Host "    3. Configure your LLM API key in settings" -ForegroundColor White
 Write-Host ""
 Write-Host "  For updates, run this command again." -ForegroundColor DarkGray
 Write-Host ""

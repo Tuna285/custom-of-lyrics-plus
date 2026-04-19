@@ -27,49 +27,55 @@ const fontSizeLimit = { min: 16, max: 256, step: 4 };
 
 const thresholdSizeLimit = { min: 0, max: 100, step: 5 };
 
-//Lyrics Container
-class LyricsContainer extends react.Component {
-	constructor() {
-		super();
-		this.state = {
-			karaoke: null,
-			synced: null,
-			unsynced: null,
-			genius: null,
-			genius2: null,
-			currentLyrics: null,
-			romaji: null,
-			furigana: null,
-			hiragana: null,
-			hangul: null,
-			romaja: null,
-			katakana: null,
-			cn: null,
-			hk: null,
-			tw: null,
-			musixmatchTranslation: null,
-			neteaseTranslation: null,
-			uri: "",
-			provider: "",
-			colors: {
-				background: "",
-				inactive: "",
-			},
-			tempo: "0.25s",
-			explicitMode: -1,
-			lockMode: CONFIG.locked,
-			mode: -1,
-			isLoading: false,
-			versionIndex: 0,
-			versionIndex2: 0,
-			isFullscreen: false,
-			isFADMode: false,
-			isCached: false,
-		language: null,
-		isTranslating: false,
-		translationStatus: null, // { type: 'success'|'error', text: string }
-		videoBackground: null, // { video_id: string, sync_offset: number, title: string, has_subtitles: boolean }
-	};
+  //Lyrics Container
+  class LyricsContainer extends react.Component {
+    constructor() {
+      super();
+      this.state = {
+        karaoke: null,
+        synced: null,
+        unsynced: null,
+        genius: null,
+        genius2: null,
+        currentLyrics: null,
+        romaji: null,
+        furigana: null,
+        hiragana: null,
+        hangul: null,
+        romaja: null,
+        katakana: null,
+        cn: null,
+        hk: null,
+        tw: null,
+        musixmatchTranslation: null,
+        neteaseTranslation: null,
+        uri: "",
+        provider: "",
+        colors: {
+          background: "",
+          inactive: "",
+        },
+        tempo: "0.25s",
+        explicitMode: -1,
+        lockMode: CONFIG.locked,
+        mode: -1,
+        isLoading: false,
+        versionIndex: 0,
+        versionIndex2: 0,
+        isFullscreen: false,
+        isFADMode: false,
+        isCached: false,
+      language: null,
+      isTranslating: false,
+      translationIndicatorUri: null, // Spotify URI — spinner only when matches this.state.uri
+      translationStatus: null, // { type, text, trackUri? }
+      preTranslateChip: null, // { uri, title } — next-track background Gemini (not current song)
+      videoBackground: null, // { video_id: string, sync_offset: number, title: string, has_subtitles: boolean }
+      reasoningContent: "", // Legacy — kept for any external readers; per-task buckets below
+      reasoningStreams: {}, // { translation: string, phonetic: string } — streamed reasoning per task
+      reasoningActiveTab: null, // 'translation' | 'phonetic' | null — currently focused tab
+      isReasoningVisible: false, // Controls whether reasoning window is visible
+    };
 		this.currentTrackUri = "";
 		this.nextTrackUri = "";
 		this.availableModes = [];
@@ -421,9 +427,9 @@ infoFromTrack(track) {
 		this.setState({ tempo });
 	}
 
-	async tryServices(trackInfo, mode = -1) {
+	async tryServices(trackInfo, mode = -1, options = {}) {
 		// Delegate to LyricsFetcher
-		return LyricsFetcher.tryServices(trackInfo, mode);
+		return LyricsFetcher.tryServices(trackInfo, mode, options);
 	}
 
 	async fetchLyrics(track, mode = -1, refresh = false) {
@@ -599,6 +605,7 @@ infoFromTrack(track) {
 
 		// Handle song change or refresh requests
 		if (tempState.uri !== this.state.uri || refresh) {
+			this._geminiUiStartTime = {};
 			// Detect language from new lyrics data
 			let defaultLanguage = null;
 			if (tempState.synced) {
@@ -624,9 +631,15 @@ infoFromTrack(track) {
 
 			// Reset state and apply, preserving cached translations if any
 			// Preserve existing Gemini translations if available to prevent UI flicker
+			// Repair-on-load: cached payloads from older builds can lack startTime on
+			// translated lines (esp. traditional phonetic conversion). Re-attach timing
+			// from the authoritative synced/unsynced source whenever indices align.
 			const initialCurrentLyrics = this.state.currentLyrics?.length > 0 && this.state.currentLyrics?.some(l => l.text || l.text2)
 				? this.state.currentLyrics
-				: (tempState.currentLyrics || tempState.synced || tempState.unsynced || []);
+				: this._reattachTiming(
+					tempState.currentLyrics || tempState.synced || tempState.unsynced || [],
+					tempState.synced || tempState.unsynced
+				);
 			
 			this.setState({
 				furigana: null,
@@ -657,6 +670,16 @@ infoFromTrack(track) {
 			...(tempState.neteaseTranslation && { neteaseTranslation: tempState.neteaseTranslation }),
 			// Preserve videoBackground state to avoid reloading
 			videoBackground: this.state.videoBackground,
+			isTranslating: false,
+			translationStatus: null,
+			translationIndicatorUri: null,
+			preTranslateChip: null,
+			reasoningContent: "",
+			reasoningStreams: {},
+			reasoningActiveTab: null,
+			// Keep reasoning window open across track changes so the user can watch
+			// new song's translation/phonetic stream replace the previous song's content.
+			isReasoningVisible: this.state.isReasoningVisible,
 		});
 		// Video background is fetched independently in parallel
 		return;
@@ -665,7 +688,10 @@ infoFromTrack(track) {
 		// Preserve cached translations when not changing songs
 		const initialCurrentLyrics2 = this.state.currentLyrics?.length > 0 && this.state.currentLyrics?.some(l => l.text || l.text2)
 			? this.state.currentLyrics
-			: (tempState.currentLyrics || tempState.synced || tempState.unsynced || []);
+			: this._reattachTiming(
+				tempState.currentLyrics || tempState.synced || tempState.unsynced || [],
+				tempState.synced || tempState.unsynced
+			);
 		
 		this.setState({
 			...tempState,
@@ -700,7 +726,7 @@ infoFromTrack(track) {
 		if (!lyrics) {
 			lyrics = lyricsState.synced || lyricsState.unsynced || lyricsState.genius || null;
 			if (!lyrics) {
-				this.setState({ currentLyrics: [] });
+				this._setCurrentLyrics([]);
 				return;
 			}
 		}
@@ -777,6 +803,10 @@ infoFromTrack(track) {
 					return await this.getTraditionalConversion(lyricsState, baseLyrics, originalLanguage, mode);
 				}
 			} catch (error) {
+				const prog = this.state.translationStatus;
+				if (prog?.type === "progress" && prog?.trackUri === this.state.uri) {
+					this.setState({ translationStatus: null });
+				}
 				const modeDisplayName = mode === "gemini_romaji" ? "Romaji, Romaja, Pinyin translation" : "Vietnamese translation";
 				Spicetify.showNotification(`${modeDisplayName} failed: ${error.message || "Unknown error"}`, true, 4000);
 				return null; // Return null on failure
@@ -788,7 +818,7 @@ infoFromTrack(track) {
 		// If no display modes are active, just optimize the original lyrics (e.g., to handle note lines)
 		if ((!displayMode1 || displayMode1 === "none") && (!displayMode2 || displayMode2 === "none")) {
 			const optimizedLyrics = this.optimizeTranslations(lyrics, null, null);
-			this.setState({ currentLyrics: Array.isArray(optimizedLyrics) ? optimizedLyrics : [] });
+			this._setCurrentLyrics(Array.isArray(optimizedLyrics) ? optimizedLyrics : []);
 			return;
 		}
 
@@ -835,7 +865,7 @@ infoFromTrack(track) {
 			// Pre-emptive clear: If not in L1 cache, clear lyrics immediately to prevent showing old song's lyrics
 			// This addresses "Lyrics don't switch" by ensuring at least a blank slate while fetching
 			if (!CacheManager.getSync(queue.current.uri)) {
-				this.setState({ currentLyrics: [] });
+				this._setCurrentLyrics([]);
 			}
 
 			this.fetchLyrics(queue.current, this.state.explicitMode);
@@ -843,7 +873,7 @@ infoFromTrack(track) {
 
 			// Reset pre-translation state when track changes
 			this.pretranslatedUri = null;
-			this.setState({ preTranslated: false });
+			this.setState({ preTranslated: false, preTranslateChip: null });
 
 			// 1. Get next track info
 			const nextTrack = queue.queued?.[0] || queue.nextUp?.[0];
@@ -854,29 +884,89 @@ infoFromTrack(track) {
 			if (nextUri === this.nextTrackUri) return;
 			this.nextTrackUri = nextUri;
 
-			// 2. Check cache for raw lyrics
+			// 2. Check cache for raw lyrics (validate it's real lyrics, not a stale state snapshot)
 			let rawLyrics = await CacheManager.get(nextUri);
+			if (rawLyrics) {
+				const hasSynced = Array.isArray(rawLyrics.synced) && rawLyrics.synced.length > 0;
+				const hasUnsynced = Array.isArray(rawLyrics.unsynced) && rawLyrics.unsynced.length > 0;
+				const hasGenius = rawLyrics.genius && typeof rawLyrics.genius === 'string' && rawLyrics.genius.length > 0;
+				if (!hasSynced && !hasUnsynced && !hasGenius) {
+					rawLyrics = null; // Stale cache, treat as miss
+				}
+			}
+
+			const nextInfo = {
+				uri: nextUri,
+				artist: nextTrack.metadata?.artist_name,
+				title: nextTrack.metadata?.title,
+				duration: nextTrack.metadata?.duration,
+				album: nextTrack.metadata?.album_title,
+				images: nextTrack.metadata?.image_url
+			};
 
 			if (!rawLyrics) {
 				// Fetch raw lyrics if not cached
-				const nextInfo = {
-					uri: nextUri,
-					artist: nextTrack.metadata.artist_name,
-					title: nextTrack.metadata.title,
-					duration: nextTrack.metadata.duration,
-					album: nextTrack.metadata.album_title,
-					images: nextTrack.metadata.image_url
-				};
-
 				// Note: tryServices returns data but doesn't set state
 				try {
-					rawLyrics = await this.tryServices(nextInfo);
+					rawLyrics = await this.tryServices(nextInfo, -1, { skipStaleCheck: true });
 				} catch (err) {
 					console.warn("[Lyrics+] Failed to pre-fetch next track lyrics:", err);
 				}
 
 				if (rawLyrics) {
 					CacheManager.set(nextUri, rawLyrics);
+				}
+			}
+
+			// 3. Pre-translate next track's lyrics (background, silent)
+			if (rawLyrics && CONFIG.visual["pre-translation"]) {
+				const provider = CONFIG.visual["translate:translated-lyrics-source"];
+				if (provider === "geminiVi") {
+					const lyricsToTranslate = rawLyrics.synced || rawLyrics.unsynced;
+					if (lyricsToTranslate?.length && nextInfo.artist && nextInfo.title) {
+						const lyricsState = {
+							...rawLyrics,
+							uri: nextUri,
+							artist: nextInfo.artist,
+							title: nextInfo.title
+						};
+
+						// Detect language and translation modes
+						const originalLanguage = this.provideLanguageCode(lyricsToTranslate);
+						let friendlyLanguage = null;
+						if (originalLanguage) {
+							try {
+								friendlyLanguage = new Intl.DisplayNames(["en"], { type: "language" })
+									.of(originalLanguage.split("-")[0])?.toLowerCase();
+							} catch (e) { /* ignore */ }
+						}
+						const modeKey = !friendlyLanguage ? "gemini" : friendlyLanguage;
+						const dm1 = CONFIG.visual[`translation-mode:${modeKey}`];
+						const dm2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
+
+						// Fire-and-forget translations
+						let geminiPretransStarted = false;
+						const triggerMode = (mode) => {
+							if (mode && mode !== "none" && String(mode).startsWith("gemini")) {
+								geminiPretransStarted = true;
+								this.getGeminiTranslation(lyricsState, lyricsToTranslate, mode, true)
+									.catch((e) => {
+										console.warn(`[Lyrics+] Pre-translation failed for ${mode}:`, e);
+										queueMicrotask(() => this._maybeClearPretranslateChip(nextUri));
+									});
+							}
+						};
+						triggerMode(dm1);
+						triggerMode(dm2);
+
+						this.pretranslatedUri = nextUri;
+						if (geminiPretransStarted) {
+							this.setState({
+								preTranslateChip: { uri: nextUri, title: nextInfo.title || "" },
+							});
+						}
+						console.log(`[Lyrics+] Pre-translating next: ${nextInfo.artist} - ${nextInfo.title}`);
+					}
 				}
 			}
 		} catch (error) {
@@ -942,7 +1032,7 @@ infoFromTrack(track) {
 
 			// Smart deduplication and optimization
 			const optimizedTranslations = this.optimizeTranslations(lyrics, mode1, mode2);
-			this.setState({ currentLyrics: Array.isArray(optimizedTranslations) ? optimizedTranslations : [] });
+			this._setCurrentLyrics(Array.isArray(optimizedTranslations) ? optimizedTranslations : []);
 		};
 
 		// Check if we already have cached results
@@ -976,7 +1066,7 @@ infoFromTrack(track) {
 
 		// No cache yet - show original lyrics immediately so UI isn't blank while waiting
 		const optimizedOriginal = this.optimizeTranslations(lyrics, null, null);
-		this.setState({ currentLyrics: Array.isArray(optimizedOriginal) ? optimizedOriginal : [] });
+		this._setCurrentLyrics(Array.isArray(optimizedOriginal) ? optimizedOriginal : []);
 
 		// Staggered parallel execution: Phonetic starts first, Translation starts 500ms later
 		// This avoids API contention while keeping total time close to parallel
@@ -1078,31 +1168,87 @@ infoFromTrack(track) {
 	 * @param {Array} mode2 - Translation from Display Mode 2
 	 * @returns {Array} Optimized lyrics with smart deduplication
 	 */
+	// Format a duration in ms into a human-friendly short string (e.g. "850ms", "3.2s", "1m 24s").
+	_formatDuration(ms) {
+		const n = Math.max(0, Math.round(Number(ms) || 0));
+		if (n < 1000) return `${n}ms`;
+		if (n < 60000) return `${(n / 1000).toFixed(1)}s`;
+		const minutes = Math.floor(n / 60000);
+		const seconds = Math.round((n % 60000) / 1000);
+		return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+	}
+
 	optimizeTranslations(originalLyrics, mode1, mode2) {
-		// Delegate to TranslationUtils
-		return TranslationUtils.optimizeTranslations(originalLyrics, mode1, mode2);
+		// Delegate to TranslationUtils, then guarantee timing is intact. If TranslationUtils
+		// (or any future override) drops startTime, we re-attach from the very `originalLyrics`
+		// it was given — that array is the authoritative timeline by definition here.
+		const optimized = TranslationUtils.optimizeTranslations(originalLyrics, mode1, mode2);
+		return this._reattachTiming(optimized, originalLyrics);
+	}
+
+	/**
+	 * Repair-on-load helper: when a lyric array is missing per-line `startTime`
+	 * (e.g. legacy cached `currentLyrics` from before phonetic conversion preserved
+	 * timing), splice the timestamps back in by index from the authoritative source
+	 * (`synced`/`unsynced`). Without this, click-to-seek is dead and active-line
+	 * detection collapses to the last/first line.
+	 */
+	/**
+	 * Single chokepoint for committing currentLyrics into React state. Every other
+	 * setState({ currentLyrics: ... }) call is rewritten to go through this so we
+	 * can guarantee timing is intact regardless of upstream code path.
+	 */
+	_setCurrentLyrics(arr) {
+		if (!Array.isArray(arr)) {
+			this.setState({ currentLyrics: arr });
+			return;
+		}
+		const source = this.state.synced || this.state.unsynced;
+		this.setState({ currentLyrics: this._reattachTiming(arr, source) });
+	}
+
+	_reattachTiming(target, source) {
+		if (!Array.isArray(target)) return target;
+		if (!Array.isArray(source) || source.length !== target.length) return target;
+		const needsRepair = target.some(l => l && (typeof l.startTime !== "number" || !isFinite(l.startTime)));
+		if (!needsRepair) return target;
+		return target.map((line, i) => {
+			const src = source[i];
+			if (!src) return line;
+			return {
+				...line,
+				startTime: (typeof line?.startTime === "number" && isFinite(line.startTime)) ? line.startTime : src.startTime,
+				endTime: (typeof line?.endTime === "number" && isFinite(line.endTime)) ? line.endTime : src.endTime,
+			};
+		});
+	}
+
+	/** Hide next-track pre-translate chip when no Gemini work remains for that URI (incl. instant cache hits). */
+	_maybeClearPretranslateChip(uri) {
+		if (!uri) return;
+		const hasInflight = this._inflightGemini && [...this._inflightGemini.keys()].some((k) => k.startsWith(uri + ":"));
+		const pend = this._pretranslatePending?.[uri] || 0;
+		if (!hasInflight && pend === 0 && this.state.preTranslateChip?.uri === uri) {
+			this.setState({ preTranslateChip: null });
+		}
 	}
 
 	async getGeminiTranslation(lyricsState, lyrics, mode, silent = false) {
-		const apiMode = CONFIG.visual["gemini:api-mode"] || "official";
 		const viKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini-api-key`);
 		const romajiKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini-api-key-romaji`);
-		const proxyApiKey = ConfigUtils.getPersisted(`${APP_NAME}:visual:gemini:proxy-api-key`);
 
 		// --- 1. CONFIG VALIDATION (Sync) ---
 		let wantSmartPhonetic = (mode === "gemini_romaji");
 		let apiKey;
 
-		if (apiMode === "proxy") {
-			apiKey = proxyApiKey || "proxy-default";
-		} else if (wantSmartPhonetic) {
+		if (wantSmartPhonetic) {
 			apiKey = romajiKey || viKey;
 		} else {
 			apiKey = viKey || romajiKey;
 		}
 
-		if (apiMode === "official" && !apiKey) {
-			throw new Error("Gemini API key missing. Please add at least one key in Settings.");
+		if (!apiKey) {
+			throw new Error("API key missing. Please add at least one key in Settings.");
 		}
 
 		if (!Array.isArray(lyrics) || lyrics.length === 0) {
@@ -1118,85 +1264,210 @@ infoFromTrack(track) {
 		// Await Cache (L1 -> L2 logic inside CacheManager)
 		const cached = await CacheManager.get(cacheKey2);
 		if (cached) {
+			if (silent) {
+				const u = lyricsState.uri;
+				queueMicrotask(() => this._maybeClearPretranslateChip(u));
+			}
 			return cached;
 		}
 
 		// --- 3. IN-FLIGHT DEDUPLICATION ---
 		this._inflightGemini = this._inflightGemini || new Map();
 		if (this._inflightGemini.has(cacheKey2)) {
-			return this._inflightGemini.get(cacheKey2); // Return existing Promise
+			const inflight = this._inflightGemini.get(cacheKey2);
+			if (!silent) {
+				inflight.uiWanted = true;
+				if (lyricsState.uri === this.state.uri) {
+					this.setState({
+						isTranslating: true,
+						translationIndicatorUri: lyricsState.uri,
+						translationStatus: null,
+						reasoningContent: "",
+						reasoningStreams: {},
+						reasoningActiveTab: null,
+						// Preserve user's window-visibility choice — new song's stream
+						// will fill the open window and replace the previous content.
+					});
+				}
+			}
+			return inflight.promise;
 		}
 
 		// --- 4. PREPARE REQUEST ---
 		const text = lyrics.map((l) => l?.text || " ").join("\n");
-		if (!silent) this.setState({ isTranslating: true });
+		const inflight = { uiWanted: !silent, promise: null };
+		const trackUri = lyricsState.uri;
 
-		// --- 5. EXECUTE (Async) ---
-		const executionPromise = (async () => {
-			try {
-				const { vi, phonetic, duration } = await Translator.callGemini({
-					apiKey,
-					artist: lyricsState.artist || this.state.artist,
-					title: lyricsState.title || this.state.title,
-					text,
-					styleKey,
-					pronounKey,
-					wantSmartPhonetic,
-					priority: !silent,
-					taskId: cacheKey2
-				});
-
-				// UI Feedback
-				if (duration && !silent) {
-					this.setState({
-						isTranslating: false,
-						translationStatus: { type: 'success', text: getText("notifications.translatedIn", { duration }) }
-					});
-					setTimeout(() => this.setState({ translationStatus: null }), 3000);
-				}
-
-				// Process Result
-				let outText = wantSmartPhonetic ? phonetic : vi;
-				if (!outText) throw new Error("Empty result from Gemini.");
-
-				let lines = Array.isArray(outText) ? outText : (typeof outText === 'string' ? outText.split("\n") : null);
-				if (!lines) throw new Error("Invalid translation format.");
-
-				const mapped = lyrics.map((line, i) => ({
-					...line,
-					text: lines[i]?.trim() || line?.text || "",
-					originalText: line?.text || "",
-				}));
-
-				// --- 6. SAVE TO CACHE (Fire & Forget) ---
-				CacheManager.set(cacheKey2, mapped);
-
-				return mapped;
-
-			} catch (err) {
-				// UI Error Handling
-				if (!silent) {
-					this.setState({
-						isTranslating: false,
-						translationStatus: { type: 'error', text: err.message || getText("notifications.translationFailed") }
-					});
-					setTimeout(() => this.setState({ translationStatus: null }), 5000);
-				}
-				throw err;
-			} finally {
-				// Cleanup
-				this._inflightGemini.delete(cacheKey2);
-				if (this.state.isTranslating) this.setState({ isTranslating: false });
+		// Mark the wall-clock start of the first Gemini task for this track. Subsequent parallel
+		// tasks (translation + phonetic) reuse this timestamp so the user sees real elapsed time
+		// instead of summed per-task durations.
+		if (!silent) {
+			this._geminiUiStartTime = this._geminiUiStartTime || {};
+			if (this._geminiUiStartTime[trackUri] == null) {
+				this._geminiUiStartTime[trackUri] = Date.now();
 			}
-		})();
+		}
 
-		// Store the promise for deduplication
-		this._inflightGemini.set(cacheKey2, executionPromise);
+        // --- 5. EXECUTE (Async) ---
+        const executionPromise = (async () => {
+			if (silent) {
+				this._pretranslatePending = this._pretranslatePending || {};
+				this._pretranslatePending[trackUri] = (this._pretranslatePending[trackUri] || 0) + 1;
+			}
+            try {
+				if (inflight.uiWanted && trackUri === this.state.uri) {
+					this.setState({
+						isTranslating: true,
+						translationIndicatorUri: trackUri,
+						translationStatus: null,
+						reasoningContent: "",
+						reasoningStreams: {},
+						reasoningActiveTab: null,
+						// Preserve user's window-visibility choice — new song's stream
+						// will fill the open window and replace the previous content.
+					});
+				}
+
+                // Per-task live-stream sink — keeps Translation and Phonetic reasoning separate.
+                // Auto-focus only the FIRST time a bucket gets content; after that, never override
+                // the user's tab choice (or the previously-set focus). This prevents the window
+                // from flipping back and forth on every chunk when both streams run in parallel.
+                const taskKey = wantSmartPhonetic ? "phonetic" : "translation";
+                let lastUiReasoning = "";
+                const handleReasoningProgress = (partial) => {
+                    if (!inflight.uiWanted || trackUri !== this.state.uri) return;
+                    if (!partial || partial === lastUiReasoning) return;
+                    lastUiReasoning = partial;
+                    this.setState((prev) => {
+                        const prevStreams = prev.reasoningStreams || {};
+                        const wasEmpty = !prevStreams[taskKey] || !String(prevStreams[taskKey]).trim();
+                        const next = {
+                            reasoningStreams: { ...prevStreams, [taskKey]: partial },
+                        };
+                        // Only set active tab on the very first chunk for this bucket AND only if no tab is focused yet
+                        if (wasEmpty && !prev.reasoningActiveTab) {
+                            next.reasoningActiveTab = taskKey;
+                        }
+                        return next;
+                    });
+                };
+
+                const { vi, phonetic, duration, reasoningContent } = await Translator.callGemini({
+                    apiKey,
+                    artist: lyricsState.artist || this.state.artist,
+                    title: lyricsState.title || this.state.title,
+                    text,
+                    styleKey,
+                    pronounKey,
+                    wantSmartPhonetic,
+                    priority: inflight.uiWanted,
+                    taskId: cacheKey2,
+                    onReasoningProgress: handleReasoningProgress,
+                });
+
+                if (duration != null && inflight.uiWanted && trackUri === this.state.uri) {
+					// Wall-clock timing: when translation + phonetic run in parallel,
+					// summing their individual durations would double-count time. Instead,
+					// measure from the first task starting to the last task finishing.
+					const otherPending = [...this._inflightGemini.keys()].some(
+						(k) => k.startsWith(trackUri + ":") && k !== cacheKey2
+					);
+					if (!otherPending) {
+						const startedAt = (this._geminiUiStartTime || {})[trackUri];
+						const total = startedAt ? (Date.now() - startedAt) : (Number(duration) || 0);
+						if (this._geminiUiStartTime) delete this._geminiUiStartTime[trackUri];
+						this.setState({
+							translationStatus: {
+								type: "success",
+								text: getText("notifications.translatedIn", { duration: this._formatDuration(total) }),
+								trackUri,
+							},
+						});
+						setTimeout(() => {
+							this.setState((s) =>
+								s.translationStatus?.trackUri === trackUri ? { translationStatus: null } : {}
+							);
+						}, 3000);
+					}
+                }
+
+                if (reasoningContent && inflight.uiWanted && trackUri === this.state.uri) {
+                    this.setState((prev) => ({
+                        reasoningStreams: { ...(prev.reasoningStreams || {}), [taskKey]: reasoningContent },
+                    }));
+                }
+
+                // Process Result
+                let outText = wantSmartPhonetic ? phonetic : vi;
+                if (!outText) throw new Error("Empty result from Gemini.");
+
+                let lines = Array.isArray(outText) ? outText : (typeof outText === 'string' ? outText.split("\n") : null);
+                if (!lines) throw new Error("Invalid translation format.");
+
+                const mapped = lyrics.map((line, i) => ({
+                    ...line,
+                    text: lines[i]?.trim() || line?.text || "",
+                    originalText: line?.text || "",
+                }));
+
+                // --- 6. SAVE TO CACHE (Fire & Forget) ---
+                CacheManager.set(cacheKey2, mapped);
+
+                return mapped;
+
+            } catch (err) {
+                if (inflight.uiWanted && trackUri === this.state.uri) {
+					if (this._geminiUiStartTime && this._geminiUiStartTime[trackUri] != null) {
+						delete this._geminiUiStartTime[trackUri];
+					}
+                    this.setState({
+                        translationStatus: {
+							type: 'error',
+							text: err.message || getText("notifications.translationFailed"),
+							trackUri,
+						},
+                    });
+                    setTimeout(() => {
+						this.setState((s) =>
+							s.translationStatus?.trackUri === trackUri ? { translationStatus: null } : {}
+						);
+					}, 5000);
+                }
+                throw err;
+            } finally {
+                this._inflightGemini.delete(cacheKey2);
+				if (silent) {
+					const u = trackUri;
+					this._pretranslatePending = this._pretranslatePending || {};
+					this._pretranslatePending[u] = Math.max(0, (this._pretranslatePending[u] || 1) - 1);
+					if (this._pretranslatePending[u] <= 0) {
+						delete this._pretranslatePending[u];
+					}
+					queueMicrotask(() => this._maybeClearPretranslateChip(u));
+				}
+                if (inflight.uiWanted && trackUri === this.state.uri) {
+					const hasMoreGemini = [...this._inflightGemini.keys()].some((k) => k.startsWith(trackUri + ':'));
+					if (!hasMoreGemini) {
+						this.setState({ isTranslating: false, translationIndicatorUri: null });
+					}
+				}
+            }
+        })();
+
+		inflight.promise = executionPromise;
+		this._inflightGemini.set(cacheKey2, inflight);
 
 		return executionPromise;
 	}
 
-	async getTraditionalConversion(lyricsState, lyrics, language, displayMode) {
+  // Toggle reasoning modal visibility
+  toggleReasoning = () => {
+    this.setState(prevState => ({
+      isReasoningVisible: !prevState.isReasoningVisible
+    }));
+  };
+
+  async getTraditionalConversion(lyricsState, lyrics, language, displayMode) {
 		// Debug logging
 		if (window.lyricsPlusDebug) {
 			console.log("[Lyrics+] getTraditionalConversion called:", { language, displayMode, lyricsCount: lyrics?.length, uri: lyricsState?.uri?.split(':').pop() });
@@ -1209,15 +1480,30 @@ infoFromTrack(track) {
 
 		const cacheKey = `${lyricsState.uri}:trad:${language}:${displayMode}`;
 
+		// Re-attach timing metadata from the original lyric lines so that downstream
+		// consumers (active-line detection, click-to-seek, idle indicators) keep working.
+		// Without this, traditional conversion (Kuroshiro/Pinyin) historically dropped
+		// startTime, breaking sync for local LRC files and any non-Gemini display mode.
+		const mergeTiming = (converted) => {
+			if (!Array.isArray(converted)) return converted;
+			return converted.map((item, i) => {
+				const src = lyrics[i] || {};
+				const text = typeof item === "string" ? item : item?.text;
+				return {
+					...src,
+					...(typeof item === "object" && item !== null ? item : {}),
+					text: text ?? src.text ?? "",
+					startTime: src.startTime,
+					endTime: src.endTime,
+				};
+			});
+		};
+
 		// Await Cache
 		const cached = await CacheManager.get(cacheKey);
 		if (cached) {
 			if (window.lyricsPlusDebug) console.log("[Lyrics+] getTraditionalConversion - CACHE HIT, returning cached");
-			// Handle legacy cache format (string array)
-			if (Array.isArray(cached) && cached.length > 0 && typeof cached[0] === 'string') {
-				return cached.map(t => ({ text: t }));
-			}
-			return cached;
+			return mergeTiming(cached);
 		}
 
 		// De-duplicate concurrent calls
@@ -1246,14 +1532,15 @@ infoFromTrack(track) {
 				const translated = await this.translateLyrics(language, lyrics, displayMode);
 
 				if (translated !== undefined && translated !== null) {
-					// Standardize format
-					let formattedResult = translated;
-					if (Array.isArray(translated) && translated.length > 0 && typeof translated[0] === 'string') {
-						formattedResult = translated.map(t => ({ text: t }));
+					// Cache only the converted text payload (small + portable); timing is
+					// always re-attached on read via mergeTiming, so cache stays decoupled
+					// from any specific song's timeline.
+					let cachePayload = translated;
+					if (Array.isArray(translated) && translated.length > 0 && typeof translated[0] !== 'string') {
+						cachePayload = translated.map(t => ({ text: t?.text ?? "" }));
 					}
-
-					CacheManager.set(cacheKey, formattedResult);
-					return formattedResult;
+					CacheManager.set(cacheKey, cachePayload);
+					return mergeTiming(translated);
 				}
 				throw new Error("Empty result from conversion.");
 
@@ -1421,7 +1708,6 @@ infoFromTrack(track) {
 			}
 
 			const res = Utils.processTranslatedLyrics(result, lyrics);
-			Spicetify.showNotification("✓ Conversion completed successfully", false, 2000);
 			return res;
 		} catch (error) {
 			Spicetify.showNotification(`Conversion failed: ${error.message || "Unknown error"}`, true, 3000);
@@ -1496,8 +1782,12 @@ infoFromTrack(track) {
 			// Translation services
 			musixmatchTranslation: this.state.musixmatchTranslation,
 			neteaseTranslation: this.state.neteaseTranslation,
-			// Current display mode results
-			currentLyrics: this.state.currentLyrics,
+			// Current display mode results — repaired before persisting so a future
+			// reload can never replay a timing-stripped payload.
+			currentLyrics: this._reattachTiming(
+				this.state.currentLyrics,
+				lyricsToSave.synced || lyricsToSave.unsynced
+			),
 			// Language detection
 			language: this.state.language,
 			timestamp: Date.now()
@@ -1595,7 +1885,7 @@ infoFromTrack(track) {
 			
 			// Clear currentLyrics state to force UI refresh showing original lyrics
 			// This ensures the translation lines disappear immediately while re-fetching
-			this.setState({ currentLyrics: null });
+			this._setCurrentLyrics(null);
 		} else {
 			// Full clear: all translations for this URI (original behavior)
 			clearedCount = CacheManager.clearByUri(uri);
@@ -1637,12 +1927,6 @@ infoFromTrack(track) {
 			keysToDelete.forEach(key => this._inflightGemini.delete(key));
 		}
 
-		// Check if there are any translations to reset
-		const hasTranslations = this.state.romaji || this.state.furigana || this.state.hiragana ||
-			this.state.katakana || this.state.hangul || this.state.romaja ||
-			this.state.cn || this.state.hk || this.state.tw ||
-			this.state.musixmatchTranslation || this.state.neteaseTranslation;
-
 		// Only reset full translation states if doing full clear
 		if (!modesToClear) {
 			this.setState({
@@ -1660,16 +1944,47 @@ infoFromTrack(track) {
 			});
 		}
 
+		const totalCleared = clearedCount + geminiClearedCount;
+		const modeKey = this.modeKey || "gemini";
+		const dm1 = CONFIG.visual[`translation-mode:${modeKey}`];
+		const dm2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
+		const activeGemini = [dm1, dm2].some((m) => m && m !== "none" && String(m).startsWith("gemini"));
+		const hasSelectiveModes = modesToClear && modesToClear.length > 0;
+		const touchesGemini = !modesToClear || modesToClear.some((m) => String(m).startsWith("gemini"));
+		const showProgress =
+			activeGemini &&
+			touchesGemini &&
+			(modesToClear == null || totalCleared > 0 || hasSelectiveModes);
+
+		if (showProgress) {
+			this.setState({
+				translationStatus: {
+					type: "progress",
+					text: getText("notifications.reTranslating"),
+					trackUri: this.state.uri,
+				},
+			});
+		}
+
 		// Force re-process lyrics with current display modes
 		const currentMode = this.getCurrentMode();
 		this.lyricsSource(this.state, currentMode);
 
-		const totalCleared = clearedCount + geminiClearedCount;
-		// Show status in TranslatingIndicator instead of popup notification
-		const statusText = (totalCleared > 0 || modesToClear) ? "Re-translating..." : "Cache cleared";
-		this.setState({ translationStatus: { type: 'success', text: statusText } });
-		// Auto-clear status after 1.5s
-		setTimeout(() => this.setState({ translationStatus: null }), 1500);
+		if (!showProgress) {
+			const clearedForUri = this.state.uri;
+			this.setState({
+				translationStatus: {
+					type: "success",
+					text: getText("notifications.cacheClearedShort"),
+					trackUri: clearedForUri,
+				},
+			});
+			setTimeout(() => {
+				this.setState((s) =>
+					s.translationStatus?.trackUri === clearedForUri ? { translationStatus: null } : {}
+				);
+			}, 1500);
+		}
 	}
 
 	processLyricsFromFile(event) {
@@ -1763,37 +2078,60 @@ infoFromTrack(track) {
 		// Only pre-translate if current song is long enough (>45s) and has played for a bit (>5s)
 		if (duration < 45000 || progress < 5000) return;
 
-		console.log(`[Lyrics+] Pre-translating next track: ${nextInfo.artist} - ${nextInfo.title}`);
+		console.log(`[Lyrics+] Pre-translate: starting for ${nextInfo.artist} - ${nextInfo.title}`);
 		this.pretranslatedUri = nextInfo.uri;
 
 		// 1. Check/Fetch Raw Lyrics (without setting state)
-		let lyricsData = CacheManager.getSync(nextInfo.uri);
+		let lyricsData = null;
+
+		// Helper: check if cached data has actual lyrics content (not a stale state snapshot)
+		const hasLyricsContent = (data) => {
+			if (!data) return false;
+			const hasSynced = Array.isArray(data.synced) && data.synced.length > 0;
+			const hasUnsynced = Array.isArray(data.unsynced) && data.unsynced.length > 0;
+			const hasGenius = data.genius && typeof data.genius === 'string' && data.genius.length > 0;
+			return hasSynced || hasUnsynced || hasGenius;
+		};
+
+		// Check L1 + L2 cache first
+		try {
+			const cached = await CacheManager.get(nextInfo.uri);
+			if (cached && hasLyricsContent(cached)) {
+				lyricsData = cached;
+				console.log(`[Lyrics+] Pre-translate: cache HIT with valid lyrics`);
+			} else if (cached) {
+				console.log(`[Lyrics+] Pre-translate: cache HIT but stale (no lyrics content), treating as MISS`);
+			}
+		} catch (e) {
+			console.warn(`[Lyrics+] Pre-translate: cache lookup failed:`, e);
+		}
 
 		if (!lyricsData) {
+			// Fetch from network (same as fetchLyrics)
+			console.log(`[Lyrics+] Pre-translate: fetching lyrics from network...`);
 			try {
-				lyricsData = await this.tryServices(nextInfo);
-				if (lyricsData.provider) {
+				lyricsData = await this.tryServices(nextInfo, -1, { skipStaleCheck: true });
+				if (lyricsData?.provider) {
 					CacheManager.set(nextInfo.uri, lyricsData);
+					console.log(`[Lyrics+] Pre-translate: lyrics fetched from ${lyricsData.provider}`);
 				}
 			} catch (e) {
-				console.warn("[Lyrics+] Pre-translation fetch failed:", e);
+				console.warn("[Lyrics+] Pre-translate: lyrics fetch failed:", e);
 				this.pretranslatedUri = null;
 				return;
 			}
 		}
 
 		if (!lyricsData) {
+			console.log(`[Lyrics+] Pre-translate: no lyrics data available, aborting`);
 			this.pretranslatedUri = null;
 			return;
 		}
 
 		// 2. Trigger Translation (background only)
 		const lyricsToTranslate = lyricsData.synced || lyricsData.unsynced || lyricsData.genius;
-		if (!lyricsToTranslate) {
-			// No lyrics to translate, but we fetched them. 
-			// Keep pretranslatedUri set so we don't keep trying to fetch empty lyrics?
-			// Or reset? If we reset, we'll keep fetching empty lyrics every 3s.
-			// Better to NOT reset here if we successfully got "no lyrics".
+		if (!lyricsToTranslate || (Array.isArray(lyricsToTranslate) && lyricsToTranslate.length === 0)) {
+			console.log(`[Lyrics+] Pre-translate: no translatable lyrics found`);
 			return;
 		}
 
@@ -1806,7 +2144,7 @@ infoFromTrack(track) {
 		// Ensure metadata is present for translation prompt
 		const lyricsStateForTranslation = {
 			...lyricsData,
-			uri: nextInfo.uri, // Explicitly ensure URI matches for deduplication
+			uri: nextInfo.uri,
 			artist: nextInfo.artist,
 			title: nextInfo.title
 		};
@@ -1817,10 +2155,7 @@ infoFromTrack(track) {
 		if (originalLanguage) {
 			try {
 				friendlyLanguage = new Intl.DisplayNames(["en"], { type: "language" }).of(originalLanguage.split("-")[0])?.toLowerCase();
-			} catch (e) {
-				// Intl.DisplayNames may not support all language codes
-				if (window.lyricsPlusDebug) console.warn("[Lyrics+] Could not get friendly language name:", e);
-			}
+			} catch (e) { /* ignore */ }
 		}
 
 		const modeKey = !friendlyLanguage ? "gemini" : friendlyLanguage;
@@ -1830,18 +2165,27 @@ infoFromTrack(track) {
 		const triggerTranslation = async (mode) => {
 			if (!mode || mode === "none") return;
 			if (String(mode).startsWith("gemini")) {
+				console.log(`[Lyrics+] Pre-translate: triggering ${mode} translation (${lyricsToTranslate.length} lines)`);
 				// Silent translation in background
-				await this.getGeminiTranslation(lyricsStateForTranslation, lyricsToTranslate, mode, true).catch(e => {
-					console.warn(`[Lyrics+] Pre-translation for mode ${mode} failed:`, e);
-					// Reset flag to allow retry in next interval (after backoff)
+				await this.getGeminiTranslation(lyricsStateForTranslation, lyricsToTranslate, mode, true).catch((e) => {
+					console.warn(`[Lyrics+] Pre-translate: ${mode} translation failed:`, e);
 					this.pretranslatedUri = null;
+					queueMicrotask(() => this._maybeClearPretranslateChip(nextInfo.uri));
 				});
 			}
 		};
 
 		// Trigger translations in parallel
+		const startedGemini = [displayMode1, displayMode2].some(
+			(m) => m && m !== "none" && String(m).startsWith("gemini")
+		);
 		triggerTranslation(displayMode1);
 		triggerTranslation(displayMode2);
+		if (startedGemini) {
+			this.setState({
+				preTranslateChip: { uri: nextInfo.uri, title: nextInfo.title || "" },
+			});
+		}
 	}
 	initMoustrap() {
 		if (!this.mousetrap && Spicetify.Mousetrap) {
@@ -1871,7 +2215,7 @@ infoFromTrack(track) {
 
 			// Reset pre-translation state when track changes
 			this.pretranslatedUri = null;
-			this.setState({ preTranslated: false });
+			this.setState({ preTranslated: false, preTranslateChip: null });
 
 			// 1. Get next track info
 			const nextTrack = queue.queued?.[0] || queue.nextUp?.[0];
@@ -1995,8 +2339,9 @@ infoFromTrack(track) {
 			const duration = Spicetify.Player.getDuration();
 			const progress = Spicetify.Player.getProgress();
 
-			// Check if we are within the last 30 seconds of the song
-			if (duration > 0 && duration - progress < 30000) {
+			// Check if we are within the pre-translation window before song ends
+			const preTransTime = (Number(CONFIG.visual["pre-translation-time"]) || 30) * 1000;
+			if (duration > 0 && duration - progress < preTransTime) {
 				this.tryPretranslateNext();
 			}
 		}, 3000);
@@ -2007,6 +2352,7 @@ infoFromTrack(track) {
 		this.configButton.deregister();
 		this.mousetrap.reset();
 		window.removeEventListener("fad-request", lyricContainerUpdate);
+
 
 		if (this.pretranslateInterval) {
 			clearInterval(this.pretranslateInterval);
@@ -2087,6 +2433,15 @@ infoFromTrack(track) {
 	render() {
 		const fadLyricsContainer = document.getElementById("fad-lyrics-plus-container");
 		this.state.isFADMode = !!fadLyricsContainer;
+
+		const trackUriNow = this.state.uri;
+		const translationStatusForTrack =
+			this.state.translationStatus &&
+			(!this.state.translationStatus.trackUri || this.state.translationStatus.trackUri === trackUriNow)
+				? this.state.translationStatus
+				: null;
+		const translationIndicatorVisible =
+			this.state.isTranslating && this.state.translationIndicatorUri === trackUriNow;
 
 		const brightness = CONFIG.visual["background-brightness"];
 		const brightnessVal = (brightness !== undefined && brightness !== null) ? brightness : 100;
@@ -2240,6 +2595,7 @@ infoFromTrack(track) {
 		const out = react.createElement(
 			"div",
 			{
+				key: `lyrics-tree-${this.state.renderKey}`,
 				className: `lyrics-lyricsContainer-LyricsContainer${CONFIG.visual["fade-blur"] ? " blur-enabled" : ""}${fadLyricsContainer ? " fad-enabled" : ""
 					}${this.state.videoBackground && CONFIG.visual["video-background"] ? " video-bg-active" : ""}`,
 				style: this.styleVariables,
@@ -2264,12 +2620,17 @@ infoFromTrack(track) {
 		react.createElement("div", {
 			className: "lyrics-lyricsContainer-LyricsBackground",
 		}),
-			// Translation in progress indicator
-			react.createElement(TranslatingIndicator, {
-				isVisible: this.state.isTranslating,
-				status: this.state.translationStatus,
-				currentLang: CONFIG.visual["ui-language"]
-			}),
+        // Translation + pre-translate chips: portal'd & anchored to the live lyrics container's top-right.
+        react.createElement(window.TranslationStatusOverlay, {
+            isVisible: translationIndicatorVisible,
+            status: translationStatusForTrack,
+            reasoningStreams: this.state.reasoningStreams || {},
+            onReasoningClick: this.toggleReasoning,
+            isReasoningOpen: this.state.isReasoningVisible,
+            preTranslateChip: this.state.preTranslateChip,
+            currentUri: trackUriNow,
+            preTranslateEnabled: !!CONFIG.visual["pre-translation"],
+        }),
 			react.createElement(
 				"div",
 				{
@@ -2461,7 +2822,16 @@ infoFromTrack(track) {
 					)
 				)
 			),
-			activeItem
+			activeItem,
+			// Draggable reasoning window — tabs split per task (translation / phonetic)
+			react.createElement(window.ReasoningWindow, {
+				open: !!this.state.isReasoningVisible,
+				streams: this.state.reasoningStreams || {},
+				activeTab: this.state.reasoningActiveTab,
+				onTabChange: (tab) => this.setState({ reasoningActiveTab: tab }),
+				isStreaming: !!this.state.isTranslating,
+				onClose: this.toggleReasoning,
+			})
 		);
 
 		if (this.state.isFullscreen) return reactDOM.createPortal(out, this.fullscreenContainer);

@@ -167,12 +167,12 @@ const LyricsFetcher = {
      * @param {number} mode 
      * @returns {Promise<LyricsData>}
      */
-    async tryServices(trackInfo, mode = -1) {
+    async tryServices(trackInfo, mode = -1, { skipStaleCheck = false } = {}) {
         const currentMode = CONFIG.modes[mode] || "";
         let bestResult = null; // Stores Level 2 (Unsynced) result
 
-        // Early exit if request already stale
-        if (!this.isRequestValid(trackInfo.uri)) {
+        // Early exit if request already stale (skip for pre-translation of next track)
+        if (!skipStaleCheck && !this.isRequestValid(trackInfo.uri)) {
             return { ...emptyState, uri: trackInfo.uri, stale: true };
         }
 
@@ -200,7 +200,7 @@ const LyricsFetcher = {
             }
             
             // Check if request is still valid after each provider call
-            if (!this.isRequestValid(trackInfo.uri)) {
+            if (!skipStaleCheck && !this.isRequestValid(trackInfo.uri)) {
                 return { ...emptyState, uri: trackInfo.uri, stale: true };
             }
 

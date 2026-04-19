@@ -8,7 +8,13 @@ window.LANG_VI = {
   },
   "ui": {
     "translating": "Đang dịch...",
-    "providedBy": "Lời bài hát được cung cấp bởi {provider}"
+    "providedBy": "Lời bài hát được cung cấp bởi {provider}",
+    "reasoningTitle": "Quá trình suy nghĩ của AI",
+    "reasoningPending": "Đang chờ model trả lời. Nếu API chỉ gửi reasoning sau khi xong, nội dung sẽ hiện ở đây.",
+    "reasoningEmpty": "Không có đoạn reasoning riêng cho lần gọi này. Nhiều model không hiện thinking, hoặc prompt đang yêu cầu chỉ xuất kết quả.",
+    "reasoningTabTranslation": "Dịch",
+    "reasoningTabPhonetic": "Phiên âm",
+    "preTranslateChip": "Tiếp: {title}"
   },
   "tabs": {
     "general": "Chung",
@@ -21,9 +27,11 @@ window.LANG_VI = {
     "displayControls": "Hiển thị & Điều khiển",
     "syncedOptions": "Tùy chọn Lời bài hát (Synced)",
     "unsyncedOptions": "Tùy chọn Lời bài hát (Unsynced)",
-    "geminiApi": "API Gemini, Gemma",
+    "geminiApi": "API dịch thuật (LLM)",
     "serviceOrder": "Thứ tự Dịch vụ",
-    "corsProxy": "CORS Proxy Template"
+    "corsProxy": "CORS Proxy Template",
+    "videoBackground": "Video Background",
+    "generalBackground": "Nền chung"
   },
   "settings": {
     "language": {
@@ -33,6 +41,10 @@ window.LANG_VI = {
     "playbarButton": {
       "label": "Nút Playbar",
       "desc": "Thay thế nút Lyrics mặc định của Spotify bằng Lyrics Plus."
+    },
+    "miniLyrics": {
+      "label": "Mini Lyrics Overlay",
+      "desc": "Hiện panel lyrics nổi trên mọi trang (bật/tắt bằng Ctrl+Shift+M)."
     },
     "globalDelay": {
       "label": "Global Delay",
@@ -66,41 +78,47 @@ window.LANG_VI = {
       "label": "Unsynced: Tự động cuộn",
       "desc": "Tự động cuộn theo tiến trình bài hát. Tạm dừng 5s khi cuộn thủ công."
     },
-    "apiMode": {
-      "label": "Chế độ API",
-      "desc": "Chọn API: Google Official (cần key) hoặc ProxyPal (miễn phí).",
+    "apiEndpoint": {
+      "label": "API Endpoint",
+      "desc": "URL API tương thích OpenAI (<code>/v1/chat/completions</code>). Chọn preset từ dropdown hoặc dán URL tùy ý."
+    },
+    "modelName": {
+      "label": "Tên Model",
+      "desc": "Tên model LLM của nhà cung cấp. Chọn model phổ biến hoặc nhập tên tùy ý."
+    },
+    "apiKey": {
+      "label": "API Key",
+      "desc": "Key chính cho dịch thuật."
+    },
+    "apiKey2": {
+      "label": "API Key 2",
+      "desc": "Key phụ cho phiên âm (tùy chọn, dùng key chính nếu bỏ trống)."
+    },
+    "responseMode": {
+      "label": "Định dạng Response",
+      "desc": "'Prompt Engineering' hoạt động với MỌI model. 'JSON Schema' cần model hỗ trợ nhưng cho kết quả ổn định hơn.",
       "options": {
-        "official": "Official (API Key)",
-        "proxy": "ProxyPal (Free)"
-      }
-    },
-    "geminiApiKey": {
-      "label": "Gemma API Key",
-      "desc": "Key API cho chế độ hiển thị chính."
-    },
-    "geminiApiKeyRomaji": {
-      "label": "Gemma API Key 2",
-      "desc": "Key API phụ (nếu cần)."
-    },
-    "proxyModel": {
-      "label": "Proxy Model",
-      "desc": "Model sử dụng với ProxyPal."
-    },
-    "proxyApiKey": {
-      "label": "Proxy API Key",
-      "desc": "API Key (mặc định: proxypal-local)."
-    },
-    "proxyEndpoint": {
-      "label": "Proxy Endpoint",
-      "desc": "URL của Proxy (mặc định: http://localhost:8317/v1/chat/completions)."
+        "prompt": "Prompt Engineering (Mọi model)",
+        "json_schema": "JSON Schema"
+      },
+      "unsupportedToast": "Model này không hỗ trợ JSON Schema — đã tự chuyển sang Prompt Engineering."
     },
     "preTranslation": {
       "label": "Dịch trước (Pre-translation)",
-      "desc": "Tự động dịch 30s trước khi khi bài hát bắt đầu."
+      "desc": "Tự động dịch trước khi bài hát bắt đầu."
+    },
+    "preTranslationTime": {
+      "label": "Thời gian dịch trước",
+      "desc": "Bắt đầu dịch trước bao lâu trước khi bài hát kết thúc."
     },
     "disableQueue": {
       "label": "Tắt hàng đợi (Parallel)",
       "desc": "Xử lý song song. Nhanh hơn nhưng dễ bị giới hạn (rate limit)."
+    },
+    "disableThinking": {
+      "label": "Tắt suy nghĩ (Thinking)",
+      "desc": "Bỏ bước reasoning để nhanh + rẻ hơn. Không có tác dụng với model không hỗ trợ.",
+      "unsupportedToast": "Model này không hỗ trợ tắt thinking."
     },
     "transparentBackground": {
       "label": "Nền trong suốt",
@@ -123,6 +141,9 @@ window.LANG_VI = {
     "videoBackgroundDim": {
       "label": "Độ sáng Video",
       "desc": "Điều chỉnh độ sáng video (0-100)"
+    },
+    "videoBackgroundBlur": {
+      "label": "Độ mờ Video"
     },
     "debugMode": {
       "label": "Chế độ Debug",
@@ -166,13 +187,15 @@ window.LANG_VI = {
     "genius": { "name": "Genius" }
   },
   "notifications": {
-    "translatedIn": "Dịch xong trong {duration}ms",
+    "translatedIn": "Dịch xong trong {duration}",
+    "reTranslating": "Đang dịch lại…",
+    "cacheClearedShort": "Đã xóa cache dịch",
     "settingsChanged": "Cài đặt thay đổi, đang tải lại...",
     "autoCached": "Đã cache ({lines} dòng)",
     "translationFailed": "Dịch thất bại",
-    "geminiKeyMissing": "Thiếu Gemini API Key. Vui lòng kiểm tra Settings.",
+    "geminiKeyMissing": "Thiếu LLM API Key. Vui lòng kiểm tra Settings.",
     "noLyricsToTranslate": "Không có lời để dịch.",
-    "emptyResult": "Gemini trả về rỗng.",
+    "emptyResult": "AI trả về rỗng.",
     "lineCountMismatch": "Lỗi số dòng! Kì vọng: {expected}, Thực tế: {got}",
     "noTrack": "Không có bài hát đang phát",
     "invalidId": "Video ID không hợp lệ",
@@ -220,8 +243,8 @@ window.LANG_VI = {
       "none": "Không"
     },
     "geminiModes": {
-      "romaji": "Romaji, Romaja, Pinyin (Gemma)",
-      "vi": "Tiếng Việt (Gemma)"
+      "romaji": "Romaji, Romaja, Pinyin (AI)",
+      "vi": "Tiếng Việt (AI)"
     },
     "styles": {
       "smart_adaptive": "Tự động (Đề xuất)",
@@ -253,7 +276,9 @@ window.LANG_VI = {
     "resetCache": "Xóa cache dịch",
     "openSettings": "Mở Cài đặt",
     "preTransNext": "Bài tiếp theo đã được dịch trước",
-    "copy": "Sao chép"
+    "preTranslateChip": "AI đang dịch sẵn bài tiếp theo (nền)",
+    "copy": "Sao chép",
+    "viewReasoning": "Xem quá trình suy nghĩ"
   },
   "videoModal": {
     "title": "Cài đặt Video Background",

@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-04-19
+
+### Added
+
+- **Mini Lyrics in Picture-in-Picture**: Inject synchronized lyrics into Spotify's native PiP mini player. Toggle from PiP settings panel or with `Ctrl+Shift+M`.
+- **Endpoint & Model Presets**: New dropdown picker for popular LLM providers (Google Gemini/Gemma, OpenRouter, OpenAI, DeepSeek, Anthropic Claude, local Ollama) with curated model lists; custom URL/model still accepted.
+- **Live AI Reasoning Window**: Brain icon next to the translating indicator opens a draggable, auto-scrolling window that streams the model's thinking in real time, with separate tabs for translation and phonetic streams.
+- **Response Format selection**: Choose between *Prompt Engineering* (universal) and *JSON Schema* (stricter parsing) — auto-falls back to Prompt Engineering when the model doesn't support it.
+- **Pre-translation lead time**: Configure how many seconds before the current song ends to start translating the next track.
+- **Disable AI Thinking** config option for models that support it.
+
+### Changed
+
+- **Settings UI rewrite**: Removed Direct API / ProxyPal modes. Translation tab now exposes a flat layout with Endpoint, Model, API Key 1/2, Response Format, and Pre-translation lead time.
+- **Translation completion time**: Now reports true wall-clock duration instead of summing parallel task durations. Output is human-readable (`3.5s`, `1m 24s`) instead of raw milliseconds.
+- **Smart idle indicator (♪)**: Per-song adaptive timing based on tempo estimation, with a grace period to prevent premature appearance on lines that end abruptly.
+- **Reasoning window UI**: Redesigned for a less "AI generated" look, fixed initial position and size, draggable, auto-scrolls to the newest line.
+- **Reasoning window persistence**: Position and size are now saved across closes, song changes, and Spotify restarts. Window also stays open when switching tracks — new song's translation/phonetic stream replaces the previous content in place.
+- **Streaming throttling**: `onProgress` callbacks throttled so the reasoning window doesn't slow down responses on long songs.
+- **Removed** unused `.gitignore` file.
+
+### Fixed
+
+- **Pre-translate indicator** floating layout — now stacks correctly with translating indicator and matches its size, fixed unsynced issue with songs.
+- **Local LRC sync stuck after enabling display mode** — phonetic conversion (Romaji/Pinyin/Romaja) and legacy cached translations no longer drop per-line `startTime`, restoring active-line highlighting and click-to-seek.
+- **README** image placeholders restored (`preview.gif`, conversion previews, manual download).
+
+### Documentation
+
+- `README.md` and `README_VI.md` rewritten Key Features and Configuration sections to cover the new features and the flattened settings UI.
+
 ## [1.3.0] - 2026-01-23
 
 ### Added
@@ -231,3 +262,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial commit
 - Basic lyrics display with Gemini translation support
+

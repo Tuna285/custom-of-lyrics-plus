@@ -229,7 +229,7 @@ let adjustmentsDebounceTimeout = null;
 const getStaticOptions = () => ({
 	source: {
 		traditional: "Traditional",
-		geminiVi: "Gemini, Gemma",
+		geminiVi: "AI",
 	}, 
 	translationDisplay: {
 		replace: getText("contextMenu.translationDisplay.replace", {}, "Replace original"),
@@ -246,8 +246,8 @@ const getStaticOptions = () => ({
 		none: getText("contextMenu.modeBase.none", {}, "None"),
 	},
 	geminiModes: {
-		gemini_romaji: getText("contextMenu.geminiModes.romaji", {}, "Romaji, Romaja, Pinyin (Gemini, Gemma)"),
-		gemini_vi: getText("contextMenu.geminiModes.vi", {}, "Vietnamese (Gemini, Gemma)"),
+		gemini_romaji: getText("contextMenu.geminiModes.romaji", {}, "Romaji, Romaja, Pinyin (AI)"),
+		gemini_vi: getText("contextMenu.geminiModes.vi", {}, "Vietnamese (AI)"),
 	},
 	languageModes: {
 		japanese: {
@@ -469,7 +469,7 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 					if (value === "geminiVi" && CONFIG.visual["translate:detect-language-override"] !== "off") {
 						CONFIG.visual["translate:detect-language-override"] = "off";
 						localStorage.setItem(`${APP_NAME}:visual:translate:detect-language-override`, "off");
-						Spicetify.showNotification("Language Override reset to 'Off' for Gemini mode", false, 3000);
+						Spicetify.showNotification("Language Override reset to 'Off' for AI mode", false, 3000);
 					}
 				}
 			}

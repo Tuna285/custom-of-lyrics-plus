@@ -157,6 +157,48 @@ const GeminiClient = {
         else geminiQueueTranslation.promote(key);
     },
 
+    /**
+     * Real-time view of reasoning from a partial buffer (used during streaming).
+     * Returns the union of: (a) all closed <thought>/<think> blocks, and (b) the body of the
+     * last unclosed block (so the user sees tokens as they arrive).
+     */
+    extractStreamingReasoning(buffer) {
+        const s = String(buffer || "");
+        const parts = [];
+        const tagRe = /<(thought|think|redacted_thinking)>([\s\S]*?)(?:<\/\1>|$)/gi;
+        let m;
+        while ((m = tagRe.exec(s)) !== null) {
+            const inner = m[2];
+            if (inner) parts.push(inner);
+        }
+        return parts.join("\n\n").trim();
+    },
+
+    /**
+     * Strip <thought>, <think>, etc. from model output; collect inner text for optional UI.
+     */
+    stripReasoningBlocks(raw) {
+        let s = String(raw || "");
+        const collected = [];
+        const patterns = [
+            /<thought>([\s\S]*?)<\/thought>/gi,
+            new RegExp("<" + "think" + ">[\\s\\S]*?<" + "/" + "think" + ">", "gi"),
+            new RegExp("<" + "redacted_thinking" + ">[\\s\\S]*?<" + "/" + "redacted_thinking" + ">", "gi")
+        ];
+        let prev = null;
+        while (prev !== s) {
+            prev = s;
+            for (const re of patterns) {
+                s = s.replace(re, (_, inner) => {
+                    if (inner && String(inner).trim()) collected.push(String(inner).trim());
+                    return "";
+                });
+            }
+            s = s.trim();
+        }
+        return { cleaned: s, reasoningContent: collected.join("\n\n") };
+    },
+
     extractGeminiJson(text) {
         let raw = String(text || "").trim();
         raw = raw.replace(/```[a-z]*\n?/gim, "").replace(/```/g, "").trim();
@@ -206,20 +248,64 @@ const GeminiClient = {
             }
         }
 
-        // Priority 2: Try JSON array
+        // Priority 2: Try JSON (array OR object with array-valued field).
+        // Models sometimes return {"translations": [...]}, {"phonetics": [...]}, {"lines": [...]}
+        // even when prompted for tags — handle that without leaking JSON syntax to the user.
         function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
+        function extractArray(obj) {
+            if (!obj || typeof obj !== "object") return null;
+            if (Array.isArray(obj)) return obj;
+            // Prefer well-known keys
+            const preferred = ["translations", "phonetics", "vi", "lines", "result", "results", "output"];
+            for (const k of preferred) {
+                if (Array.isArray(obj[k])) return obj[k];
+            }
+            // Fallback: any string-array value on the object
+            for (const k of Object.keys(obj)) {
+                const v = obj[k];
+                if (Array.isArray(v) && v.every(x => typeof x === "string")) return v;
+            }
+            return null;
+        }
+
         let parsed = safeParse(raw);
-        if (!parsed || !Array.isArray(parsed)) {
-            const start = raw.indexOf("[");
-            const end = raw.lastIndexOf("]");
-            if (start !== -1 && end > start) {
-                parsed = safeParse(raw.slice(start, end + 1));
+        let arr = extractArray(parsed);
+
+        // Bracket-balanced object/array slice (handles strings + escapes, ignores brackets inside quotes).
+        // Used when raw has prose around the JSON (e.g. "Here is the output: {...}").
+        if (!arr) {
+            const sliceJson = (text, openCh, closeCh) => {
+                const start = text.indexOf(openCh);
+                if (start === -1) return null;
+                let depth = 0, inStr = false, esc = false;
+                for (let i = start; i < text.length; i++) {
+                    const c = text[i];
+                    if (inStr) {
+                        if (esc) { esc = false; continue; }
+                        if (c === "\\") { esc = true; continue; }
+                        if (c === '"') inStr = false;
+                        continue;
+                    }
+                    if (c === '"') { inStr = true; continue; }
+                    if (c === openCh) depth++;
+                    else if (c === closeCh) { depth--; if (depth === 0) return text.slice(start, i + 1); }
+                }
+                return null;
+            };
+            // Try object first (more common from Gemini structured output), then array
+            const objSlice = sliceJson(raw, "{", "}");
+            if (objSlice) arr = extractArray(safeParse(objSlice));
+            if (!arr) {
+                const arrSlice = sliceJson(raw, "[", "]");
+                const slicedParsed = safeParse(arrSlice || "");
+                arr = extractArray(slicedParsed);
             }
         }
 
-        if (Array.isArray(parsed)) {
-            console.log(`[Lyrics+] Parsed ${parsed.length} lines via JSON`);
-            return { vi: parsed, phonetic: parsed.join('\n') };
+        if (Array.isArray(arr)) {
+            console.log(`[Lyrics+] Parsed ${arr.length} lines via JSON`);
+            const stringArr = arr.map(x => (x == null ? "" : String(x)));
+            return { vi: stringArr, phonetic: stringArr.join('\n') };
         }
 
         // Priority 3: Fallback - split by newlines
@@ -228,74 +314,334 @@ const GeminiClient = {
         return { vi: rawLines, phonetic: rawLines.join('\n') };
     },
 
-    async callGemini({ apiKey, artist, title, text, styleKey, pronounKey, wantSmartPhonetic, _isRetry, priority, taskId }) {
+    /**
+     * Mutate `body` with thinking-disable flags for the SPECIFIC API family detected from endpoint+model.
+     * Strict providers (Gemini OpenAI-compat) reject unknown fields, so we cannot broadcast — we must
+     * detect and send only the field that family accepts. No-op when the model doesn't have thinking
+     * in the first place (e.g. Gemma, GPT-4o, Claude Haiku).
+     */
+    applyThinkingDisable(body, endpoint, model) {
+        if (!body || typeof body !== "object") return body;
+        const url = String(endpoint || "").toLowerCase();
+        const m = String(model || "").toLowerCase();
+        let applied = true;
+
+        // ── Google Gemini (OpenAI-compat or Vertex) ──────────────────────────
+        if (url.includes("generativelanguage.googleapis.com") || url.includes("aiplatform.googleapis.com")) {
+            const supportsThinkingConfig = /gemini-(2\.5|3)|flash-thinking|thinking-exp/.test(m);
+            if (supportsThinkingConfig) {
+                body.extra_body = {
+                    ...(body.extra_body || {}),
+                    google: {
+                        ...((body.extra_body && body.extra_body.google) || {}),
+                        thinking_config: { thinking_budget: 0, include_thoughts: false },
+                    },
+                };
+            } else {
+                applied = false;
+            }
+        }
+        // ── OpenRouter ───────────────────────────────────────────────────────
+        else if (url.includes("openrouter.ai")) {
+            body.reasoning = { ...(body.reasoning || {}), exclude: true, max_tokens: 0 };
+        }
+        // ── OpenAI ───────────────────────────────────────────────────────────
+        else if (url.includes("api.openai.com")) {
+            if (/^(o1|o3|o4|gpt-5)/.test(m)) body.reasoning_effort = "minimal";
+            else applied = false;
+        }
+        // ── DeepSeek (model-bound: user must pick non-reasoning model) ───────
+        else if (url.includes("api.deepseek.com")) {
+            applied = false;
+        }
+        // ── Qwen DashScope ───────────────────────────────────────────────────
+        else if (url.includes("dashscope.aliyuncs.com")) {
+            body.extra_body = { ...(body.extra_body || {}), enable_thinking: false };
+        }
+        // ── Anthropic native (not via OpenAI-compat) ─────────────────────────
+        else if (url.includes("api.anthropic.com")) {
+            applied = false;
+        }
+        // ── Local / Self-hosted runtimes ────────────────────────────────────
+        else {
+            const isOllama = url.includes(":11434") || url.includes("/api/chat") || url.includes("ollama");
+            if (isOllama) body.think = false;
+            else body.chat_template_kwargs = { ...(body.chat_template_kwargs || {}), enable_thinking: false };
+        }
+
+        if (!applied) this.warnThinkingUnsupported(endpoint, model);
+        return body;
+    },
+
+    /** Show a one-shot toast per endpoint+model when disable-thinking is unsupported. */
+    warnThinkingUnsupported(endpoint, model) {
+        if (!this._thinkingWarnedKeys) this._thinkingWarnedKeys = new Set();
+        const key = `${endpoint}::${model}`;
+        if (this._thinkingWarnedKeys.has(key)) return;
+        this._thinkingWarnedKeys.add(key);
+        try {
+            const msg = (typeof getText === "function" && getText("settings.disableThinking.unsupportedToast"))
+                || "This model doesn't support disabling thinking.";
+            Spicetify?.showNotification?.(msg, true);
+        } catch (_) { /* notification optional */ }
+    },
+
+    /**
+     * Detect whether (endpoint, model) supports `response_format: { type: "json_object" }` AND
+     * the OpenAI `system` role. On Google's OpenAI-compat layer, Gemma 1/2/3 reject both
+     * with HTTP 400 "Developer instruction is not enabled". Gemma 4+ and Gemini handle them fine.
+     * Other endpoints (OpenAI/Anthropic/DeepSeek/OpenRouter) all support both.
+     */
+    modelSupportsJsonSchema(endpoint, model) {
+        const ep = (endpoint || "").toLowerCase();
+        const m = (model || "").toLowerCase();
+        const isGoogle = ep.includes("generativelanguage.googleapis.com");
+        if (!isGoogle) return true;
+        // Google API: only Gemma 1/2/3 are limited. Gemini and Gemma 4+ work.
+        if (/^gemma-[123](?:[^\d]|$)/.test(m)) return false;
+        return true;
+    },
+
+    /** One-shot toast when JSON schema mode is auto-demoted to prompt mode. */
+    warnJsonSchemaUnsupported(endpoint, model) {
+        if (!this._jsonFallbackWarnedKeys) this._jsonFallbackWarnedKeys = new Set();
+        const key = `${endpoint}::${model}`;
+        if (this._jsonFallbackWarnedKeys.has(key)) return;
+        this._jsonFallbackWarnedKeys.add(key);
+        try {
+            const msg = (typeof getText === "function" && getText("settings.responseMode.unsupportedToast"))
+                || `${model} doesn't support JSON Schema — using Prompt Engineering instead.`;
+            Spicetify?.showNotification?.(msg, false, 4000);
+        } catch (_) { /* notification optional */ }
+    },
+
+    /**
+     * Stream an OpenAI-compatible chat completion, emitting partial reasoning to onProgress.
+     * Falls back gracefully if the server returns a non-SSE body.
+     * Returns: { content, reasoningContent, message } shaped like the non-streaming `data.choices[0]`.
+     */
+    async streamChatCompletion({ endpoint, headers, body, onProgress, signal }) {
+        const streamingBody = { ...body, stream: true, stream_options: { include_usage: true } };
+        const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { ...headers, "Accept": "text/event-stream" },
+            body: JSON.stringify(streamingBody),
+            signal,
+        });
+        if (!response.ok) {
+            // Let the caller's error pipeline format this
+            let errBody = "";
+            try { errBody = await response.text(); } catch (_) { }
+            const err = new Error(`HTTP ${response.status}${errBody ? `: ${errBody.slice(0, 300)}` : ""}`);
+            err.status = response.status;
+            throw err;
+        }
+        if (!response.body || !response.body.getReader) {
+            // Non-streaming fallback
+            const data = await response.json();
+            const message = data?.choices?.[0]?.message || {};
+            return {
+                content: message.content || "",
+                reasoningContent: this.extractReasoningFromMessage(message),
+                message,
+            };
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+        let contentBuf = "";
+        let reasoningBuf = ""; // From delta.reasoning_content
+        let lastEmit = 0;
+        let pendingDirty = false; // Set when a chunk arrives during the throttle window
+        let trailingTimer = null;
+
+        // Throttle window for onProgress emissions.
+        //   - Each emit triggers a React re-render of <App> (state update for reasoningStreams).
+        //   - Reading speed of humans on streaming text caps at ~5fps usefully; faster only burns CPU.
+        //   - 250ms = ~4fps: feels live, ~3x fewer re-renders than the previous 80ms throttle.
+        const THROTTLE_MS = 250;
+
+        const doEmit = () => {
+            if (typeof onProgress !== "function") return;
+            lastEmit = Date.now();
+            pendingDirty = false;
+            const inline = this.extractStreamingReasoning(contentBuf);
+            const merged = [reasoningBuf, inline].filter(Boolean).join("\n\n").trim();
+            try { onProgress({ reasoning: merged, content: contentBuf }); } catch (_) { }
+        };
+
+        const emitProgress = (force = false) => {
+            if (typeof onProgress !== "function") return;
+            if (force) {
+                // Cancel any pending trailing emit and flush immediately
+                if (trailingTimer) { clearTimeout(trailingTimer); trailingTimer = null; }
+                doEmit();
+                return;
+            }
+            const now = Date.now();
+            const elapsed = now - lastEmit;
+            if (elapsed >= THROTTLE_MS) {
+                doEmit();
+            } else if (!trailingTimer) {
+                // Schedule a trailing emit so the LAST chunk in the window isn't lost.
+                pendingDirty = true;
+                trailingTimer = setTimeout(() => {
+                    trailingTimer = null;
+                    if (pendingDirty) doEmit();
+                }, THROTTLE_MS - elapsed);
+            } else {
+                // A trailing emit is already scheduled; just mark the buffer dirty
+                pendingDirty = true;
+            }
+        };
+
+        // Final message-shaped object built from accumulated deltas
+        const finalMessage = { role: "assistant", content: "" };
+        let usage = null;
+
+        // SSE parser loop (matches modelTest.html style)
+        // Lines: "data: {...}" or "data: [DONE]"
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() ?? "";
+
+            for (const line of lines) {
+                const t = line.trim();
+                if (!t || t === "data: [DONE]" || t === ":") continue;
+                if (!t.startsWith("data:")) continue;
+                const jsonStr = t.slice(5).trim();
+                if (!jsonStr || jsonStr === "[DONE]") continue;
+                let chunk;
+                try { chunk = JSON.parse(jsonStr); } catch (_) { continue; }
+
+                if (chunk.usage) usage = chunk.usage;
+                const choice = chunk.choices?.[0];
+                if (!choice) continue;
+
+                const delta = choice.delta || {};
+                if (typeof delta.content === "string" && delta.content) {
+                    contentBuf += delta.content;
+                    emitProgress(false);
+                }
+                // Some providers stream thinking in a separate channel
+                const dr = delta.reasoning_content ?? delta.reasoning ?? delta.thought ?? delta.thinking;
+                if (typeof dr === "string" && dr) {
+                    reasoningBuf += dr;
+                    emitProgress(false);
+                }
+            }
+        }
+        // Flush any tail bytes
+        try { buffer += decoder.decode(); } catch (_) { }
+        emitProgress(true);
+
+        finalMessage.content = contentBuf;
+        if (reasoningBuf) finalMessage.reasoning_content = reasoningBuf;
+
+        return {
+            content: contentBuf,
+            reasoningContent: reasoningBuf,
+            message: finalMessage,
+            usage,
+        };
+    },
+
+    /**
+     * Compute a safe `max_tokens` budget from the song length so long lyrics don't get truncated mid-JSON.
+     * Heuristic per line:
+     *   Translation: ~80 tokens (VI words + tag/JSON overhead + safety)
+     *   Phonetic:    ~60 tokens (romanization is shorter than VI translation)
+     * Floor at 2000 (short songs / single quote requests), cap at 16000 (provider limits).
+     */
+    estimateMaxTokens(lineCount, wantSmartPhonetic) {
+        const perLine = wantSmartPhonetic ? 60 : 80;
+        const overhead = 400; // JSON wrapper, system echoes, reasoning tag boilerplate
+        const estimated = lineCount * perLine + overhead;
+        return Math.min(16000, Math.max(2000, estimated));
+    },
+
+    async callGemini({ apiKey, artist, title, text, styleKey, pronounKey, wantSmartPhonetic, _isRetry, priority, taskId, onReasoningProgress }) {
         const startTime = Date.now();
         const lineCount = text.split('\n').length;
 
         DebugLogger.group(`${wantSmartPhonetic ? 'Phonetic' : 'Translation'} Request`);
 
-        const apiMode = CONFIG?.visual?.["gemini:api-mode"] || "official";
-        const proxyEndpoint = CONFIG?.visual?.["gemini:proxy-endpoint"] || "http://localhost:8317/v1/chat/completions";
+        const endpoint = CONFIG?.visual?.["gemini:endpoint"] || "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+        const model = CONFIG?.visual?.["gemini:model"] || "gemma-3-27b-it";
+        let responseMode = CONFIG?.visual?.["gemini:response-mode"] || "prompt";
 
-        let endpoint, body, headers;
+        // Auto-demote JSON Schema → Prompt Engineering for models that don't support it
+        // (e.g. Gemma 1/2/3 on Google API reject both `system` role and `response_format`).
+        if (responseMode === "json_schema" && !this.modelSupportsJsonSchema(endpoint, model)) {
+            DebugLogger.log(`Model "${model}" doesn't support JSON Schema on this endpoint — falling back to Prompt Engineering mode.`);
+            this.warnJsonSchemaUnsupported(endpoint, model);
+            responseMode = "prompt";
+        }
 
-        if (apiMode === "proxy") {
-            const proxyModel = CONFIG?.visual?.["gemini:proxy-model"] || "gemini-2.5-flash";
-            const proxyApiKey = CONFIG?.visual?.["gemini:proxy-api-key"] || "proxypal-local";
-            endpoint = proxyEndpoint;
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${proxyApiKey}`
-            };
+        if (!apiKey?.trim()) throw new Error("Missing API key");
 
-            let proxyPrompt;
+        const headers = {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+        };
+
+        let body;
+
+        if (responseMode === "json_schema") {
+            // JSON Schema mode: system/user split + response_format
+            let prompt;
             if (_isRetry) {
-                proxyPrompt = {
+                prompt = {
                     system: "You are a translator. Output valid JSON only.",
                     user: Prompts.buildMinimalFallbackPrompt({ artist, title, text })
                 };
             } else if (wantSmartPhonetic) {
-                proxyPrompt = Prompts.buildProxyPhoneticPrompt({ artist, title, text });
+                prompt = Prompts.buildJsonSchemaPhoneticPrompt({ artist, title, text });
             } else {
-                proxyPrompt = Prompts.buildProxyVietnamesePrompt({ artist, title, text, styleKey, pronounKey });
+                prompt = Prompts.buildJsonSchemaTranslationPrompt({ artist, title, text, styleKey, pronounKey });
             }
 
             body = {
-                model: proxyModel,
+                model,
                 messages: [
-                    { role: "system", content: proxyPrompt.system },
-                    { role: "user", content: proxyPrompt.user }
+                    { role: "system", content: prompt.system },
+                    { role: "user", content: prompt.user }
                 ],
-                temperature: wantSmartPhonetic ? 0.5 : 1,
-                max_tokens: 4000,
+                temperature: wantSmartPhonetic ? 0.35 : 1,
+                max_tokens: this.estimateMaxTokens(lineCount, wantSmartPhonetic),
                 response_format: { type: "json_object" }
             };
         } else {
-            if (!apiKey?.trim()) throw new Error("Missing API key");
-            endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent?key=${encodeURIComponent(apiKey)}`;
-            headers = {
-                "Content-Type": "application/json",
-                "User-Agent": "Spicetify-LyricsPlus/1.0"
-            };
+            // Prompt Engineering mode: single user message (some models like Gemma 3 don't support system messages)
+            let prompt;
+            if (_isRetry) {
+                prompt = {
+                    system: "You are a translator. Output compact tags <1>...</1> only.",
+                    user: Prompts.buildMinimalFallbackPrompt({ artist, title, text })
+                };
+            } else {
+                prompt = Prompts.buildPromptEngPrompt({ artist, title, text, styleKey, pronounKey, wantSmartPhonetic });
+            }
 
-            const gemma3Prompt = _isRetry
-                ? Prompts.buildMinimalFallbackPrompt({ artist, title, text })
-                : Prompts.buildGemma3Prompt({ artist, title, text, styleKey, pronounKey, wantSmartPhonetic });
+            // Combine system + user into single user message for universal compatibility
+            const combinedContent = `${prompt.system}\n\n---\n\n${prompt.user}`;
 
             body = {
-                contents: [{ parts: [{ text: gemma3Prompt }] }],
-                generationConfig: {
-                    temperature: wantSmartPhonetic ? 0.5 : 0.7,  
-                    topK: 40,
-                    maxOutputTokens: 3000
-                },
-                safetySettings: [
-                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-                ]
+                model,
+                messages: [{ role: "user", content: combinedContent }],
+                temperature: wantSmartPhonetic ? 0.35 : 0.7,
+                max_tokens: this.estimateMaxTokens(lineCount, wantSmartPhonetic)
             };
+        }
+
+        // Optionally tell the model to skip its internal reasoning stage entirely
+        if (CONFIG?.visual?.["gemini:disable-thinking"] === true) {
+            this.applyThinkingDisable(body, endpoint, model);
         }
 
         try {
@@ -303,48 +649,32 @@ const GeminiClient = {
             const disableQueue = CONFIG?.visual?.["gemini:disable-queue"] === true;
 
             const makeRequest = async () => {
-                const res = await this.fetchWithRetry(async () => {
+                const streamed = await this.fetchWithRetry(async () => {
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 120000);
                     try {
-                        const response = await fetch(endpoint, {
-                            method: "POST",
+                        return await this.streamChatCompletion({
+                            endpoint,
                             headers,
-                            body: JSON.stringify(body),
-                            signal: controller.signal
-                        });
-                        if (!response.ok) {
-                            let errorDetails = `HTTP ${response.status}`;
-                            try {
-                                const errorBody = await response.text();
-                                if (errorBody) {
-                                    // Try to parse JSON error
-                                    try {
-                                        // Handle various error formats
-                                        const errorJson = JSON.parse(errorBody);
-                                        const msg = errorJson.error?.message || errorJson.message || errorJson.error || JSON.stringify(errorJson);
-                                        errorDetails = `HTTP ${response.status}: ${msg}`;
-                                    } catch {
-                                        errorDetails = `HTTP ${response.status}: ${errorBody.substring(0, 300)}`; // Increased limit
-                                    }
+                            body,
+                            signal: controller.signal,
+                            onProgress: ({ reasoning }) => {
+                                if (typeof onReasoningProgress === "function" && reasoning) {
+                                    try { onReasoningProgress(reasoning); } catch (_) { }
                                 }
-                            } catch (e) {
-                                console.warn('[Lyrics+] Failed to read error response body:', e);
-                            }
-                            
-                            const error = new Error(errorDetails);
-                            error.status = response.status;
-                            // Attach extra info for the catch block
-                            error.endpoint = endpoint;
-                            error.model = body.model; 
-                            throw error;
-                        }
-                        return response;
+                            },
+                        });
+                    } catch (e) {
+                        // Normalize error shape so the existing error pipeline can format it
+                        if (!e.endpoint) e.endpoint = endpoint;
+                        if (!e.model) e.model = model;
+                        throw e;
                     } finally { clearTimeout(timeoutId); }
                 });
 
-                const data = await res.json();
-                return this.processResponse(data, apiMode, wantSmartPhonetic, lineCount, startTime);
+                // Adapt streamed result to the shape processResponse expects
+                const data = { choices: [{ message: streamed.message }], usage: streamed.usage };
+                return this.processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime);
             };
 
             if (disableQueue) {
@@ -356,63 +686,53 @@ const GeminiClient = {
         } catch (error) {
             const errorMsg = error.message || 'Unknown error';
             
-            // Log full details for debugging
             console.error(`[Lyrics+] Translation Error:`, { 
                 message: errorMsg, 
                 status: error.status,
-                apiMode,
-                model: error.model || body?.model,
-                endpoint: error.endpoint || (apiMode === 'proxy' ? proxyEndpoint : 'Official API'),
+                model: error.model || model,
+                endpoint: error.endpoint || endpoint,
+                responseMode,
                 stack: error.stack
             });
             console.groupEnd();
 
-            // Retry with fallback prompt if first attempt failed (not AbortError, not network error)
+            // Retry with fallback prompt if first attempt failed
             if (error.name !== 'AbortError' && !_isRetry && error.status) {
                 console.log('[Lyrics+] Retrying with fallback minimal prompt...');
                 return this.callGemini({
                     apiKey, artist, title, text,
                     styleKey: 'literal_study', pronounKey: 'default',
-                    wantSmartPhonetic, _isRetry: true
+                    wantSmartPhonetic, _isRetry: true,
+                    onReasoningProgress
                 });
             }
 
             // Build user-friendly error message
             let userMessage = errorMsg;
             
-            // Network/Connection errors (no status code)
             if (!error.status) {
                 if (error.name === 'AbortError') {
                     userMessage = `Request timed out after 120s. The API is taking too long to respond.`;
                 } else if (error.message?.includes('fetch') || error.message?.includes('network') || error.message?.includes('Failed to fetch')) {
-                    userMessage = apiMode === 'proxy' 
-                        ? `Network Error. Check if ProxyPal is running at ${proxyEndpoint}`
-                        : `Network Error. Check your internet connection.`;
+                    userMessage = `Network Error. Check your internet connection and API endpoint: ${endpoint}`;
                 } else {
                     userMessage = `Connection failed: ${errorMsg}`;
                 }
-            }
-            // HTTP Status code errors
-            else if (error.status === 500) {
-                userMessage = apiMode === 'proxy'
-                    ? `Server Error (500). Check if ProxyPal is running and the model is supported.`
-                    : `Server Error (500). Google API is temporarily unavailable. Try again later.`;
+            } else if (error.status === 500) {
+                userMessage = `Server Error (500). The API is temporarily unavailable. Try again later.`;
             } else if (error.status === 502 || error.status === 503 || error.status === 504) {
                 userMessage = `Service Unavailable (${error.status}). The API is overloaded or down. Try again later.`;
             } else if (error.status === 404) {
-                userMessage = `Model Not Found (404). The model '${error.model || body?.model}' is not available.`;
+                userMessage = `Model Not Found (404). The model '${error.model || model}' may not be available at this endpoint.`;
             } else if (error.status === 401 || error.status === 403) {
-                userMessage = apiMode === 'proxy'
-                    ? `Authentication Failed (${error.status}). Check your Proxy API Key in Settings.`
-                    : `Authentication Failed (${error.status}). Check your Gemini API Key in Settings.`;
+                userMessage = `Authentication Failed (${error.status}). Check your API Key in Settings.`;
             } else if (error.status === 429) {
                 userMessage = `Rate Limit Exceeded (429). Too many requests. Please wait a moment.`;
             } else if (error.status === 400) {
-                userMessage = `Bad Request (400). The request format may be invalid: ${errorMsg.replace(/^HTTP 400:\s*/, '').substring(0, 100)}`;
+                userMessage = `Bad Request (400). ${errorMsg.replace(/^HTTP 400:\s*/, '').substring(0, 100)}`;
             }
             
-            // Show notification for critical errors only (not 429 rate limit spam)
-            const shouldNotify = error.status !== 429; // Silent for rate limit
+            const shouldNotify = error.status !== 429;
             
             if (shouldNotify) {
                 try {
@@ -427,44 +747,47 @@ const GeminiClient = {
         }
     },
 
-    processResponse(data, apiMode, wantSmartPhonetic, lineCount, startTime) {
-        let raw;
-        if (apiMode === "proxy") {
-            if (!data?.choices?.length) throw new Error("No choices returned from proxy");
-            raw = data.choices[0]?.message?.content;
-        } else {
-            if (!data?.candidates?.length) throw new Error("No candidates returned");
-            const candidate = data.candidates[0];
-            if (candidate?.finishReason === "SAFETY") {
-                throw new Error("Translation blocked by safety filters.");
-            }
-            raw = candidate?.content?.parts?.[0]?.text;
+    /** Pull reasoning from non-content fields (o-series, some gateways) */
+    extractReasoningFromMessage(message) {
+        if (!message || typeof message !== "object") return "";
+        const pick = message.reasoning_content ?? message.reasoning ?? message.thought ?? message.thinking;
+        if (typeof pick === "string") return pick.trim();
+        if (Array.isArray(pick)) {
+            return pick
+                .map((x) => (typeof x === "string" ? x : x?.text ?? x?.content ?? ""))
+                .filter(Boolean)
+                .join("\n\n")
+                .trim();
         }
+        return "";
+    },
+
+    processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime) {
+        // OpenAI-compatible format: always data.choices[0].message.content
+        if (!data?.choices?.length) throw new Error("No response from API");
+        const message = data.choices[0]?.message;
+        const raw = message?.content;
 
         if (!raw) throw new Error("Empty response content");
 
+        const { cleaned: cleanedRaw, reasoningContent: fromContent } = this.stripReasoningBlocks(raw);
+        const fromFields = this.extractReasoningFromMessage(message);
+        const reasoningContent = [fromContent, fromFields].filter(Boolean).join("\n\n");
+        if (!cleanedRaw) throw new Error("Empty response after stripping thinking blocks");
+
         let result;
-        if (apiMode === "proxy") {
-            try {
-                let cleanRaw = raw.trim();
-                if (cleanRaw.startsWith('```')) {
-                    cleanRaw = cleanRaw.replace(/^```[a-z]*\n?/i, '').replace(/```$/, '').trim();
-                }
-                const parsed = JSON.parse(cleanRaw);
-                if (wantSmartPhonetic && parsed.phonetics) {
-                    result = { vi: parsed.phonetics, phonetic: parsed.phonetics.join('\n') };
-                } else if (parsed.translations) {
-                    result = { vi: parsed.translations, phonetic: parsed.translations.join('\n') };
-                } else if (Array.isArray(parsed)) {
-                    result = { vi: parsed, phonetic: parsed.join('\n') };
-                } else {
-                    throw new Error("Invalid JSON structure");
-                }
-            } catch (e) {
-                result = this.extractGeminiJson(raw);
-            }
+        if (responseMode === "json_schema") {
+            // JSON-Schema mode: model SHOULD return clean JSON, but reality bites:
+            //   - Some endpoints wrap in ```json fences
+            //   - Some prepend prose ("Here is the translation: {...}")
+            //   - Truncation mid-array on long songs leaves trailing garbage
+            // Always route through extractGeminiJson — its bracket-balanced slicer + object-key
+            // extraction handles all of the above cleanly. Falls back to tag/numbered parsing if
+            // the model ignored the JSON instruction entirely (e.g. Gemma without strict mode).
+            result = this.extractGeminiJson(cleanedRaw);
         } else {
-            result = this.extractGeminiJson(raw);
+            // Prompt Engineering: parse compact tags / numbered list / JSON / line split
+            result = this.extractGeminiJson(cleanedRaw);
         }
 
         const duration = Date.now() - startTime;
@@ -492,7 +815,7 @@ const GeminiClient = {
 
         DebugLogger.log(`Completed in ${duration}ms.`);
         DebugLogger.groupEnd();
-        return { ...result, duration };
+        return { ...result, duration, reasoningContent };
     }
 };
 

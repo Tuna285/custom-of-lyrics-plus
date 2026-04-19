@@ -95,34 +95,95 @@ const ConfigSlider = ({ name, defaultValue, onChange = () => { } }) => {
 };
 
 const ConfigSelection = ({ name, defaultValue, options, onChange = () => { } }) => {
-	const [value, setValue] = useState(defaultValue);
+	const normalizeSelectValue = (v) => (v === undefined || v === null ? "" : String(v));
+	const [value, setValue] = useState(normalizeSelectValue(defaultValue));
 	const setValueCallback = useCallback((event) => {
-		let value = event.target.value;
-		if (!Number.isNaN(Number(value))) value = Number.parseInt(value);
-		setValue(value); onChange(value);
-	}, [value, options]);
-	useEffect(() => { setValue(defaultValue); }, [defaultValue]);
+		const raw = event.target.value;
+		let out = raw;
+		if (Array.isArray(options)) {
+			out = Number.parseInt(raw, 10);
+			if (Number.isNaN(out)) out = 0;
+		} else if (options && typeof options === "object") {
+			const keys = Object.keys(options);
+			const allNumericKeys = keys.length > 0 && keys.every((k) => /^\d+$/.test(k));
+			if (allNumericKeys) {
+				const n = Number.parseInt(raw, 10);
+				out = Number.isNaN(n) ? raw : String(n);
+			}
+		}
+		setValue(raw);
+		onChange(out);
+	}, [options, onChange]);
+	useEffect(() => { setValue(normalizeSelectValue(defaultValue)); }, [defaultValue]);
 
-	if (!Object.keys(options).length) return null;
+	const entries = Array.isArray(options)
+		? options.map((v) => [String(v), v])
+		: Object.keys(options).map((k) => [k, options[k]]);
+	if (!entries.length) return null;
 
 	return react.createElement("div", { className: "setting-row" },
 		react.createElement("label", { className: "col description" }, name),
 		react.createElement("div", { className: "col action" },
 			react.createElement("select", { className: "main-dropDown-dropDown", value, onChange: setValueCallback },
-				Object.keys(options).map((item) => react.createElement("option", { value: item }, options[item]))
+				entries.map(([optVal, label]) => react.createElement("option", { key: optVal, value: optVal }, label))
 			)
 		)
 	);
 };
 
-const ConfigInput = ({ name, defaultValue, onChange = () => { } }) => {
-	const [value, setValue] = useState(defaultValue);
-	const setValueCallback = useCallback((event) => { const value = event.target.value; setValue(value); onChange(value); }, [value]);
+const ConfigInput = ({ name, defaultValue, onChange = () => { }, placeholder = "", inputType = "text", autoComplete = "off" }) => {
+	const [value, setValue] = useState(defaultValue ?? "");
+	const setValueCallback = useCallback((event) => {
+		const v = event.target.value;
+		setValue(v);
+		onChange(v);
+	}, [onChange]);
+	useEffect(() => { setValue(defaultValue ?? ""); }, [defaultValue]);
 
 	return react.createElement("div", { className: "setting-row" },
 		react.createElement("label", { className: "col description" }, name),
 		react.createElement("div", { className: "col action" },
-			react.createElement("input", { value, onChange: setValueCallback })
+			react.createElement("input", { value, onChange: setValueCallback, placeholder, type: inputType, autoComplete, spellCheck: false })
+		)
+	);
+};
+
+// Combo input = free-form text input + native <datalist> of preset suggestions.
+// Users can either pick a preset from the dropdown or type any custom value.
+// `options` accepts either ["string", ...] or [{ value, label }, ...] entries.
+const ConfigComboBox = ({ name, defaultValue, onChange = () => { }, placeholder = "", inputType = "text", autoComplete = "off", options = [] }) => {
+	const listId = useMemo(
+		() => `lp-datalist-${String(name).replace(/[^a-z0-9]/gi, "-").toLowerCase()}-${Math.random().toString(36).slice(2, 8)}`,
+		[name]
+	);
+	const [value, setValue] = useState(defaultValue ?? "");
+	const setValueCallback = useCallback((event) => {
+		const v = event.target.value;
+		setValue(v);
+		onChange(v);
+	}, [onChange]);
+	useEffect(() => { setValue(defaultValue ?? ""); }, [defaultValue]);
+
+	const optionEls = (options || []).map((opt) => {
+		const optValue = typeof opt === "string" ? opt : opt.value;
+		const optLabel = typeof opt === "string" ? undefined : opt.label;
+		return react.createElement("option", { key: optValue, value: optValue, label: optLabel });
+	});
+
+	return react.createElement("div", { className: "setting-row" },
+		react.createElement("label", { className: "col description" }, name),
+		react.createElement("div", { className: "col action lp-combo-action" },
+			react.createElement("input", {
+				value,
+				onChange: setValueCallback,
+				placeholder,
+				type: inputType,
+				autoComplete,
+				spellCheck: false,
+				list: listId,
+				className: "lp-combo-input"
+			}),
+			react.createElement("datalist", { id: listId }, optionEls)
 		)
 	);
 };
@@ -370,21 +431,55 @@ const ConfigHelper = () => {
 		{ desc: getText("settings.unsyncedAutoScroll.label"), info: getText("settings.unsyncedAutoScroll.desc"), key: "unsynced-auto-scroll", type: ConfigSlider },
 	];
 
-	// Translation Settings
+	const preTranslationTimePresets = [10, 15, 20, 30, 45, 60, 90, 120].reduce((acc, sec) => {
+		acc[String(sec)] = `${sec} s`;
+		return acc;
+	}, {});
+
+	// Popular OpenAI-compatible endpoints. Users can still type any custom URL.
+	const ENDPOINT_PRESETS = [
+		{ value: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", label: "Google Gemini / Gemma (official)" },
+		{ value: "https://openrouter.ai/api/v1/chat/completions", label: "OpenRouter (gateway)" },
+		{ value: "https://api.deepseek.com/v1/chat/completions", label: "DeepSeek" },
+		{ value: "https://api.openai.com/v1/chat/completions", label: "OpenAI" },
+		{ value: "https://api.anthropic.com/v1/chat/completions", label: "Anthropic Claude (OpenAI-compat)" },
+	];
+
+	// Popular models matching the endpoints above (verified Apr 2026). Free-form input still allowed.
+	const MODEL_PRESETS = [
+		// Google Gemini 2.5 — fast tiers (free-tier friendly)
+		"gemini-2.5-flash",
+		"gemini-2.5-flash-lite",
+		// Gemma 4 (released Apr 2, 2026) — open-weight via Google API
+		"gemma-4-31b-it",
+		"gemma-4-26b-a4b-it",
+		// Gemma 3 legacy (still served, useful as fallback)
+		"gemma-3-27b-it",
+		// OpenRouter (gateway namespace prefix) — current routes
+		"openai/gpt-5.4-mini",
+		"anthropic/claude-sonnet-4.6",
+		// DeepSeek — aliases auto-route to V3.2 (chat = non-thinking, reasoner = thinking)
+		"deepseek-chat",
+		"deepseek-reasoner",
+		// OpenAI GPT-5.4 family (Mar 2026)
+		"gpt-5.4",
+		"gpt-5.4-mini",
+		// Anthropic Claude 4.x (Feb–Apr 2026)
+		"claude-opus-4-7",
+		"claude-sonnet-4-6",
+		"claude-haiku-4-5",
+	];
+
+	// Translation Settings (OpenAI-compatible endpoint + keys; no proxy/official split)
 	const translationSettings = [
-		{ desc: getText("settings.apiMode.label"), key: "gemini:api-mode", type: ConfigSelection, options: { "official": getText("settings.apiMode.options.official"), "proxy": getText("settings.apiMode.options.proxy") }, info: getText("settings.apiMode.desc") },
-
-		// Official Settings
-		{ desc: getText("settings.geminiApiKey.label"), key: "gemini-api-key", type: ConfigInput, info: getText("settings.geminiApiKey.desc"), when: () => CONFIG.visual["gemini:api-mode"] !== "proxy" },
-		{ desc: getText("settings.geminiApiKeyRomaji.label"), key: "gemini-api-key-romaji", type: ConfigInput, info: getText("settings.geminiApiKeyRomaji.desc"), when: () => CONFIG.visual["gemini:api-mode"] !== "proxy" },
-
-		// Proxy Settings
-		{ desc: getText("settings.proxyModel.label"), key: "gemini:proxy-model", type: ConfigSelection, options: { "gemini-2.5-flash": "Gemini 2.5 Flash (Default)", "gemini-2.5-pro": "Gemini 2.5 Pro", "gemini-3-flash-preview": "Gemini 3 Flash Preview", "gemini-3-pro-preview": "Gemini 3 Pro Preview" }, info: getText("settings.proxyModel.desc"), when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
-		{ desc: getText("settings.proxyApiKey.label"), key: "gemini:proxy-api-key", type: ConfigInput, info: getText("settings.proxyApiKey.desc"), when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
-		{ desc: getText("settings.proxyEndpoint.label"), key: "gemini:proxy-endpoint", type: ConfigInput, info: getText("settings.proxyEndpoint.desc"), when: () => CONFIG.visual["gemini:api-mode"] === "proxy" },
-
-		// Common Settings
+		{ desc: getText("settings.apiEndpoint.label"), key: "gemini:endpoint", type: ConfigComboBox, info: getText("settings.apiEndpoint.desc"), placeholder: "https://…/v1/chat/completions", options: ENDPOINT_PRESETS },
+		{ desc: getText("settings.modelName.label"), key: "gemini:model", type: ConfigComboBox, info: getText("settings.modelName.desc"), placeholder: "gemma-3-27b-it", options: MODEL_PRESETS },
+		{ desc: getText("settings.apiKey.label"), key: "gemini-api-key", type: ConfigInput, info: getText("settings.apiKey.desc"), inputType: "password", placeholder: "••••••••" },
+		{ desc: getText("settings.apiKey2.label"), key: "gemini-api-key-romaji", type: ConfigInput, info: getText("settings.apiKey2.desc"), inputType: "password", placeholder: "Optional" },
+		{ desc: getText("settings.responseMode.label"), key: "gemini:response-mode", type: ConfigSelection, options: { prompt: getText("settings.responseMode.options.prompt"), json_schema: getText("settings.responseMode.options.json_schema") }, info: getText("settings.responseMode.desc") },
+		{ desc: getText("settings.disableThinking.label"), key: "gemini:disable-thinking", type: ConfigSlider, info: getText("settings.disableThinking.desc") },
 		{ desc: getText("settings.preTranslation.label"), key: "pre-translation", type: ConfigSlider, info: getText("settings.preTranslation.desc") },
+		{ desc: getText("settings.preTranslationTime.label"), key: "pre-translation-time", type: ConfigSelection, options: preTranslationTimePresets, info: getText("settings.preTranslationTime.desc"), when: () => CONFIG.visual["pre-translation"] },
 		{ desc: getText("settings.disableQueue.label"), key: "gemini:disable-queue", type: ConfigSlider, info: getText("settings.disableQueue.desc") },
 	];
 
@@ -515,6 +610,13 @@ function openConfig() {
 	background: rgba(255,255,255,.12);
 	border-color: rgba(255,255,255,.2);
 	outline: none;
+}
+#${APP_NAME}-config-container .lp-combo-action { width: 100%; max-width: 360px; }
+#${APP_NAME}-config-container .lp-combo-input {
+	width: 100%;
+	min-width: 240px;
+	font-family: var(--font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+	font-size: 12.5px;
 }
 #${APP_NAME}-config-container h2 { font-size: 18px; margin: 0 0 16px; font-weight: 700; }
 

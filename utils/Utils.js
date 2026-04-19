@@ -425,12 +425,15 @@ const Utils = {
 
 		// Robustness: If originalText is same as text, treat as no translation
 		if (originalText === text) originalText = null;
+		
+		// Treat whitespace-only text as empty (text can be a React element, guard with typeof)
+		if (typeof text === "string" && !text.trim()) text = null;
 
 		if (isBelow && originalText) {
 			return { mainText: originalText, subText: text, subText2: text2 };
 		} else if (isReplace) {
 			// If replace mode, we prioritize text (translation).
-			// If text is missing (shouldn't happen often), fallback to originalText.
+			// If text is missing or empty, fallback to originalText.
 			return { mainText: text || originalText, subText: text2, subText2: null };
 		}
 		// Default / Unchanged / Fixed mode fallback

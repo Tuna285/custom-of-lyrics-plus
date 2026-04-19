@@ -389,7 +389,7 @@ const LoadingIcon = react.createElement(
     )
 );
 
-// Translation status indicator - shows translating, success, or error states
+// Translation status indicator - shows translating, in-progress message, success, or error
 const TranslatingIndicator = react.memo(({ isVisible, status, text = getText("ui.translating") }) => {
     // Show if translating or has a status to display
     if (!isVisible && !status) return null;
@@ -397,14 +397,15 @@ const TranslatingIndicator = react.memo(({ isVisible, status, text = getText("ui
     // Determine display state
     const isSuccess = status?.type === 'success';
     const isError = status?.type === 'error';
+    const isProgress = status?.type === 'progress';
     const displayText = status?.text || text;
     const className = `lyrics-translating-indicator${isSuccess ? ' success' : ''}${isError ? ' error' : ''}`;
+    const showSpinner = (isVisible && !status) || isProgress;
 
     return react.createElement(
         "div",
         { className },
-        // Show spinner only when translating (not for success/error)
-        isVisible && !status && react.createElement(
+        showSpinner && react.createElement(
             "div",
             { className: "lyrics-translating-spinner" },
             react.createElement("div", { className: "lyrics-translating-dot" }),
@@ -418,3 +419,509 @@ const TranslatingIndicator = react.memo(({ isVisible, status, text = getText("ui
         react.createElement("span", { className: "lyrics-translating-text" }, displayText)
     );
 });
+
+/** Lucide "sparkles" (viewBox 24×24) — universally read as "AI / thinking" */
+const REASONING_ICON_PATHS = [
+    "M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z",
+    "M20 3v4",
+    "M22 5h-4",
+    "M4 17v2",
+    "M5 18H3",
+];
+
+/**
+ * Translating pill + optional reasoning button (same corner row). Reasoning appears after the model returns stripped &lt;thought&gt; / similar blocks.
+ */
+const TranslatingIndicatorRow = react.memo(
+    ({
+        isVisible,
+        status,
+        text = getText("ui.translating"),
+        reasoningStreams = {},
+        onReasoningClick,
+        isReasoningOpen = false,
+    }) => {
+        const showPill = isVisible || !!status;
+        const hasReasoningText = !!(
+            (reasoningStreams.translation && reasoningStreams.translation.trim()) ||
+            (reasoningStreams.phonetic && reasoningStreams.phonetic.trim())
+        );
+        // Brain only shows alongside the active pill. Once translation finishes the pill (and brain) disappear; the modal — if user opened it — stays open independently.
+        const showBrain = showPill;
+        if (!showPill) return null;
+
+        return react.createElement(
+            "div",
+            { className: "lyrics-translating-indicator-row" },
+            showPill &&
+                react.createElement(TranslatingIndicator, {
+                    isVisible,
+                    status,
+                    text,
+                }),
+            showBrain &&
+                react.createElement(
+                    "div",
+                    {
+                        role: "button",
+                        tabIndex: 0,
+                        className: `lyrics-reasoning-icon-btn${isReasoningOpen ? " is-open" : ""}${isVisible && !hasReasoningText ? " is-pending" : ""}`,
+                        title: getText("tooltips.viewReasoning"),
+                        "aria-label": getText("tooltips.viewReasoning"),
+                        "aria-expanded": !!isReasoningOpen,
+                        // Fire on pointerdown so Electron drag/hover overlays can't swallow the click
+                        onPointerDown: (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            try { onReasoningClick && onReasoningClick(); } catch (_) {}
+                        },
+                        onClick: (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        },
+                        onKeyDown: (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                try { onReasoningClick && onReasoningClick(); } catch (_) {}
+                            }
+                        },
+                    },
+                    react.createElement(
+                        "svg",
+                        {
+                            width: 16,
+                            height: 16,
+                            viewBox: "0 0 24 24",
+                            fill: "none",
+                            stroke: "currentColor",
+                            strokeWidth: 2,
+                            strokeLinecap: "round",
+                            strokeLinejoin: "round",
+                            "aria-hidden": true,
+                            style: { pointerEvents: "none" },
+                        },
+                        ...REASONING_ICON_PATHS.map((d, i) => react.createElement("path", { key: i, d }))
+                    )
+                )
+        );
+    }
+);
+
+/** Small chip: background LLM work for the upcoming track (pre-translate). */
+const PreTranslateChip = react.memo(({ chip, currentUri, enabled }) => {
+    if (!enabled || !chip?.uri || chip.uri === currentUri) return null;
+    const title = (chip.title && String(chip.title).trim()) || chip.uri.split(":").pop() || "—";
+    return react.createElement(
+        "div",
+        {
+            className: "lyrics-pretranslate-chip",
+            title: getText("tooltips.preTranslateChip"),
+        },
+        react.createElement("span", { className: "lyrics-pretranslate-chip-pulse" }),
+        react.createElement("span", { className: "lyrics-pretranslate-chip-text" }, getText("ui.preTranslateChip", { title }))
+    );
+});
+
+window.TranslatingIndicator = TranslatingIndicator;
+window.TranslatingIndicatorRow = TranslatingIndicatorRow;
+window.PreTranslateChip = PreTranslateChip;
+
+/**
+ * Track the bounding rect of the active lyrics container so a portal'd overlay can
+ * be positioned over the lyrics-plus area (instead of floating in the viewport corner).
+ */
+const useLyricsContainerRect = () => {
+    const [rect, setRect] = useState(null);
+
+    useEffect(() => {
+        let raf = 0;
+        let stopped = false;
+        const update = () => {
+            if (stopped) return;
+            // Prefer the deepest visible lyrics container (handles fullscreen / fad / normal)
+            const candidates = [
+                document.querySelector("#lyrics-fullscreen-container .lyrics-lyricsContainer-LyricsContainer"),
+                document.querySelector(".lyrics-lyricsContainer-LyricsContainer.fad-enabled"),
+                document.querySelector(".lyrics-lyricsContainer-LyricsContainer"),
+            ].filter(Boolean);
+            const el = candidates.find((e) => {
+                const r = e.getBoundingClientRect();
+                return r.width > 0 && r.height > 0;
+            });
+            if (!el) {
+                setRect((prev) => (prev ? null : prev));
+                return;
+            }
+            const r = el.getBoundingClientRect();
+            setRect((prev) => {
+                if (!prev) return r;
+                if (
+                    Math.abs(prev.top - r.top) < 0.5 &&
+                    Math.abs(prev.right - r.right) < 0.5 &&
+                    Math.abs(prev.width - r.width) < 0.5 &&
+                    Math.abs(prev.height - r.height) < 0.5
+                ) return prev;
+                return r;
+            });
+        };
+        const tick = () => { update(); raf = requestAnimationFrame(tick); };
+        raf = requestAnimationFrame(tick);
+        const onResize = () => update();
+        window.addEventListener("resize", onResize);
+        return () => {
+            stopped = true;
+            cancelAnimationFrame(raf);
+            window.removeEventListener("resize", onResize);
+        };
+    }, []);
+
+    return rect;
+};
+
+/**
+ * Portal-rendered indicator stack pinned to the top-right corner of the lyrics container.
+ * Solves both the click-being-swallowed issue (escapes lyrics overlay tree) and the
+ * "floating outside the lyrics area" issue (position recomputed every frame).
+ */
+const TranslationStatusOverlay = ({
+    isVisible,
+    status,
+    reasoningStreams,
+    onReasoningClick,
+    isReasoningOpen,
+    preTranslateChip,
+    currentUri,
+    preTranslateEnabled,
+}) => {
+    const rect = useLyricsContainerRect();
+    if (!rect) return null;
+    const reactDOMRef = (typeof Spicetify !== "undefined" && Spicetify.ReactDOM) || window.ReactDOM;
+    if (!reactDOMRef || !reactDOMRef.createPortal || typeof document === "undefined") return null;
+
+    const style = {
+        position: "fixed",
+        top: `${Math.round(rect.top + 20)}px`,
+        left: `${Math.round(rect.right - 24)}px`,
+        transform: "translateX(-100%)",
+        zIndex: 2147483000,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-end",
+        gap: "8px",
+        pointerEvents: "auto",
+        WebkitAppRegion: "no-drag",
+        isolation: "isolate",
+    };
+
+    const node = react.createElement(
+        "div",
+        { className: "lyrics-translation-status-stack", style },
+        react.createElement(TranslatingIndicatorRow, {
+            isVisible,
+            status,
+            reasoningStreams,
+            onReasoningClick,
+            isReasoningOpen,
+        }),
+        react.createElement(PreTranslateChip, {
+            chip: preTranslateChip,
+            currentUri,
+            enabled: !!preTranslateEnabled,
+        })
+    );
+    return reactDOMRef.createPortal(node, document.body);
+};
+
+window.TranslationStatusOverlay = TranslationStatusOverlay;
+
+/**
+ * Draggable reasoning window (modelTest.html-style):
+ *  - Header is the drag handle
+ *  - Body auto-scrolls to bottom while user is near the bottom (sticky tail)
+ *  - Close button collapses
+ *  - Initial position: anchored just under the brain icon (top-right of lyrics area)
+ */
+const REASONING_TAB_LABELS = {
+    translation: () => getText("ui.reasoningTabTranslation") || "Translation",
+    phonetic: () => getText("ui.reasoningTabPhonetic") || "Phonetic",
+};
+
+// Persisted geometry key — survives close, song change, and Spotify restart.
+const REASONING_WINDOW_GEOMETRY_KEY = "lyrics-plus:reasoning-window-geometry";
+
+const ReasoningWindow = ({ open, streams = {}, activeTab, onTabChange, isStreaming, onClose, anchorRect }) => {
+    const reactDOMRef = (typeof Spicetify !== "undefined" && Spicetify.ReactDOM) || window.ReactDOM;
+
+    // Build the list of available tabs from streams that have content
+    const availableTabs = useMemo(() => {
+        const tabs = [];
+        for (const key of ["translation", "phonetic"]) {
+            const v = streams[key];
+            if (v && String(v).trim()) tabs.push(key);
+        }
+        return tabs;
+    }, [streams.translation, streams.phonetic]);
+
+    // Effective active tab — fall back to first available
+    const effectiveTab = useMemo(() => {
+        if (activeTab && availableTabs.includes(activeTab)) return activeTab;
+        return availableTabs[0] || activeTab || null;
+    }, [activeTab, availableTabs]);
+
+    // Compute a sensible initial geometry based on the anchor container.
+    // Used as fallback when no persisted geometry exists in localStorage.
+    const initialGeometry = useMemo(() => {
+        const vw = window.innerWidth || 1280;
+        const vh = window.innerHeight || 800;
+
+        const anchorW = anchorRect?.width || vw;
+        const anchorH = anchorRect?.height || vh;
+        const w = Math.round(Math.max(300, Math.min(420, anchorW * 0.38)));
+        const h = Math.round(Math.max(240, Math.min(380, anchorH * 0.5)));
+
+        let top, left;
+        if (anchorRect) {
+            top = Math.round(anchorRect.bottom - h - 20);
+            left = Math.round(anchorRect.right - w - 20);
+        } else {
+            top = vh - h - 80;
+            left = vw - w - 32;
+        }
+
+        // Clamp to viewport (8px safety margin)
+        top = Math.max(8, Math.min(vh - h - 8, top));
+        left = Math.max(8, Math.min(vw - w - 8, left));
+
+        return { top, left, w, h };
+    }, [anchorRect?.bottom, anchorRect?.right, anchorRect?.width, anchorRect?.height]);
+
+    // Load persisted geometry once on mount, clamped to current viewport so a smaller
+    // window after restart never leaves the panel hidden off-screen.
+    const loadPersistedGeometry = () => {
+        try {
+            const raw = localStorage.getItem(REASONING_WINDOW_GEOMETRY_KEY);
+            if (!raw) return null;
+            const saved = JSON.parse(raw);
+            if (!saved || typeof saved !== "object") return null;
+            const vw = window.innerWidth || 1280;
+            const vh = window.innerHeight || 800;
+            const w = Math.max(260, Math.min(720, Number(saved.w) || initialGeometry.w));
+            const h = Math.max(180, Math.min(640, Number(saved.h) || initialGeometry.h));
+            const top = Math.max(8, Math.min(vh - h - 8, Number(saved.top) || initialGeometry.top));
+            const left = Math.max(8, Math.min(vw - w - 8, Number(saved.left) || initialGeometry.left));
+            return { top, left, w, h };
+        } catch (_) {
+            return null;
+        }
+    };
+
+    const [pos, setPos] = useState(() => {
+        const persisted = loadPersistedGeometry();
+        return persisted
+            ? { top: persisted.top, left: persisted.left }
+            : { top: initialGeometry.top, left: initialGeometry.left };
+    });
+    const [size, setSize] = useState(() => {
+        const persisted = loadPersistedGeometry();
+        return persisted
+            ? { w: persisted.w, h: persisted.h }
+            : { w: initialGeometry.w, h: initialGeometry.h };
+    });
+    const dragRef = useRef(null);
+    const bodyRef = useRef(null);
+    const stickToBottomRef = useRef(true);
+    const wasOpenRef = useRef(false);
+
+    // Persist geometry whenever it changes so the window restores to the same spot
+    // across closes, song changes, and Spotify restarts.
+    useEffect(() => {
+        try {
+            localStorage.setItem(
+                REASONING_WINDOW_GEOMETRY_KEY,
+                JSON.stringify({ top: pos.top, left: pos.left, w: size.w, h: size.h })
+            );
+        } catch (_) { /* ignore quota errors */ }
+    }, [pos.top, pos.left, size.w, size.h]);
+
+    // Reset sticky flag each time the window re-opens (geometry is preserved across opens).
+    useEffect(() => {
+        if (open && !wasOpenRef.current) {
+            stickToBottomRef.current = true;
+        }
+        wasOpenRef.current = open;
+    }, [open]);
+
+    // When user switches tabs, snap back to bottom (sticky again)
+    useEffect(() => {
+        stickToBottomRef.current = true;
+    }, [effectiveTab]);
+
+    // Pointer-based drag (works on mouse + touch + Spotify Electron)
+    const onHeaderPointerDown = useCallback((e) => {
+        if (e.target && e.target.closest && e.target.closest(".reasoning-window-close")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startTop = pos.top;
+        const startLeft = pos.left;
+        const onMove = (ev) => {
+            const nx = ev.clientX - startX;
+            const ny = ev.clientY - startY;
+            setPos({
+                top: Math.max(8, Math.min((window.innerHeight || 800) - 60, startTop + ny)),
+                left: Math.max(8, Math.min((window.innerWidth || 1200) - 80, startLeft + nx)),
+            });
+        };
+        const onUp = () => {
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", onUp);
+            window.removeEventListener("pointercancel", onUp);
+        };
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp);
+        window.addEventListener("pointercancel", onUp);
+    }, [pos.top, pos.left]);
+
+    // Resize from bottom-right corner
+    const onResizePointerDown = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startW = size.w;
+        const startH = size.h;
+        const onMove = (ev) => {
+            const nw = Math.max(260, Math.min(720, startW + (ev.clientX - startX)));
+            const nh = Math.max(180, Math.min(640, startH + (ev.clientY - startY)));
+            setSize({ w: nw, h: nh });
+        };
+        const onUp = () => {
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", onUp);
+            window.removeEventListener("pointercancel", onUp);
+        };
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp);
+        window.addEventListener("pointercancel", onUp);
+    }, [size.w, size.h]);
+
+    // Detect manual scroll to disable auto-stick
+    const onBodyScroll = useCallback(() => {
+        const el = bodyRef.current;
+        if (!el) return;
+        const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        stickToBottomRef.current = distFromBottom < 24;
+    }, []);
+
+    const currentText = effectiveTab ? (streams[effectiveTab] || "") : "";
+
+    // Auto-scroll to latest token while sticky (re-runs on content + tab change)
+    useEffect(() => {
+        if (!open) return;
+        const el = bodyRef.current;
+        if (!el) return;
+        if (stickToBottomRef.current) {
+            el.scrollTop = el.scrollHeight;
+        }
+    }, [currentText, open, effectiveTab]);
+
+    if (!open) return null;
+    if (!reactDOMRef || !reactDOMRef.createPortal || typeof document === "undefined") return null;
+
+    const text = currentText.trim();
+    const placeholder = !text
+        ? (isStreaming ? getText("ui.reasoningPending") : getText("ui.reasoningEmpty"))
+        : "";
+
+    // Tab bar appears whenever there is more than one stream OR streaming is active (so user can preview the in-flight task)
+    const showTabs = availableTabs.length > 1 || (isStreaming && availableTabs.length >= 1);
+
+    const tabBar = showTabs && react.createElement(
+        "div",
+        { className: "reasoning-window-tabs" },
+        ...availableTabs.map((key) => {
+            const isActive = key === effectiveTab;
+            const labelFn = REASONING_TAB_LABELS[key];
+            const label = labelFn ? labelFn() : key;
+            return react.createElement(
+                "button",
+                {
+                    key,
+                    type: "button",
+                    className: `reasoning-window-tab${isActive ? " is-active" : ""}`,
+                    onPointerDown: (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!isActive) onTabChange && onTabChange(key);
+                    },
+                    onClick: (e) => { e.preventDefault(); e.stopPropagation(); },
+                },
+                label
+            );
+        })
+    );
+
+    const node = react.createElement(
+        "div",
+        {
+            ref: dragRef,
+            className: "reasoning-window",
+            style: {
+                top: `${pos.top}px`,
+                left: `${pos.left}px`,
+                width: `${size.w}px`,
+                height: `${size.h}px`,
+            },
+            onClick: (e) => e.stopPropagation(),
+        },
+        react.createElement(
+            "div",
+            {
+                className: "reasoning-window-header",
+                onPointerDown: onHeaderPointerDown,
+            },
+            react.createElement(
+                "div",
+                { className: "reasoning-window-title" },
+                react.createElement(
+                    "span",
+                    { className: `reasoning-window-dot${isStreaming ? " is-live" : ""}`, "aria-hidden": "true" }
+                ),
+                react.createElement("span", { className: "reasoning-window-title-text" }, getText("ui.reasoningTitle"))
+            ),
+            react.createElement(
+                "button",
+                {
+                    type: "button",
+                    className: "reasoning-window-close",
+                    "aria-label": "Close",
+                    onPointerDown: (e) => { e.preventDefault(); e.stopPropagation(); onClose && onClose(); },
+                    onClick: (e) => { e.preventDefault(); e.stopPropagation(); },
+                },
+                "×"
+            )
+        ),
+        tabBar,
+        react.createElement(
+            "div",
+            {
+                ref: bodyRef,
+                className: "reasoning-window-body",
+                onScroll: onBodyScroll,
+            },
+            placeholder
+                ? react.createElement("p", { className: "reasoning-window-placeholder" }, placeholder)
+                : text
+        ),
+        react.createElement("div", {
+            className: "reasoning-window-resize",
+            onPointerDown: onResizePointerDown,
+        })
+    );
+
+    return reactDOMRef.createPortal(node, document.body);
+};
+
+window.ReasoningWindow = ReasoningWindow;

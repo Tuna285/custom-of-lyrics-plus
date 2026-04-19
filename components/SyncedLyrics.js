@@ -22,6 +22,80 @@ const isNoteLineObject = (line) => {
     return false;
 };
 
+// === Idling indicator timing constants ===
+// All providers (Spotify, LRCLIB, Musixmatch synced) only give startTime per line.
+// We must estimate when each line actually finishes singing using char count + a per-song tempo.
+const DEFAULT_MS_PER_CHAR = 120;
+const MIN_LINE_DUR = 3000;
+// Grace period: keep "♪" hidden for this long after the estimated line end,
+// so it doesn't pop in while a held note is still ringing out.
+const IDLE_GRACE_MS = 1500;
+// Minimum time the "♪" must remain visible before the next lyric, otherwise skip it.
+const IDLE_MIN_VISIBLE_MS = 2000;
+const GAP_THRESHOLD_MIN = 5000;
+const GAP_THRESHOLD_MAX = 8000;
+const INTRO_THRESHOLD_MIN = 3000;
+const INTRO_THRESHOLD_MAX = 8000;
+
+// Compute the song's own tempo from consecutive line pairs.
+// Pairs spaced > 8s apart are treated as pauses and excluded so they don't bias the estimate.
+const computeTimingStats = (lyrics) => {
+    const fallback = {
+        msPerChar: DEFAULT_MS_PER_CHAR,
+        avgLineDur: 4000,
+        gapThreshold: 7000,
+        introThreshold: 5000,
+    };
+    if (!Array.isArray(lyrics) || lyrics.length < 2) return fallback;
+
+    const charRates = [];
+    const consecutiveDurs = [];
+
+    for (let i = 0; i < lyrics.length - 1; i++) {
+        const curr = lyrics[i];
+        const next = lyrics[i + 1];
+        if (!curr?.startTime || !next?.startTime) continue;
+        const dur = next.startTime - curr.startTime;
+        if (dur <= 0 || dur > 8000) continue;
+
+        const text = curr.originalText || curr.text || "";
+        if (typeof text !== "string") continue;
+        const len = text.trim().length;
+        if (len < 2) continue;
+
+        charRates.push(dur / len);
+        consecutiveDurs.push(dur);
+    }
+
+    if (charRates.length < 4) return fallback;
+
+    const median = (arr) => {
+        const sorted = [...arr].sort((a, b) => a - b);
+        return sorted[Math.floor(sorted.length / 2)];
+    };
+
+    // Clamp to sane musical range: fastest rap ~50ms/char, slowest ballad ~400ms/char
+    const msPerChar = Math.min(400, Math.max(50, median(charRates)));
+    const avgLineDur = median(consecutiveDurs);
+
+    // Fast songs flag pauses sooner; slow songs need longer pauses to feel idle.
+    const gapThreshold = Math.min(GAP_THRESHOLD_MAX, Math.max(GAP_THRESHOLD_MIN, avgLineDur * 2));
+    const introThreshold = Math.min(INTRO_THRESHOLD_MAX, Math.max(INTRO_THRESHOLD_MIN, avgLineDur * 1.5));
+
+    return { msPerChar, avgLineDur, gapThreshold, introThreshold };
+};
+
+// Estimate how long a line actually plays. Prefers provider-supplied endTime when present
+// (e.g. Musixmatch karaoke richsync), falls back to char-count × per-song tempo.
+const estimateLineDuration = (line, stats) => {
+    if (line?.endTime && line?.startTime && line.endTime > line.startTime) {
+        return line.endTime - line.startTime;
+    }
+    const text = line?.originalText || line?.text || "";
+    const len = typeof text === "string" ? text.trim().length : 0;
+    return Math.max(MIN_LINE_DUR, len * (stats?.msPerChar || DEFAULT_MS_PER_CHAR));
+};
+
 const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara }) => {
     const [position, setPosition] = useState(0);
     const activeLineEle = useRef();
@@ -39,6 +113,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
         const raw = [emptyLine, emptyLine, ...lyrics];
         const processed = [];
         let newIndex = 0;
+        const timingStats = computeTimingStats(lyrics);
 
 
         for (let i = 0; i < raw.length; i++) {
@@ -51,7 +126,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
             });
 
             // Insert intro indicator after emptyLines but before first lyric
-            if (i === 1 && lyrics.length > 0 && lyrics[0].startTime > 5000) {
+            if (i === 1 && lyrics.length > 0 && lyrics[0].startTime > timingStats.introThreshold) {
                 processed.push({
                     text: "♪",
                     startTime: 500,
@@ -60,20 +135,20 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
             }
 
             if (currentLine && nextLine && currentLine.startTime && nextLine.startTime) {
-                const textLen = (currentLine.originalText || currentLine.text || "").length;
-                // Estimate duration based on text length (120ms per char), min 3s
-                const estDur = Math.max(3000, textLen * 120);
+                const estDur = estimateLineDuration(currentLine, timingStats);
                 const gap = nextLine.startTime - (currentLine.startTime + estDur);
 
-                // Auto-gap detector: Insert idling indicator if gap is large (>7s)
-                // Use isNoteLineObject to check the entire line object, not just text field
-                if (gap > 7000 && !isNoteLineObject(currentLine) && !isNoteLineObject(nextLine)) {
-                    const insertTime = currentLine.startTime + estDur;
-                    processed.push({
-                        text: "♪",
-                        startTime: insertTime,
-                        lineNumber: newIndex++,
-                    });
+                // Auto-gap detector with adaptive threshold + grace period.
+                // Skip if "♪" wouldn't stay visible long enough to feel intentional.
+                if (gap > timingStats.gapThreshold && !isNoteLineObject(currentLine) && !isNoteLineObject(nextLine)) {
+                    const insertTime = currentLine.startTime + estDur + IDLE_GRACE_MS;
+                    if (nextLine.startTime - insertTime >= IDLE_MIN_VISIBLE_MS) {
+                        processed.push({
+                            text: "♪",
+                            startTime: insertTime,
+                            lineNumber: newIndex++,
+                        });
+                    }
                 }
             }
         }
@@ -317,6 +392,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
     const padded = useMemo(() => {
         const raw = [emptyLine, ...lyrics];
         const processed = [];
+        const timingStats = computeTimingStats(lyrics);
 
 
         for (let i = 0; i < raw.length; i++) {
@@ -326,7 +402,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
             processed.push(currentLine);
 
             // Insert intro indicator after emptyLine but before first lyric
-            if (i === 0 && lyrics.length > 0 && lyrics[0].startTime > 5000) {
+            if (i === 0 && lyrics.length > 0 && lyrics[0].startTime > timingStats.introThreshold) {
                 processed.push({
                     text: "♪",
                     startTime: 500,
@@ -334,19 +410,18 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
             }
 
             if (currentLine && nextLine && currentLine.startTime && nextLine.startTime) {
-                const textLen = (currentLine.originalText || currentLine.text || "").length;
-                // Estimate duration based on text length (120ms per char), min 3s
-                const estDur = Math.max(3000, textLen * 120);
+                const estDur = estimateLineDuration(currentLine, timingStats);
                 const gap = nextLine.startTime - (currentLine.startTime + estDur);
 
-                // Auto-gap detector: Insert idling indicator if gap is large (>7s)
-                // Use isNoteLineObject to check the entire line object, not just text field
-                if (gap > 7000 && !isNoteLineObject(currentLine) && !isNoteLineObject(nextLine)) {
-                    const insertTime = currentLine.startTime + estDur;
-                    processed.push({
-                        text: "♪",
-                        startTime: insertTime,
-                    });
+                // Auto-gap detector with adaptive threshold + grace period.
+                if (gap > timingStats.gapThreshold && !isNoteLineObject(currentLine) && !isNoteLineObject(nextLine)) {
+                    const insertTime = currentLine.startTime + estDur + IDLE_GRACE_MS;
+                    if (nextLine.startTime - insertTime >= IDLE_MIN_VISIBLE_MS) {
+                        processed.push({
+                            text: "♪",
+                            startTime: insertTime,
+                        });
+                    }
                 }
             }
         }

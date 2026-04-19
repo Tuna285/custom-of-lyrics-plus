@@ -119,10 +119,13 @@ interface VisualConfig {
     "video-background-blur": number;
     "video-background-dim": number;
     "video-background-scale": number;
-    "gemini:api-mode": "official" | "proxy";
-    "gemini:proxy-endpoint": string;
-    "gemini:proxy-model": string;
-    "gemini:proxy-api-key": string;
+    "gemini:endpoint": string;
+    "gemini:model": string;
+    "gemini-api-key": string;
+    "gemini-api-key-romaji": string;
+    "gemini:response-mode": "prompt" | "json_schema";
+    "gemini:disable-thinking": boolean;
+    "pre-translation-time": string;
     "gemini:disable-queue": boolean;
     "ui-language": string;
     [key: string]: any; // Allow dynamic keys like "translation-mode:japanese"

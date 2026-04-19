@@ -33,6 +33,7 @@
     "components/Settings.js",
     "components/OptionsMenu.js",
     "components/PlaybarButton.js",
+    "components/MiniLyrics.js",
     "components/VideoBackground.js"
   ],
   "authors": [

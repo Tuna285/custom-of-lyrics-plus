@@ -7,7 +7,13 @@ window.LANG_EN = {
   },
   "ui": {
     "translating": "Translating...",
-    "providedBy": "Lyrics provided by {provider}"
+    "providedBy": "Lyrics provided by {provider}",
+    "reasoningTitle": "AI Reasoning Process",
+    "reasoningPending": "Still waiting for the model response. If your endpoint returns reasoning only after the full reply, text will appear here when ready.",
+    "reasoningEmpty": "No separate reasoning text for this response. Many models hide thinking, or your prompt asks for output only.",
+    "reasoningTabTranslation": "Translation",
+    "reasoningTabPhonetic": "Phonetic",
+    "preTranslateChip": "Next: {title}"
   },
   "tabs": {
     "general": "General",
@@ -20,9 +26,11 @@ window.LANG_EN = {
     "displayControls": "Display & Controls",
     "syncedOptions": "Synced Lyrics Options",
     "unsyncedOptions": "Unsynced Lyrics Options",
-    "geminiApi": "Gemini, Gemma API",
+    "geminiApi": "LLM API",
     "serviceOrder": "Service Order & Toggle",
-    "corsProxy": "CORS Proxy Template"
+    "corsProxy": "CORS Proxy Template",
+    "videoBackground": "Video Background",
+    "generalBackground": "General Background"
   },
   "settings": {
     "language": {
@@ -32,6 +40,10 @@ window.LANG_EN = {
     "playbarButton": {
       "label": "Playbar button",
       "desc": "Replace Spotify's lyrics button with Lyrics Plus."
+    },
+    "miniLyrics": {
+      "label": "Mini Lyrics Overlay",
+      "desc": "Show a floating lyrics panel on any page (toggle with Ctrl+Shift+M)."
     },
     "globalDelay": {
       "label": "Global delay",
@@ -65,41 +77,47 @@ window.LANG_EN = {
       "label": "Unsynced: Smart auto-scroll",
       "desc": "Automatically scroll unsynced lyrics based on song progress. Pauses for 5 seconds when you manually scroll."
     },
-    "apiMode": {
-      "label": "API Mode",
-      "desc": "Choose between official Google API (requires API key) or ProxyPal for free access.",
+    "apiEndpoint": {
+      "label": "API Endpoint",
+      "desc": "OpenAI-compatible API URL (<code>/v1/chat/completions</code>). Pick a preset from the dropdown or paste a custom URL."
+    },
+    "modelName": {
+      "label": "Model Name",
+      "desc": "LLM model name from your provider. Pick a popular model or type any custom name."
+    },
+    "apiKey": {
+      "label": "API Key",
+      "desc": "Primary API key for translation."
+    },
+    "apiKey2": {
+      "label": "API Key 2",
+      "desc": "Secondary API key for phonetic/romaji (optional, falls back to primary key)."
+    },
+    "responseMode": {
+      "label": "Response Format",
+      "desc": "'Prompt Engineering' works with ALL models. 'JSON Schema' requires model support but produces more reliable structured output.",
       "options": {
-        "official": "Official (API Key)",
-        "proxy": "ProxyPal (Free)"
-      }
-    },
-    "geminiApiKey": {
-      "label": "Gemma API Key",
-      "desc": "Gemma API for Display Mode"
-    },
-    "geminiApiKeyRomaji": {
-      "label": "Gemma API Key 2",
-      "desc": "Gemma API (optional)"
-    },
-    "proxyModel": {
-      "label": "Proxy Model",
-      "desc": "Model to use with ProxyPal"
-    },
-    "proxyApiKey": {
-      "label": "Proxy API Key",
-      "desc": "API Key (default: proxypal-local)."
-    },
-    "proxyEndpoint": {
-      "label": "Proxy Endpoint",
-      "desc": "Full Proxy URL (default: http://localhost:8317/v1/chat/completions)."
+        "prompt": "Prompt Engineering (Universal)",
+        "json_schema": "JSON Schema"
+      },
+      "unsupportedToast": "This model doesn't support JSON Schema — auto-switched to Prompt Engineering."
     },
     "preTranslation": {
       "label": "Pre-translation",
-      "desc": "Automatically translate lyrics 30s before a song starts playing."
+      "desc": "Automatically translate lyrics before a song starts playing."
+    },
+    "preTranslationTime": {
+      "label": "Pre-translation time",
+      "desc": "How long before song ends to start pre-translating the next track."
     },
     "disableQueue": {
       "label": "Disable Queue (Parallel Requests)",
       "desc": "Process all translation requests in parallel without queuing. May hit rate limits faster but translates quicker."
+    },
+    "disableThinking": {
+      "label": "Disable AI Thinking",
+      "desc": "Skip the reasoning step for faster, cheaper responses. No effect on models that don't support it.",
+      "unsupportedToast": "This model doesn't support disabling thinking."
     },
     "transparentBackground": {
       "label": "Transparent Background",
@@ -122,6 +140,9 @@ window.LANG_EN = {
     "videoBackgroundDim": {
       "label": "Video Brightness",
       "desc": "Adjust video brightness (0-100)"
+    },
+    "videoBackgroundBlur": {
+      "label": "Video Blur"
     },
     "debugMode": {
       "label": "Debug Mode",
@@ -165,13 +186,15 @@ window.LANG_EN = {
     "genius": { "name": "genius" }
   },
   "notifications": {
-    "translatedIn": "Translated in {duration}ms",
+    "translatedIn": "Translated in {duration}",
+    "reTranslating": "Re-translating…",
+    "cacheClearedShort": "Translation cache cleared",
     "settingsChanged": "Settings changed, re-fetching...",
     "autoCached": "Auto-cached lyrics ({lines} lines)",
     "translationFailed": "Translation failed",
-    "geminiKeyMissing": "Gemini API key missing. Please add at least one key in Settings.",
+    "geminiKeyMissing": "LLM API key missing. Please add at least one key in Settings.",
     "noLyricsToTranslate": "No lyrics to translate.",
-    "emptyResult": "Empty result from Gemini.",
+    "emptyResult": "Empty result from AI.",
     "lineCountMismatch": "Line count mismatch! Expected: {expected}, Got: {got}",
     "noTrack": "No track playing",
     "invalidId": "Invalid video ID",
@@ -219,8 +242,8 @@ window.LANG_EN = {
       "none": "None"
     },
     "geminiModes": {
-      "romaji": "Romaji, Romaja, Pinyin (Gemini, Gemma)",
-      "vi": "Vietnamese (Gemini, Gemma)"
+      "romaji": "Romaji, Romaja, Pinyin (AI)",
+      "vi": "Vietnamese (AI)"
     },
     "styles": {
       "smart_adaptive": "Smart Adaptive (Recommended)",
@@ -251,9 +274,10 @@ window.LANG_EN = {
     "loadFile": "Load lyrics from file",
     "resetCache": "Reset translation cache",
     "openSettings": "Open Settings",
-    "openSettings": "Open Settings",
     "preTransNext": "Next song pre-translated",
-    "copy": "Copy to clipboard"
+    "preTranslateChip": "AI is preparing the next track in the background",
+    "copy": "Copy to clipboard",
+    "viewReasoning": "View AI reasoning"
   },
   "videoModal": {
     "title": "Video Background Settings",
