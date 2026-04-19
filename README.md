@@ -44,6 +44,8 @@ Inject synchronized lyrics directly into Spotify's native Picture-in-Picture min
 
 Animated YouTube music-video backdrops for the lyrics page (auto-fetched via ivLyrics). Adjustable scale, dim, and blur — pairs nicely with the transparent mode and any Spicetify theme.
 
+<img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/51520969-7a8f-44e5-bf70-3262e9d658c7" />
+
 ### 4. Modern Interface & Optimized Experience
 
 - **Transparent background** — harmonizes with any Spicetify theme.
