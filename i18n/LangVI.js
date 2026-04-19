@@ -115,10 +115,16 @@ window.LANG_VI = {
       "label": "Tắt hàng đợi (Parallel)",
       "desc": "Xử lý song song. Nhanh hơn nhưng dễ bị giới hạn (rate limit)."
     },
-    "disableThinking": {
-      "label": "Tắt suy nghĩ (Thinking)",
-      "desc": "Bỏ bước reasoning để nhanh + rẻ hơn. Không có tác dụng với model không hỗ trợ.",
-      "unsupportedToast": "Model này không hỗ trợ tắt thinking."
+    "reasoningEffort": {
+      "label": "Mức độ suy luận (Reasoning)",
+      "desc": "Model suy nghĩ nhiều hay ít trước khi trả lời. Thấp = nhanh hơn. 'Thấp' là sweet spot cho dịch lyric. Không tác dụng với model không có thinking mode (vd. Gemma 4 26B A4B).",
+      "options": {
+        "off": "Tắt (nhanh nhất)",
+        "low": "Thấp (khuyên dùng)",
+        "medium": "Trung bình",
+        "high": "Cao (chậm nhất, cho lyric phức tạp)"
+      },
+      "unsupportedToast": "Model này không hỗ trợ điều chỉnh mức suy luận."
     },
     "transparentBackground": {
       "label": "Nền trong suốt",

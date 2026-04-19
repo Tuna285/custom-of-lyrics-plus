@@ -315,73 +315,112 @@ const GeminiClient = {
     },
 
     /**
-     * Mutate `body` with thinking-disable flags for the SPECIFIC API family detected from endpoint+model.
+     * Mutate `body` with reasoning-effort flags for the SPECIFIC API family detected from endpoint+model.
      * Strict providers (Gemini OpenAI-compat) reject unknown fields, so we cannot broadcast — we must
-     * detect and send only the field that family accepts. No-op when the model doesn't have thinking
-     * in the first place (e.g. Gemma, GPT-4o, Claude Haiku).
+     * detect and send only the field that family accepts.
+     *
+     * `effort` values:
+     *   "off"    — disable reasoning entirely (fastest, cheapest)
+     *   "low"    — minimal reasoning (~512 tokens) — recommended default for lyrics
+     *   "medium" — moderate reasoning (~2048 tokens)
+     *   "high"   — full reasoning (~8192 tokens or dynamic)
+     *
+     * No-op when the model doesn't have thinking in the first place (e.g. Gemma 4 26B A4B, GPT-4o).
      */
-    applyThinkingDisable(body, endpoint, model) {
+    applyReasoningEffort(body, endpoint, model, effort) {
         if (!body || typeof body !== "object") return body;
+        if (!effort || effort === "default") return body;
         const url = String(endpoint || "").toLowerCase();
         const m = String(model || "").toLowerCase();
         let applied = true;
 
+        // Per-level Google thinking_budget (negative = dynamic). Tokens numbers are
+        // calibrated for ~50-line lyric tasks: low is enough for 1-2 line reconsideration,
+        // high lets the model do a full audit if it wants.
+        const geminiBudget = effort === "off" ? 0 : effort === "low" ? 512 : effort === "medium" ? 2048 : -1;
+        const openRouterBudget = effort === "off" ? 0 : effort === "low" ? 512 : effort === "medium" ? 2048 : 8192;
+
         // ── Google Gemini (OpenAI-compat or Vertex) ──────────────────────────
         if (url.includes("generativelanguage.googleapis.com") || url.includes("aiplatform.googleapis.com")) {
-            const supportsThinkingConfig = /gemini-(2\.5|3)|flash-thinking|thinking-exp/.test(m);
+            const supportsThinkingConfig = /gemini-(2\.5|3)|flash-thinking|thinking-exp|gemma-4-(31b|e[24]b)/.test(m);
             if (supportsThinkingConfig) {
                 body.extra_body = {
                     ...(body.extra_body || {}),
                     google: {
                         ...((body.extra_body && body.extra_body.google) || {}),
-                        thinking_config: { thinking_budget: 0, include_thoughts: false },
+                        thinking_config: {
+                            thinking_budget: geminiBudget,
+                            include_thoughts: effort !== "off",
+                        },
                     },
                 };
             } else {
-                applied = false;
+                // Model has no thinking mode (Gemma 4 26B A4B, Gemma 1/2/3) — silently skip
+                // when requesting "off" (desired anyway); only warn on explicit effort levels.
+                applied = effort === "off";
             }
         }
         // ── OpenRouter ───────────────────────────────────────────────────────
         else if (url.includes("openrouter.ai")) {
-            body.reasoning = { ...(body.reasoning || {}), exclude: true, max_tokens: 0 };
+            if (effort === "off") {
+                body.reasoning = { ...(body.reasoning || {}), exclude: true, max_tokens: 0 };
+            } else {
+                body.reasoning = { ...(body.reasoning || {}), max_tokens: openRouterBudget };
+            }
         }
-        // ── OpenAI ───────────────────────────────────────────────────────────
+        // ── OpenAI (reasoning models: o-series, gpt-5) ───────────────────────
         else if (url.includes("api.openai.com")) {
-            if (/^(o1|o3|o4|gpt-5)/.test(m)) body.reasoning_effort = "minimal";
-            else applied = false;
+            if (/^(o1|o3|o4|gpt-5)/.test(m)) {
+                body.reasoning_effort = effort === "off" ? "minimal" : effort;
+            } else {
+                applied = effort === "off"; // non-reasoning GPT-4.x has nothing to cap
+            }
         }
-        // ── DeepSeek (model-bound: user must pick non-reasoning model) ───────
+        // ── DeepSeek (model-bound: reasoning vs chat model) ─────────────────
         else if (url.includes("api.deepseek.com")) {
-            applied = false;
+            applied = effort === "off"; // only "off" warns; other levels silently accepted as default
         }
         // ── Qwen DashScope ───────────────────────────────────────────────────
         else if (url.includes("dashscope.aliyuncs.com")) {
-            body.extra_body = { ...(body.extra_body || {}), enable_thinking: false };
+            body.extra_body = {
+                ...(body.extra_body || {}),
+                enable_thinking: effort !== "off",
+                ...(effort !== "off" && effort !== "high" ? { thinking_budget: openRouterBudget } : {}),
+            };
         }
         // ── Anthropic native (not via OpenAI-compat) ─────────────────────────
         else if (url.includes("api.anthropic.com")) {
-            applied = false;
+            // Claude's effort scale: low | medium | max (no "off" / "minimal")
+            const claudeEffort = effort === "off" ? "low" : effort === "high" ? "max" : effort;
+            body.effort = claudeEffort;
+            if (effort === "off") applied = false; // inform user Claude doesn't truly disable
         }
         // ── Local / Self-hosted runtimes ────────────────────────────────────
         else {
             const isOllama = url.includes(":11434") || url.includes("/api/chat") || url.includes("ollama");
-            if (isOllama) body.think = false;
-            else body.chat_template_kwargs = { ...(body.chat_template_kwargs || {}), enable_thinking: false };
+            if (isOllama) {
+                body.think = effort !== "off";
+            } else {
+                body.chat_template_kwargs = {
+                    ...(body.chat_template_kwargs || {}),
+                    enable_thinking: effort !== "off",
+                };
+            }
         }
 
-        if (!applied) this.warnThinkingUnsupported(endpoint, model);
+        if (!applied) this.warnReasoningEffortUnsupported(endpoint, model, effort);
         return body;
     },
 
-    /** Show a one-shot toast per endpoint+model when disable-thinking is unsupported. */
-    warnThinkingUnsupported(endpoint, model) {
+    /** Show a one-shot toast when the requested reasoning effort can't be honored for (endpoint, model). */
+    warnReasoningEffortUnsupported(endpoint, model, effort) {
         if (!this._thinkingWarnedKeys) this._thinkingWarnedKeys = new Set();
-        const key = `${endpoint}::${model}`;
+        const key = `${endpoint}::${model}::${effort}`;
         if (this._thinkingWarnedKeys.has(key)) return;
         this._thinkingWarnedKeys.add(key);
         try {
-            const msg = (typeof getText === "function" && getText("settings.disableThinking.unsupportedToast"))
-                || "This model doesn't support disabling thinking.";
+            const msg = (typeof getText === "function" && getText("settings.reasoningEffort.unsupportedToast"))
+                || "This model doesn't support adjusting reasoning effort.";
             Spicetify?.showNotification?.(msg, true);
         } catch (_) { /* notification optional */ }
     },
@@ -420,13 +459,23 @@ const GeminiClient = {
      * Falls back gracefully if the server returns a non-SSE body.
      * Returns: { content, reasoningContent, message } shaped like the non-streaming `data.choices[0]`.
      */
-    async streamChatCompletion({ endpoint, headers, body, onProgress, signal }) {
+    async streamChatCompletion({ endpoint, headers, body, onProgress, signal, lineCount = 0, responseMode = "prompt" }) {
         const streamingBody = { ...body, stream: true, stream_options: { include_usage: true } };
+
+        // Chain external signal with an internal AbortController so we can also abort
+        // proactively when we detect the model is wasting tokens on Pass 3 / Pass 4 redrafts.
+        const localController = new AbortController();
+        let earlyAbortReason = null; // Set when we abort proactively (vs. timeout / user cancel)
+        if (signal) {
+            if (signal.aborted) localController.abort();
+            else signal.addEventListener("abort", () => localController.abort(), { once: true });
+        }
+
         const response = await fetch(endpoint, {
             method: "POST",
             headers: { ...headers, "Accept": "text/event-stream" },
             body: JSON.stringify(streamingBody),
-            signal,
+            signal: localController.signal,
         });
         if (!response.ok) {
             // Let the caller's error pipeline format this
@@ -500,41 +549,90 @@ const GeminiClient = {
         const finalMessage = { role: "assistant", content: "" };
         let usage = null;
 
+        // ── Pass 3 / Pass 4 redraft detector ────────────────────────────────────
+        // Larger LLMs sometimes emit the full N-line draft once, then start restating
+        // the entire thing inside the FINAL REPLY channel ("Pass 3" audit pattern).
+        // This burns the token budget, hits provider caps, and slows perceived latency.
+        // Detect the start of a 2nd full draft in content and stop the stream.
+        //
+        // Only enabled for tag-based output (prompt mode) with N >= 3 lines.
+        // Reasoning-channel redrafts are NOT auto-aborted (risk of losing answer if
+        // the final reply hasn't started yet) — those are mitigated by the prompt rules
+        // and by max_tokens caps.
+        const useRedraftDetector = responseMode !== "json_schema" && lineCount >= 3;
+        let lastContentLen = -1; // skip work on chunks that didn't grow contentBuf
+
+        const countTagOne = (s) => {
+            let count = 0;
+            let idx = -1;
+            while ((idx = s.indexOf("<1>", idx + 1)) !== -1) count++;
+            return count;
+        };
+
+        const checkRedraftAbort = () => {
+            if (!useRedraftDetector || earlyAbortReason || localController.signal.aborted) return;
+            if (contentBuf.length === lastContentLen) return;
+            lastContentLen = contentBuf.length;
+            if (countTagOne(contentBuf) < 2) return;
+
+            // Truncate at the start of the 2nd <1> — we keep the first complete draft
+            // and discard the redraft, then abort to save tokens.
+            const first = contentBuf.indexOf("<1>");
+            if (first === -1) return;
+            const cut = contentBuf.indexOf("<1>", first + 3);
+            if (cut <= 0) return;
+            contentBuf = contentBuf.slice(0, cut);
+            earlyAbortReason = "content-redraft";
+            try { localController.abort(); } catch (_) { }
+        };
+        // ────────────────────────────────────────────────────────────────────────
+
         // SSE parser loop (matches modelTest.html style)
         // Lines: "data: {...}" or "data: [DONE]"
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() ?? "";
+        try {
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop() ?? "";
 
-            for (const line of lines) {
-                const t = line.trim();
-                if (!t || t === "data: [DONE]" || t === ":") continue;
-                if (!t.startsWith("data:")) continue;
-                const jsonStr = t.slice(5).trim();
-                if (!jsonStr || jsonStr === "[DONE]") continue;
-                let chunk;
-                try { chunk = JSON.parse(jsonStr); } catch (_) { continue; }
+                for (const line of lines) {
+                    const t = line.trim();
+                    if (!t || t === "data: [DONE]" || t === ":") continue;
+                    if (!t.startsWith("data:")) continue;
+                    const jsonStr = t.slice(5).trim();
+                    if (!jsonStr || jsonStr === "[DONE]") continue;
+                    let chunk;
+                    try { chunk = JSON.parse(jsonStr); } catch (_) { continue; }
 
-                if (chunk.usage) usage = chunk.usage;
-                const choice = chunk.choices?.[0];
-                if (!choice) continue;
+                    if (chunk.usage) usage = chunk.usage;
+                    const choice = chunk.choices?.[0];
+                    if (!choice) continue;
 
-                const delta = choice.delta || {};
-                if (typeof delta.content === "string" && delta.content) {
-                    contentBuf += delta.content;
-                    emitProgress(false);
+                    const delta = choice.delta || {};
+                    if (typeof delta.content === "string" && delta.content) {
+                        contentBuf += delta.content;
+                        emitProgress(false);
+                    }
+                    // Some providers stream thinking in a separate channel
+                    const dr = delta.reasoning_content ?? delta.reasoning ?? delta.thought ?? delta.thinking;
+                    if (typeof dr === "string" && dr) {
+                        reasoningBuf += dr;
+                        emitProgress(false);
+                    }
                 }
-                // Some providers stream thinking in a separate channel
-                const dr = delta.reasoning_content ?? delta.reasoning ?? delta.thought ?? delta.thinking;
-                if (typeof dr === "string" && dr) {
-                    reasoningBuf += dr;
-                    emitProgress(false);
-                }
+
+                checkRedraftAbort();
+                if (earlyAbortReason) break;
             }
+        } catch (e) {
+            // If WE aborted on purpose, swallow the AbortError and finalize gracefully.
+            // Real user/timeout aborts (no earlyAbortReason set) re-throw.
+            const isAbort = e && (e.name === "AbortError" || e.code === 20 || /aborted/i.test(e.message || ""));
+            if (!isAbort || !earlyAbortReason) throw e;
+            DebugLogger.log(`[Lyrics+] Stream aborted early: ${earlyAbortReason} — kept first complete draft, dropped redraft.`);
         }
         // Flush any tail bytes
         try { buffer += decoder.decode(); } catch (_) { }
@@ -548,6 +646,7 @@ const GeminiClient = {
             reasoningContent: reasoningBuf,
             message: finalMessage,
             usage,
+            earlyAbortReason,
         };
     },
 
@@ -572,7 +671,7 @@ const GeminiClient = {
         DebugLogger.group(`${wantSmartPhonetic ? 'Phonetic' : 'Translation'} Request`);
 
         const endpoint = CONFIG?.visual?.["gemini:endpoint"] || "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-        const model = CONFIG?.visual?.["gemini:model"] || "gemma-3-27b-it";
+        const model = CONFIG?.visual?.["gemini:model"] || "gemma-4-26b-a4b-it";
         let responseMode = CONFIG?.visual?.["gemini:response-mode"] || "prompt";
 
         // Auto-demote JSON Schema → Prompt Engineering for models that don't support it
@@ -639,9 +738,12 @@ const GeminiClient = {
             };
         }
 
-        // Optionally tell the model to skip its internal reasoning stage entirely
-        if (CONFIG?.visual?.["gemini:disable-thinking"] === true) {
-            this.applyThinkingDisable(body, endpoint, model);
+        // Reasoning effort: "off" | "low" | "medium" | "high". Fallback to "low" (sweet spot
+        // for lyric translation — enough thinking to handle tricky lines, tight enough to avoid
+        // Pass 3/4 audit loops).
+        const reasoningEffort = CONFIG?.visual?.["gemini:reasoning-effort"] || "low";
+        if (reasoningEffort !== "default") {
+            this.applyReasoningEffort(body, endpoint, model, reasoningEffort);
         }
 
         try {
@@ -658,6 +760,8 @@ const GeminiClient = {
                             headers,
                             body,
                             signal: controller.signal,
+                            lineCount,
+                            responseMode,
                             onProgress: ({ reasoning }) => {
                                 if (typeof onReasoningProgress === "function" && reasoning) {
                                     try { onReasoningProgress(reasoning); } catch (_) { }

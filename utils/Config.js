@@ -128,9 +128,14 @@ const CONFIG = {
         "gemini-api-key": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key") || "",
         "gemini-api-key-romaji": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key-romaji") || "",
         "gemini:endpoint": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:endpoint") || "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-        "gemini:model": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:model") || "gemma-3-27b-it",
+        "gemini:model": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:model") || "gemma-4-26b-a4b-it",
         "gemini:response-mode": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:response-mode") || "prompt",
-        "gemini:disable-thinking": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:disable-thinking") === "true",
+        // Reasoning effort: "off" | "low" | "medium" | "high"
+        // Migration from legacy boolean `gemini:disable-thinking`:
+        //   true  → "off"       (preserve explicit opt-out)
+        //   false → "low"       (implicit default; low is new sweet spot for lyric translation)
+        "gemini:reasoning-effort": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:reasoning-effort")
+            || (ConfigUtils.getPersisted("lyrics-plus:visual:gemini:disable-thinking") === "true" ? "off" : "low"),
         translate: ConfigUtils.getPersisted("lyrics-plus:visual:translate") === "true",
         "ja-detect-threshold": ConfigUtils.getPersisted("lyrics-plus:visual:ja-detect-threshold") || "40",
         "hans-detect-threshold": ConfigUtils.getPersisted("lyrics-plus:visual:hans-detect-threshold") || "40",

@@ -124,7 +124,7 @@ interface VisualConfig {
     "gemini-api-key": string;
     "gemini-api-key-romaji": string;
     "gemini:response-mode": "prompt" | "json_schema";
-    "gemini:disable-thinking": boolean;
+    "gemini:reasoning-effort": "off" | "low" | "medium" | "high";
     "pre-translation-time": string;
     "gemini:disable-queue": boolean;
     "ui-language": string;

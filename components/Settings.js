@@ -447,12 +447,14 @@ const ConfigHelper = () => {
 
 	// Popular models matching the endpoints above (verified Apr 2026). Free-form input still allowed.
 	const MODEL_PRESETS = [
+		// Gemma 4 26B A4B (MoE, ~3.88B active) — fastest option with quality on par with 31B
+		// for translation tasks. No thinking mode, so no Pass 3/4 overhead. Free tier: 1500 RPD.
+		{ value: "gemma-4-26b-a4b-it", label: "Recommended — fast, good quality" },
 		// Google Gemini 2.5 — fast tiers (free-tier friendly)
 		"gemini-2.5-flash",
 		"gemini-2.5-flash-lite",
-		// Gemma 4 (released Apr 2, 2026) — open-weight via Google API
+		// Gemma 4 31B (dense) — strongest Gemma 4 with thinking mode
 		"gemma-4-31b-it",
-		"gemma-4-26b-a4b-it",
 		// Gemma 3 legacy (still served, useful as fallback)
 		"gemma-3-27b-it",
 		// OpenRouter (gateway namespace prefix) — current routes
@@ -473,11 +475,22 @@ const ConfigHelper = () => {
 	// Translation Settings (OpenAI-compatible endpoint + keys; no proxy/official split)
 	const translationSettings = [
 		{ desc: getText("settings.apiEndpoint.label"), key: "gemini:endpoint", type: ConfigComboBox, info: getText("settings.apiEndpoint.desc"), placeholder: "https://…/v1/chat/completions", options: ENDPOINT_PRESETS },
-		{ desc: getText("settings.modelName.label"), key: "gemini:model", type: ConfigComboBox, info: getText("settings.modelName.desc"), placeholder: "gemma-3-27b-it", options: MODEL_PRESETS },
+		{ desc: getText("settings.modelName.label"), key: "gemini:model", type: ConfigComboBox, info: getText("settings.modelName.desc"), placeholder: "gemma-4-26b-a4b-it", options: MODEL_PRESETS },
 		{ desc: getText("settings.apiKey.label"), key: "gemini-api-key", type: ConfigInput, info: getText("settings.apiKey.desc"), inputType: "password", placeholder: "••••••••" },
 		{ desc: getText("settings.apiKey2.label"), key: "gemini-api-key-romaji", type: ConfigInput, info: getText("settings.apiKey2.desc"), inputType: "password", placeholder: "Optional" },
 		{ desc: getText("settings.responseMode.label"), key: "gemini:response-mode", type: ConfigSelection, options: { prompt: getText("settings.responseMode.options.prompt"), json_schema: getText("settings.responseMode.options.json_schema") }, info: getText("settings.responseMode.desc") },
-		{ desc: getText("settings.disableThinking.label"), key: "gemini:disable-thinking", type: ConfigSlider, info: getText("settings.disableThinking.desc") },
+		{
+			desc: getText("settings.reasoningEffort.label"),
+			key: "gemini:reasoning-effort",
+			type: ConfigSelection,
+			options: {
+				off: getText("settings.reasoningEffort.options.off"),
+				low: getText("settings.reasoningEffort.options.low"),
+				medium: getText("settings.reasoningEffort.options.medium"),
+				high: getText("settings.reasoningEffort.options.high"),
+			},
+			info: getText("settings.reasoningEffort.desc")
+		},
 		{ desc: getText("settings.preTranslation.label"), key: "pre-translation", type: ConfigSlider, info: getText("settings.preTranslation.desc") },
 		{ desc: getText("settings.preTranslationTime.label"), key: "pre-translation-time", type: ConfigSelection, options: preTranslationTimePresets, info: getText("settings.preTranslationTime.desc"), when: () => CONFIG.visual["pre-translation"] },
 		{ desc: getText("settings.disableQueue.label"), key: "gemini:disable-queue", type: ConfigSlider, info: getText("settings.disableQueue.desc") },

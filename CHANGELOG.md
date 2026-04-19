@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-04-19
+
+### Added
+
+- **Reasoning Effort selector** (`Off` / `Low` / `Medium` / `High`) replaces the old boolean "Disable AI Thinking" toggle. Maps to the correct per-provider field (Gemini `thinking_budget`, OpenAI `reasoning_effort`, OpenRouter `reasoning.max_tokens`, Qwen `enable_thinking`, Claude `effort`, Ollama `think`). Defaults to **Low** — the sweet spot for lyric translation. Existing users who had "Disable AI Thinking" on are migrated to `Off`.
+- **Anti-redraft stream abort**: Deterministic client-side detector watches the SSE content channel for a second `<1>` tag (the signature of a full-song redraft during model audit passes). When detected, the stream is proactively aborted and truncated at the first complete draft, preventing wasted tokens and rate-limit hits on chatty models.
+- **Targeted-revision thinking rules**: Added prompt rules #7/#8 to discourage full-lyric redrafts during reasoning — model is instructed to emit minimal per-line patches and cap itself at one revision pass over fewer than 5 lines.
+
+### Changed
+
+- **Default model** updated to `gemma-4-26b-a4b-it` (MoE, no thinking mode — ~6× faster than dense reasoning models at comparable lyric-translation quality, with 15 RPM / 1500 RPD on Google's free tier).
+
 ## [1.4.0] - 2026-04-19
 
 ### Added

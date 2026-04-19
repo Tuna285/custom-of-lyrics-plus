@@ -114,10 +114,16 @@ window.LANG_EN = {
       "label": "Disable Queue (Parallel Requests)",
       "desc": "Process all translation requests in parallel without queuing. May hit rate limits faster but translates quicker."
     },
-    "disableThinking": {
-      "label": "Disable AI Thinking",
-      "desc": "Skip the reasoning step for faster, cheaper responses. No effect on models that don't support it.",
-      "unsupportedToast": "This model doesn't support disabling thinking."
+    "reasoningEffort": {
+      "label": "Reasoning Effort",
+      "desc": "How much thinking the model does before answering. Lower = faster. 'Low' is the sweet spot for lyric translation. Ignored by models without thinking mode (e.g. Gemma 4 26B A4B).",
+      "options": {
+        "off": "Off (fastest)",
+        "low": "Low (recommended)",
+        "medium": "Medium",
+        "high": "High (slowest, for complex lyrics)"
+      },
+      "unsupportedToast": "This model doesn't support adjusting reasoning effort."
     },
     "transparentBackground": {
       "label": "Transparent Background",

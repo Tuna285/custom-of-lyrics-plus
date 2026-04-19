@@ -209,7 +209,9 @@ function buildTaskThinkingRules(finalOutputLabel) {
 3) The final ${finalOutputLabel} must appear once and comprise the entire message.
 4) Translate the source DIRECTLY to Vietnamese. Do not route through English, romaji, pinyin, or any other intermediate language — source quote and Vietnamese are the only allowed pair in any notes.
 5) Produce the Vietnamese for each line ONCE. Do not redraft the whole song or emit the full Vietnamese output more than once across reasoning + reply.
-6) Prefer short deliberation. Trust the first instinct — it is usually the most natural Vietnamese phrasing. Exhaustive self-review hurts both latency and quality.`;
+6) Prefer short deliberation. Trust the first instinct — it is usually the most natural Vietnamese phrasing. Exhaustive self-review hurts both latency and quality.
+7) TARGETED REVISION ONLY. If — after your initial line-by-line draft — you decide a few lines need adjustment, write a MINIMAL patch in reasoning naming only those line numbers (e.g. "Line 7: change to ..."). NEVER restate the entire translation in reasoning to "show the corrected version". Re-emitting all N lines a second time wastes the output budget, slows the response, and risks token-cap truncation. The full set of N tags must appear EXACTLY ONCE — in the final reply, not in reasoning.
+8) HARD CAP: at most ONE targeted-revision pass over fewer than 5 lines. If you find yourself wanting to revise more than 5 lines, your initial draft was wrong — start the final reply fresh and stop reasoning. Do not chain "Pass 3 → Pass 4 → Pass 5" audits.`;
 }
 
 /**
