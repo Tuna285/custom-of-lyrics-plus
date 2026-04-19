@@ -7,7 +7,7 @@
 > [!NOTE]
 > **Currently, the translation feature only supports Vietnamese (Tiếng Việt).** Support for other languages may be added in future updates.
 
-Preview
+<img width="800" height="800" alt="image" src="https://github.com/user-attachments/assets/32e85501-567d-4896-a7e4-bb4b098a30a6" />
 
 ---
 
@@ -29,7 +29,11 @@ Connects to any OpenAI-compatible LLM endpoint (Google Gemini/Gemma, OpenRouter,
 
 | Japanese → Romaji | Korean → Romaja | Chinese → Pinyin |
 | ----------------- | --------------- | ---------------- |
-|                   |                 |                  |
+|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/e9b7f1f5-0c3c-474d-8fe1-8e2e37552bfb" />|<img width="1919" height="1018" alt="image" src="https://github.com/user-attachments/assets/e8b56a5e-621e-420f-be68-ffc69e3236c1" />|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/a9e36436-9027-4fbe-a31d-2ffc27d97574" />|
+
+
+
+
 
 
 ### 2. Mini Lyrics in Picture-in-Picture
@@ -82,6 +86,7 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 2. Copy the `lyrics-plus` folder to Spicetify's CustomApps directory:
   - **Windows:** `%LocalAppData%\spicetify\CustomApps`
   - **MacOS/Linux:** `~/.config/spicetify/CustomApps`
+<img width="498" height="367" alt="image" src="https://github.com/user-attachments/assets/31a5b810-ee06-447d-91f4-1e463a601dee" />
 3. Run in terminal:
   ```bash
    spicetify config custom_apps lyrics-plus
