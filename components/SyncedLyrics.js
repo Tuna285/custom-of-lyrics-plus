@@ -32,13 +32,21 @@ const MIN_LINE_DUR = 3000;
 const IDLE_GRACE_MS = 1500;
 // Minimum time the "♪" must remain visible before the next lyric, otherwise skip it.
 const IDLE_MIN_VISIBLE_MS = 2000;
-const GAP_THRESHOLD_MIN = 5000;
-const GAP_THRESHOLD_MAX = 8000;
+// Minimum raw interval between consecutive lines before we'll even consider inserting "♪".
+// Raised from 5s -> 7s: real musical pauses tend to be >=7s; anything shorter is almost
+// always the line still being sung + a short breath. Prevents the "30 lines, 30 idle pops"
+// symptom on songs where char-count-based duration estimates severely underestimate held notes.
+const GAP_THRESHOLD_MIN = 7000;
+const GAP_THRESHOLD_MAX = 10000;
+// Safety floor: even if char-estimate says the line ended at 500ms, assume the singer held
+// the line for at least this fraction of the interval to the next line. Prevents premature
+// "♪" pop-in on lines with short lyrics but long held notes.
+const LINE_END_INTERVAL_FLOOR_RATIO = 0.6;
 const INTRO_THRESHOLD_MIN = 3000;
 const INTRO_THRESHOLD_MAX = 8000;
 
 // Compute the song's own tempo from consecutive line pairs.
-// Pairs spaced > 8s apart are treated as pauses and excluded so they don't bias the estimate.
+// Pairs spaced > 10s apart are treated as pauses and excluded so they don't bias the estimate.
 const computeTimingStats = (lyrics) => {
     const fallback = {
         msPerChar: DEFAULT_MS_PER_CHAR,
@@ -56,7 +64,7 @@ const computeTimingStats = (lyrics) => {
         const next = lyrics[i + 1];
         if (!curr?.startTime || !next?.startTime) continue;
         const dur = next.startTime - curr.startTime;
-        if (dur <= 0 || dur > 8000) continue;
+        if (dur <= 0 || dur > 10000) continue;
 
         const text = curr.originalText || curr.text || "";
         if (typeof text !== "string") continue;
@@ -135,13 +143,25 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
             }
 
             if (currentLine && nextLine && currentLine.startTime && nextLine.startTime) {
-                const estDur = estimateLineDuration(currentLine, timingStats);
-                const gap = nextLine.startTime - (currentLine.startTime + estDur);
+                const interval = nextLine.startTime - currentLine.startTime;
+                // Primary gate: raw interval between lines must exceed the per-song gap threshold.
+                // This replaces the old (interval - estDur) check which could trigger on lines
+                // that were actually still being sung (char-count underestimating held notes).
+                const canInsert =
+                    interval > timingStats.gapThreshold &&
+                    !isNoteLineObject(currentLine) &&
+                    !isNoteLineObject(nextLine);
 
-                // Auto-gap detector with adaptive threshold + grace period.
-                // Skip if "♪" wouldn't stay visible long enough to feel intentional.
-                if (gap > timingStats.gapThreshold && !isNoteLineObject(currentLine) && !isNoteLineObject(nextLine)) {
-                    const insertTime = currentLine.startTime + estDur + IDLE_GRACE_MS;
+                if (canInsert) {
+                    const estDur = estimateLineDuration(currentLine, timingStats);
+                    // Safety: even if char-estimate says the line ends very early, assume the
+                    // singer held it for at least LINE_END_INTERVAL_FLOOR_RATIO of the interval.
+                    // This is the key fix for the "♪ appears mid-line" bug on ballads / held notes.
+                    const lineEnd = currentLine.startTime + Math.max(
+                        estDur,
+                        interval * LINE_END_INTERVAL_FLOOR_RATIO
+                    );
+                    const insertTime = lineEnd + IDLE_GRACE_MS;
                     if (nextLine.startTime - insertTime >= IDLE_MIN_VISIBLE_MS) {
                         processed.push({
                             text: "♪",

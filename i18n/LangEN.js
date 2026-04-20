@@ -123,7 +123,7 @@ window.LANG_EN = {
         "medium": "Medium",
         "high": "High (slowest, for complex lyrics)"
       },
-      "unsupportedToast": "This model doesn't support adjusting reasoning effort."
+      "unsupportedToast": "This model's reasoning cannot be disabled at runtime — it will still think."
     },
     "transparentBackground": {
       "label": "Transparent Background",

@@ -63,8 +63,9 @@ CORE PRINCIPLE: Prioritize Emotional Impact and Flow over literal dictionary def
         role: `You are a Storyteller for Anime/Indie music. Your goal is to translate a "Coming-of-age" story.`,
         style: `STRATEGY: "SLICE OF LIFE"
 1) Tone: Youthful, direct, sincere, and slightly nostalgic.
-   - Avoid complex Sino-Vietnamese words. Use pure Vietnamese (Thuần Việt).
-   - Examples: "Thanh xuân", "Rực rỡ", "Ngốc nghếch".
+   - Avoid heavy/obscure Sino-Vietnamese (Hán Việt). Common ones everyday speakers use are fine.
+   - Examples (keep): "Thanh xuân", "Rực rỡ", "Ngốc nghếch".
+   - Examples (avoid as too heavy): "U hoài", "Thiên thu", "Ái tình", "Sầu bi".
 
 2) Imagery:
    - Preserve specific nouns (School, Train, Sunset, Uniform) as they are core to the genre.
@@ -191,7 +192,15 @@ function buildTranslationGuardrails() {
 3) NO emotion adjectives unless explicit (don't add: buồn bã/chán chường/cô đơn/đau đớn...).
 4) Prefer nuanced verbs/nouns over adding descriptors.
 5) Idioms & interjections ONLY: translate the function minimally (no extra emotion words).
-6) No explanations. No parentheses like "(meaning: ...)".`;
+6) No explanations. No parentheses like "(meaning: ...)".
+7) MODERN V-POP WORD CHOICE — when the source calls for common "soft/gentle/quiet" concepts, use everyday V-pop vocabulary, NOT archaic/stiff substitutes. Required substitutions:
+   - "khẽ khàng" → use "nhẹ nhàng" (default), or "khẽ", "thì thầm", "se sẽ" by context
+   - "nỉ non" → use "thì thầm", "rì rào", "vọng lại"
+   - "thiên thu" / "vạn kiếp" → use "mãi mãi", "vĩnh viễn" (unless classical mode explicitly picked)
+   - "ái tình" → use "tình yêu" (unless classical mode)
+   - "nàng" / "chàng" as default pronoun → follow the locked pronoun pair (Anh-Em / Tớ-Cậu / etc.)
+   "khẽ khàng" in particular is a known LLM tic — actively avoid it.
+8) NO POETIC-WORD REPETITION — any Hán-Việt / thi vị word (vấn vương, bâng khuâng, xao xuyến, mơ màng, man mác, da diết, ngọt lịm, dịu êm, mộng mị, u hoài, nhẹ nhàng...) may appear AT MOST ONCE per song. If the source repeats a motif, vary the Vietnamese word each time. Same-word repetition across many lines is the main thing that makes auto-translated lyrics sound artificial.`;
 }
 
 function buildTranslationFlowPunctuation() {

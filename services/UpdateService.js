@@ -4,7 +4,7 @@ const UpdateService = {
     VERSION_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/version.json",
     RAW_BASE_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main",
     INSTALL_COMMAND: "iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/install.ps1 | iex",
-    CURRENT_VERSION: "1.4.1",
+    CURRENT_VERSION: "1.4.2",
     CHECK_INTERVAL: 0,
 
     UPDATE_FILES: [

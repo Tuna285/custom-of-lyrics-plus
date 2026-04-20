@@ -325,7 +325,12 @@ const GeminiClient = {
      *   "medium" — moderate reasoning (~2048 tokens)
      *   "high"   — full reasoning (~8192 tokens or dynamic)
      *
-     * No-op when the model doesn't have thinking in the first place (e.g. Gemma 4 26B A4B, GPT-4o).
+     * Silently no-op (no warn toast) when the model has no thinking mode in the first place
+     * (e.g. Gemma 4 26B A4B, Gemma 1/2/3, GPT-4o, Claude Haiku, DeepSeek-chat) — the user's
+     * intent is already satisfied by the model's design.
+     *
+     * Warns only on genuine capability mismatch: user wants "off" on a model whose thinking
+     * cannot be disabled at runtime (e.g. Claude thinking models, DeepSeek-reasoner).
      */
     applyReasoningEffort(body, endpoint, model, effort) {
         if (!body || typeof body !== "object") return body;
@@ -342,8 +347,14 @@ const GeminiClient = {
 
         // ── Google Gemini (OpenAI-compat or Vertex) ──────────────────────────
         if (url.includes("generativelanguage.googleapis.com") || url.includes("aiplatform.googleapis.com")) {
-            const supportsThinkingConfig = /gemini-(2\.5|3)|flash-thinking|thinking-exp|gemma-4-(31b|e[24]b)/.test(m);
-            if (supportsThinkingConfig) {
+            // Three classes on Google's endpoint:
+            //   1) Gemini 2.5+ / thinking-exp — supports `thinking_config.thinking_budget` via API
+            //   2) Gemma 4 31B (dense) — thinks natively, but API does NOT accept thinking_config
+            //      (it's a Gemini-only field). Thinking cannot be disabled at runtime.
+            //   3) Gemma 4 26B A4B (MoE), Gemma 1/2/3, older Gemini — no thinking at all.
+            const isGeminiWithBudget = /gemini-(2\.5|3)|flash-thinking|thinking-exp/.test(m);
+            const isGemmaDenseThinking = /gemma-4-31b/.test(m);
+            if (isGeminiWithBudget) {
                 body.extra_body = {
                     ...(body.extra_body || {}),
                     google: {
@@ -354,13 +365,12 @@ const GeminiClient = {
                         },
                     },
                 };
-            } else {
-                // Model has no thinking mode (Gemma 4 26B A4B, Gemma 1/2/3) — silently skip
-                // when requesting "off" (desired anyway); only warn on explicit effort levels.
-                applied = effort === "off";
+            } else if (isGemmaDenseThinking && effort === "off") {
+                applied = false; // warn: Gemma 4 31B thinks no matter what
             }
+            // else: non-thinking Gemma (26B A4B, 1/2/3) — silent no-op
         }
-        // ── OpenRouter ───────────────────────────────────────────────────────
+        // ── OpenRouter (routes to many providers — always honors reasoning field) ────
         else if (url.includes("openrouter.ai")) {
             if (effort === "off") {
                 body.reasoning = { ...(body.reasoning || {}), exclude: true, max_tokens: 0 };
@@ -368,34 +378,43 @@ const GeminiClient = {
                 body.reasoning = { ...(body.reasoning || {}), max_tokens: openRouterBudget };
             }
         }
-        // ── OpenAI (reasoning models: o-series, gpt-5) ───────────────────────
+        // ── OpenAI ───────────────────────────────────────────────────────────
         else if (url.includes("api.openai.com")) {
             if (/^(o1|o3|o4|gpt-5)/.test(m)) {
                 body.reasoning_effort = effort === "off" ? "minimal" : effort;
-            } else {
-                applied = effort === "off"; // non-reasoning GPT-4.x has nothing to cap
             }
+            // else: GPT-4o / GPT-4-turbo / GPT-3.5 — no reasoning stage at all, no-op
         }
-        // ── DeepSeek (model-bound: reasoning vs chat model) ─────────────────
+        // ── DeepSeek (model-bound) ──────────────────────────────────────────
         else if (url.includes("api.deepseek.com")) {
-            applied = effort === "off"; // only "off" warns; other levels silently accepted as default
+            // deepseek-chat = no reasoning (no-op). deepseek-reasoner = always reasons,
+            // runtime cannot disable — warn only if user explicitly asked for "off".
+            if (m.includes("reasoner") && effort === "off") applied = false;
         }
-        // ── Qwen DashScope ───────────────────────────────────────────────────
+        // ── Qwen DashScope (Qwen3 family accepts enable_thinking; older Qwen2 ignore) ──
         else if (url.includes("dashscope.aliyuncs.com")) {
-            body.extra_body = {
-                ...(body.extra_body || {}),
-                enable_thinking: effort !== "off",
-                ...(effort !== "off" && effort !== "high" ? { thinking_budget: openRouterBudget } : {}),
-            };
+            if (/qwen3|qwen-3|qwq/.test(m)) {
+                body.extra_body = {
+                    ...(body.extra_body || {}),
+                    enable_thinking: effort !== "off",
+                    ...(effort !== "off" && effort !== "high" ? { thinking_budget: openRouterBudget } : {}),
+                };
+            }
+            // else: Qwen2 / Qwen-Max non-thinking — no-op
         }
-        // ── Anthropic native (not via OpenAI-compat) ─────────────────────────
+        // ── Anthropic native ────────────────────────────────────────────────
         else if (url.includes("api.anthropic.com")) {
-            // Claude's effort scale: low | medium | max (no "off" / "minimal")
-            const claudeEffort = effort === "off" ? "low" : effort === "high" ? "max" : effort;
-            body.effort = claudeEffort;
-            if (effort === "off") applied = false; // inform user Claude doesn't truly disable
+            // Only Sonnet/Opus 4+ support adjustable reasoning. Haiku and Claude 3.x don't
+            // have reasoning at all → skip to avoid unknown-field rejection.
+            const supportsClaudeReasoning = /claude-(sonnet|opus)-(4|5|6)/.test(m) || /claude-.*-thinking/.test(m);
+            if (supportsClaudeReasoning) {
+                // Claude's scale: low | medium | max. No true "off" — warn when user asked for it.
+                body.effort = effort === "off" ? "low" : effort === "high" ? "max" : effort;
+                if (effort === "off") applied = false;
+            }
+            // else: Claude Haiku / Claude 3.x — no reasoning, no-op
         }
-        // ── Local / Self-hosted runtimes ────────────────────────────────────
+        // ── Local / Self-hosted runtimes (lenient — ignore unknown fields) ──
         else {
             const isOllama = url.includes(":11434") || url.includes("/api/chat") || url.includes("ollama");
             if (isOllama) {
@@ -420,7 +439,7 @@ const GeminiClient = {
         this._thinkingWarnedKeys.add(key);
         try {
             const msg = (typeof getText === "function" && getText("settings.reasoningEffort.unsupportedToast"))
-                || "This model doesn't support adjusting reasoning effort.";
+                || "This model's reasoning cannot be disabled at runtime.";
             Spicetify?.showNotification?.(msg, true);
         } catch (_) { /* notification optional */ }
     },

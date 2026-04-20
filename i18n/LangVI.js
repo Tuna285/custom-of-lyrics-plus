@@ -124,7 +124,7 @@ window.LANG_VI = {
         "medium": "Trung bình",
         "high": "Cao (chậm nhất, cho lyric phức tạp)"
       },
-      "unsupportedToast": "Model này không hỗ trợ điều chỉnh mức suy luận."
+      "unsupportedToast": "Model này không thể tắt reasoning lúc chạy — nó vẫn sẽ suy nghĩ."
     },
     "transparentBackground": {
       "label": "Nền trong suốt",
