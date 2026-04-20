@@ -136,8 +136,14 @@ const GeminiClient = {
             return await fn();
         } catch (error) {
             if (retries === 0) throw error;
+            // Aborts (timeout, user cancel, stream teardown) are not transient — retrying
+            // re-runs the whole model call and looks like "reasoning starts from scratch".
+            if (error.name === "AbortError" || error.code === 20) throw error;
             // Don't retry on client errors (4xx), except 429 (Too Many Requests)
             if (error.status >= 400 && error.status < 500 && error.status !== 429) throw error;
+            // Parse / empty-body failures won't succeed on identical retry — avoid loops.
+            const msg = String(error.message || "");
+            if (/Empty response|No response from API/i.test(msg)) throw error;
 
             // True exponential backoff: delay = baseDelay * 2^attempt
             const delay = baseDelay * Math.pow(2, attempt - 1);
@@ -581,26 +587,99 @@ const GeminiClient = {
         const useRedraftDetector = responseMode !== "json_schema" && lineCount >= 3;
         let lastContentLen = -1; // skip work on chunks that didn't grow contentBuf
 
-        const countTagOne = (s) => {
-            let count = 0;
-            let idx = -1;
-            while ((idx = s.indexOf("<1>", idx + 1)) !== -1) count++;
-            return count;
+        // ── Reasoning-channel redraft ANNOUNCEMENT detector ─────────────────────
+        // Gemma 4 31B (and other chatty thinkers) reliably write one of these phrases
+        // in reasoning *just before* doing a forbidden full redraft. We can't safely
+        // abort (no output has been emitted yet), but we log once so the user can see
+        // the prompt was violated, and so a future pass can trigger auto-fallback.
+        const redraftTriggerRe = /(double[-\s]?check(?:ing)?\s+(?:the\s+)?line\s+count|let'?s\s+refine\s+once\s+more|one\s+more\s+(?:refinement|pass)|cleaner\s+version|let\s+me\s+write\s+it\s+out\s+again|complete\s+revised\s+version|double[-\s]?check(?:ing)?\s+(?:the\s+)?flow|just\s+to\s+be\s+sure,?\s+here\s+are\s+all|for\s+clarity,?\s+here\s+is\s+the\s+final\s+list)/i;
+        let reasoningRedraftLogged = false;
+        let lastReasoningLen = 0;
+        const checkReasoningRedraftAnnounce = () => {
+            if (reasoningRedraftLogged) return;
+            if (reasoningBuf.length === lastReasoningLen) return;
+            // Only scan the new tail (plus a small overlap) to avoid O(n²).
+            const start = Math.max(0, lastReasoningLen - 60);
+            const tail = reasoningBuf.slice(start);
+            lastReasoningLen = reasoningBuf.length;
+            const m = tail.match(redraftTriggerRe);
+            if (m) {
+                reasoningRedraftLogged = true;
+                try {
+                    console.warn(
+                        `[GeminiClient] Reasoning-redraft trigger detected ("${m[0]}"). ` +
+                        `Model is likely about to full-redraft in reasoning; expect extra latency. ` +
+                        `Consider lowering Reasoning Effort or switching to Gemma 4 26B A4B for long lyrics.`
+                    );
+                } catch (_) { }
+            }
         };
+
+        // ── SILENT redraft detector (no announcement phrase, just re-enumeration) ───
+        // Catches the case where the model goes from "Line 40: ..." straight back to
+        // "1: ..." without any "let me refine" phrase. Heuristic:
+        //   1) Scan reasoning for line-number markers: `^\s*(Line )?N[:.)]`
+        //   2) Track the max N we've seen.
+        //   3) If max N reaches >= floor(lineCount * 0.7) — i.e. model is near/at end of
+        //      its first draft — and then we see marker `1:` or `Line 1:` again, flag.
+        // Log-only (no abort): reasoning has no tag structure, so aborting risks losing
+        // the final answer. But the log lets the user diagnose and manually switch models.
+        let silentRedraftLogged = false;
+        let maxLineSeen = 0;
+        let silentScanFrom = 0;
+        const lineMarkerRe = /(?:^|\n)\s*(?:\*\s+)?(?:Line\s+|L)?(\d{1,3})\s*[:.)]/gmi;
+        const checkReasoningSilentRedraft = () => {
+            if (silentRedraftLogged) return;
+            if (lineCount < 10) return; // only long songs have this pathology
+            if (reasoningBuf.length - silentScanFrom < 20) return;
+            const threshold = Math.max(5, Math.floor(lineCount * 0.7));
+            // Scan only the new tail (with overlap in case a marker spans the boundary).
+            const overlap = Math.max(0, silentScanFrom - 5);
+            const tail = reasoningBuf.slice(overlap);
+            silentScanFrom = reasoningBuf.length;
+            lineMarkerRe.lastIndex = 0;
+            let m;
+            while ((m = lineMarkerRe.exec(tail)) !== null) {
+                const n = parseInt(m[1], 10);
+                if (!n || n > lineCount + 2) continue; // skip junk numbers
+                if (maxLineSeen >= threshold && n === 1) {
+                    silentRedraftLogged = true;
+                    try {
+                        console.warn(
+                            `[GeminiClient] SILENT reasoning redraft detected ` +
+                            `(reached line ${maxLineSeen}/${lineCount}, then restarted at 1). ` +
+                            `Model is doing a full-list redraft in reasoning without announcing it. ` +
+                            `Expect large added latency. For 40+ line songs, Gemma 4 26B A4B or Gemini ` +
+                            `2.5 Flash will complete in a fraction of the time.`
+                        );
+                    } catch (_) { }
+                    break;
+                }
+                if (n > maxLineSeen) maxLineSeen = n;
+            }
+        };
+        // ────────────────────────────────────────────────────────────────────────
 
         const checkRedraftAbort = () => {
             if (!useRedraftDetector || earlyAbortReason || localController.signal.aborted) return;
             if (contentBuf.length === lastContentLen) return;
             lastContentLen = contentBuf.length;
-            if (countTagOne(contentBuf) < 2) return;
 
-            // Truncate at the start of the 2nd <1> — we keep the first complete draft
-            // and discard the redraft, then abort to save tokens.
+            // Only treat a *second* `<1>` as Pass-3 full redraft AFTER line 2 has started (`<2>`).
+            // (1) Reasoning in the content channel often has `<1>example</1>` then later `<1>real`
+            //     — a lone first `</1>` is not enough. (2) Gemma 4 thinking models interleave prose
+            //     and tags; counting two raw `<1>` caused false aborts → empty parse → fetchWithRetry
+            //     loops that looked like infinite "thinking restarts".
             const first = contentBuf.indexOf("<1>");
             if (first === -1) return;
-            const cut = contentBuf.indexOf("<1>", first + 3);
-            if (cut <= 0) return;
-            contentBuf = contentBuf.slice(0, cut);
+            const firstClose = contentBuf.indexOf("</1>", first);
+            if (firstClose === -1) return;
+            const secondLineOpen = contentBuf.indexOf("<2>", firstClose);
+            if (secondLineOpen === -1) return;
+            const secondOpen = contentBuf.indexOf("<1>", secondLineOpen);
+            if (secondOpen === -1) return;
+
+            contentBuf = contentBuf.slice(0, secondOpen);
             earlyAbortReason = "content-redraft";
             try { localController.abort(); } catch (_) { }
         };
@@ -644,6 +723,8 @@ const GeminiClient = {
                 }
 
                 checkRedraftAbort();
+                checkReasoningRedraftAnnounce();
+                checkReasoningSilentRedraft();
                 if (earlyAbortReason) break;
             }
         } catch (e) {
@@ -710,6 +791,10 @@ const GeminiClient = {
 
         let body;
 
+        // Read reasoning effort early so prompt builders can tune their thinking rules
+        // (strict anti-redraft on low, unleashed on high).
+        const reasoningEffort = CONFIG?.visual?.["gemini:reasoning-effort"] || "low";
+
         if (responseMode === "json_schema") {
             // JSON Schema mode: system/user split + response_format
             let prompt;
@@ -721,7 +806,7 @@ const GeminiClient = {
             } else if (wantSmartPhonetic) {
                 prompt = Prompts.buildJsonSchemaPhoneticPrompt({ artist, title, text });
             } else {
-                prompt = Prompts.buildJsonSchemaTranslationPrompt({ artist, title, text, styleKey, pronounKey });
+                prompt = Prompts.buildJsonSchemaTranslationPrompt({ artist, title, text, styleKey, pronounKey, reasoningEffort });
             }
 
             body = {
@@ -743,7 +828,7 @@ const GeminiClient = {
                     user: Prompts.buildMinimalFallbackPrompt({ artist, title, text })
                 };
             } else {
-                prompt = Prompts.buildPromptEngPrompt({ artist, title, text, styleKey, pronounKey, wantSmartPhonetic });
+                prompt = Prompts.buildPromptEngPrompt({ artist, title, text, styleKey, pronounKey, wantSmartPhonetic, reasoningEffort });
             }
 
             // Combine system + user into single user message for universal compatibility
@@ -757,10 +842,7 @@ const GeminiClient = {
             };
         }
 
-        // Reasoning effort: "off" | "low" | "medium" | "high". Fallback to "low" (sweet spot
-        // for lyric translation — enough thinking to handle tricky lines, tight enough to avoid
-        // Pass 3/4 audit loops).
-        const reasoningEffort = CONFIG?.visual?.["gemini:reasoning-effort"] || "low";
+        // Apply provider-specific reasoning-effort flags (already read above to feed the prompt).
         if (reasoningEffort !== "default") {
             this.applyReasoningEffort(body, endpoint, model, reasoningEffort);
         }
@@ -772,7 +854,19 @@ const GeminiClient = {
             const makeRequest = async () => {
                 const streamed = await this.fetchWithRetry(async () => {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 120000);
+                    // Idle timeout instead of total cap: reset on every streamed chunk.
+                    // A total 120s cap killed Gemma 4 31B mid-thinking on 50+ line songs
+                    // (which can legitimately think 2-3 min). An idle timeout keeps the
+                    // connection alive as long as the model is actively emitting SSE data
+                    // (reasoning OR content) and only aborts when the server truly hangs.
+                    const IDLE_MS = 90000; // 90s of silence → abort
+                    let idleAbort = false;
+                    let idleTimer = setTimeout(() => { idleAbort = true; try { controller.abort(); } catch (_) {} }, IDLE_MS);
+                    const resetIdle = () => {
+                        if (idleAbort) return;
+                        clearTimeout(idleTimer);
+                        idleTimer = setTimeout(() => { idleAbort = true; try { controller.abort(); } catch (_) {} }, IDLE_MS);
+                    };
                     try {
                         return await this.streamChatCompletion({
                             endpoint,
@@ -782,17 +876,18 @@ const GeminiClient = {
                             lineCount,
                             responseMode,
                             onProgress: ({ reasoning }) => {
+                                resetIdle();
                                 if (typeof onReasoningProgress === "function" && reasoning) {
                                     try { onReasoningProgress(reasoning); } catch (_) { }
                                 }
                             },
                         });
                     } catch (e) {
-                        // Normalize error shape so the existing error pipeline can format it
-                        if (!e.endpoint) e.endpoint = endpoint;
-                        if (!e.model) e.model = model;
+                        if (!e.endpoint) { try { e.endpoint = endpoint; } catch (_) {} }
+                        if (!e.model) { try { e.model = model; } catch (_) {} }
+                        if (idleAbort) { try { e.idleAbort = true; } catch (_) {} }
                         throw e;
-                    } finally { clearTimeout(timeoutId); }
+                    } finally { clearTimeout(idleTimer); }
                 });
 
                 // Adapt streamed result to the shape processResponse expects
@@ -835,7 +930,9 @@ const GeminiClient = {
             
             if (!error.status) {
                 if (error.name === 'AbortError') {
-                    userMessage = `Request timed out after 120s. The API is taking too long to respond.`;
+                    userMessage = error.idleAbort
+                        ? `Request timed out: no response from API for 90s. The model may be overloaded or stuck.`
+                        : `Request cancelled.`;
                 } else if (error.message?.includes('fetch') || error.message?.includes('network') || error.message?.includes('Failed to fetch')) {
                     userMessage = `Network Error. Check your internet connection and API endpoint: ${endpoint}`;
                 } else {
@@ -865,8 +962,23 @@ const GeminiClient = {
                 } catch (e) { /* Spicetify not available */ }
             }
             
-            error.message = userMessage;
-            throw error;
+            // Some native errors (DOMException / AbortError) have a getter-only `message`
+            // property. Assigning directly throws "Cannot set property message of which has
+            // only a getter". Wrap into a plain Error so the UI shows the friendly message.
+            try {
+                error.message = userMessage;
+                throw error;
+            } catch (assignErr) {
+                if (assignErr === error) throw error; // original re-throw path
+                const wrapped = new Error(userMessage);
+                wrapped.name = error.name;
+                wrapped.status = error.status;
+                wrapped.model = error.model || model;
+                wrapped.endpoint = error.endpoint || endpoint;
+                wrapped.idleAbort = error.idleAbort;
+                wrapped.cause = error;
+                throw wrapped;
+            }
         }
     },
 

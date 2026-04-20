@@ -195,11 +195,12 @@ function buildTranslationGuardrails() {
 6) No explanations. No parentheses like "(meaning: ...)".
 7) MODERN V-POP WORD CHOICE — when the source calls for common "soft/gentle/quiet" concepts, use everyday V-pop vocabulary, NOT archaic/stiff substitutes. Required substitutions:
    - "khẽ khàng" → use "nhẹ nhàng" (default), or "khẽ", "thì thầm", "se sẽ" by context
+   - "chao nghiêng" → use "nghiêng ngả", "chao đảo", "lung lay", or "lắc lư" by context
    - "nỉ non" → use "thì thầm", "rì rào", "vọng lại"
    - "thiên thu" / "vạn kiếp" → use "mãi mãi", "vĩnh viễn" (unless classical mode explicitly picked)
    - "ái tình" → use "tình yêu" (unless classical mode)
    - "nàng" / "chàng" as default pronoun → follow the locked pronoun pair (Anh-Em / Tớ-Cậu / etc.)
-   "khẽ khàng" in particular is a known LLM tic — actively avoid it.
+   "khẽ khàng" and "chao nghiêng" in particular are known LLM tics — actively avoid them.
 8) NO POETIC-WORD REPETITION — any Hán-Việt / thi vị word (vấn vương, bâng khuâng, xao xuyến, mơ màng, man mác, da diết, ngọt lịm, dịu êm, mộng mị, u hoài, nhẹ nhàng...) may appear AT MOST ONCE per song. If the source repeats a motif, vary the Vietnamese word each time. Same-word repetition across many lines is the main thing that makes auto-translated lyrics sound artificial.`;
 }
 
@@ -211,16 +212,62 @@ function buildTranslationFlowPunctuation() {
 4) You may reorder phrases WITHIN a line for natural Vietnamese word order, but preserve meaning.`;
 }
 
-function buildTaskThinkingRules(finalOutputLabel) {
-    return `THINKING PROCESS RULES:
-1) Visible reply must be ONLY the required ${finalOutputLabel}. No filler ("Sure", "Here is..."), no plan headings, no commentary around the answer.
+/**
+ * Builds thinking-process rules calibrated to the user-chosen reasoning effort.
+ *
+ *   off / low   → "budget" set: strict anti-redraft rules. Designed for weaker or
+ *                  no-budget thinking models (Gemma 4 31B, local 7-13B) that tend to
+ *                  spin Pass 3 / Pass 4 audits and burn tokens without adding quality.
+ *   medium      → "balanced" set: keep output hygiene + the targeted-revision / no-redraft
+ *                  rules, but drop the "trust first instinct / short deliberation" nudge so
+ *                  the model is free to deliberate before committing.
+ *   high        → "unleashed" set: only output hygiene (tag format, single final reply,
+ *                  direct-from-source). No restrictions on reasoning depth, revision passes,
+ *                  or re-examining lines — top-tier models on high effort should be allowed
+ *                  to use their full thinking budget.
+ */
+function buildTaskThinkingRules(finalOutputLabel, effort = "low") {
+    const hygiene = `1) Visible reply must be ONLY the required ${finalOutputLabel}. No filler ("Sure", "Here is..."), no plan headings, no commentary around the answer.
 2) Do not output chain-of-thought, scratchpad lists, or reasoning tags in the reply. Do not paste the full source lyrics again before the deliverable.
 3) The final ${finalOutputLabel} must appear once and comprise the entire message.
 4) Translate the source DIRECTLY to Vietnamese. Do not route through English, romaji, pinyin, or any other intermediate language — source quote and Vietnamese are the only allowed pair in any notes.
-5) Produce the Vietnamese for each line ONCE. Do not redraft the whole song or emit the full Vietnamese output more than once across reasoning + reply.
+5) Produce the Vietnamese for each line ONCE in the FINAL REPLY. The full set of tags must appear EXACTLY ONCE, and ONLY in the final reply.`;
+
+    if (effort === "high") {
+        // Top-tier models on high effort — let them think freely.
+        return `THINKING PROCESS RULES (output hygiene only — reasoning depth unrestricted):
+${hygiene}`;
+    }
+
+    if (effort === "medium") {
+        return `THINKING PROCESS RULES:
+${hygiene}
+6) NO FULL-LIST REDRAFT inside reasoning. You may enumerate lines at most ONCE as your initial draft. After that, any corrections must be TARGETED — name only the line numbers that change (e.g. "Line 7: change to ..."). Never restart a full "Line 1: / Line 2: / ..." listing in reasoning after reaching the last line.
+7) For repeated/choral lines, translate once and reuse verbatim on each recurrence — do not re-deliberate per repeat.`;
+    }
+
+    // off / low — strict budget set (default).
+    return `THINKING PROCESS RULES:
+
+0) **NO FULL-LIST REDRAFT — HARDEST RULE, READ FIRST.**
+   Inside reasoning, you may enumerate lines at MOST ONCE (your initial line-by-line draft). The moment you reach the last line of that draft, you MUST stop enumerating and proceed to the final reply. NEVER write "Line 1:" a second time in reasoning after you have already reached the last line. NEVER restart a full list for "a cleaner pass", "to double-check flow", or any reason.
+   Violation cost: on a 50-line song, one redraft adds ~3 minutes and may trigger provider rate limits — unacceptable.
+   If after the first draft you want to fix lines, see rule 7 (targeted patch only).
+
+0a) **FORBIDDEN ANNOUNCEMENT PHRASES (HARD BAN).** These phrases are banned inside reasoning because you have been observed to write them IMMEDIATELY BEFORE emitting a forbidden full redraft:
+    - "Double check the line count" / "Let me verify line count"
+    - "Let's refine once more" / "One more refinement pass"
+    - "For clarity, here is the final list" / "Cleaner version"
+    - "Let me write it out again" / "Complete revised version"
+    - "Let me double check the flow" / "Let me check the flow"
+    - "For safety" / "Just to be sure, here are all lines"
+    If you feel the urge to write any of these, STOP reasoning immediately and emit the final ${finalOutputLabel}. Counting lines and verifying flow happen in your HEAD silently, not by re-listing the translation.
+
+${hygiene}
 6) Prefer short deliberation. Trust the first instinct — it is usually the most natural Vietnamese phrasing. Exhaustive self-review hurts both latency and quality.
-7) TARGETED REVISION ONLY. If — after your initial line-by-line draft — you decide a few lines need adjustment, write a MINIMAL patch in reasoning naming only those line numbers (e.g. "Line 7: change to ..."). NEVER restate the entire translation in reasoning to "show the corrected version". Re-emitting all N lines a second time wastes the output budget, slows the response, and risks token-cap truncation. The full set of N tags must appear EXACTLY ONCE — in the final reply, not in reasoning.
-8) HARD CAP: at most ONE targeted-revision pass over fewer than 5 lines. If you find yourself wanting to revise more than 5 lines, your initial draft was wrong — start the final reply fresh and stop reasoning. Do not chain "Pass 3 → Pass 4 → Pass 5" audits.`;
+7) TARGETED REVISION ONLY. If — after your initial line-by-line draft — you decide a few lines need adjustment, write a MINIMAL patch in reasoning naming only those line numbers (e.g. "Line 7: change to ..."). NEVER restate the entire translation in reasoning to "show the corrected version". Re-emitting all N lines a second time wastes the output budget, slows the response, and risks token-cap truncation.
+8) HARD CAP: at most ONE targeted-revision pass over fewer than 5 lines. If you find yourself wanting to revise more than 5 lines, your initial draft was wrong — start the final reply fresh and stop reasoning. Do not chain "Pass 3 → Pass 4 → Pass 5" audits.
+9) LONG-SONG DISCIPLINE. For songs with 30+ lines, repeated/choral lines (verses, refrains, "oh oh oh" segments) MUST be translated once and reused verbatim each time they recur — no re-deliberation per repeat. Treat the final reply as a fill-in form: write each line's translation into its matching <N>...</N> tag and move on.`;
 }
 
 /**
@@ -298,7 +345,7 @@ MAPPING RULES:
    - Preserve multi-line quote separation.`;
 }
 
-function buildTranslationSystemPrompt(lineCount, styleKey, pronounKey, mode) {
+function buildTranslationSystemPrompt(lineCount, styleKey, pronounKey, mode, effort = "low") {
     const styleObj = STYLE_INSTRUCTIONS[styleKey] || STYLE_INSTRUCTIONS.smart_adaptive;
     const pronounSection = buildPronounSection(pronounKey, styleObj);
     const outputBlock = mode === "json"
@@ -313,7 +360,7 @@ function buildTranslationSystemPrompt(lineCount, styleKey, pronounKey, mode) {
         outputBlock,
         buildTranslationGuardrails(),
         buildTranslationFlowPunctuation(),
-        buildTaskThinkingRules(thinkingLabel)
+        buildTaskThinkingRules(thinkingLabel, effort)
     ];
 
     if (mode === "tags") {
@@ -327,7 +374,7 @@ const Prompts = {
     styles: TRANSLATION_STYLES,
     pronouns: PRONOUN_MODES,
 
-    buildPromptEngPrompt({ artist, title, text, styleKey = "smart_adaptive", pronounKey = "default", wantSmartPhonetic = false }) {
+    buildPromptEngPrompt({ artist, title, text, styleKey = "smart_adaptive", pronounKey = "default", wantSmartPhonetic = false, reasoningEffort = "low" }) {
         const lines = text.split("\n");
         const lineCount = lines.length;
         const taggedInput = lines.map((l, i) => `<${i + 1}>${l}</${i + 1}>`).join("\n");
@@ -367,7 +414,7 @@ Output (${lineCount} tags):`
             };
         }
 
-        const systemPrompt = buildTranslationSystemPrompt(lineCount, styleKey, pronounKey, "tags");
+        const systemPrompt = buildTranslationSystemPrompt(lineCount, styleKey, pronounKey, "tags", reasoningEffort);
 
         return {
             system: systemPrompt,
@@ -390,10 +437,10 @@ Input: ${linesJson}
 Output JSON:`;
     },
 
-    buildJsonSchemaTranslationPrompt({ artist, title, text, styleKey = "smart_adaptive", pronounKey = "default" }) {
+    buildJsonSchemaTranslationPrompt({ artist, title, text, styleKey = "smart_adaptive", pronounKey = "default", reasoningEffort = "low" }) {
         const lines = text.split("\n");
         const lineCount = lines.length;
-        const systemPrompt = buildTranslationSystemPrompt(lineCount, styleKey, pronounKey, "json");
+        const systemPrompt = buildTranslationSystemPrompt(lineCount, styleKey, pronounKey, "json", reasoningEffort);
 
         return {
             system: systemPrompt,

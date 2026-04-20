@@ -7,8 +7,6 @@
 > [!NOTE] 
 > **Hiện tại, tính năng dịch chỉ hỗ trợ tiếng Việt.** Hỗ trợ cho các ngôn ngữ khác có thể được thêm vào trong các bản cập nhật tương lai nếu được yêu cầu.
 
-
-
 ---
 
 ## Tính năng chính
@@ -39,8 +37,6 @@ Inject lời bài hát đồng bộ trực tiếp vào mini player Picture-in-Pi
 ### 3. Nền video động
 
 Tự động lấy MV YouTube làm nền động cho trang lyrics. Tùy chỉnh scale, dim, blur — kết hợp đẹp với chế độ trong suốt và mọi theme Spicetify.
-
-
 
 ### 4. Giao diện hiện đại & Trải nghiệm tối ưu
 
@@ -83,10 +79,7 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
   - **Windows:** `%LocalAppData%\spicetify\CustomApps`
   - **MacOS/Linux:** `~/.config/spicetify/CustomApps`
   - 
-
-
-
-1. Mở terminal:
+3. Mở terminal:
   ```bash
    spicetify config custom_apps lyrics-plus
    spicetify apply
