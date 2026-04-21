@@ -3,6 +3,17 @@
 **Language / 言語 / 언어 / Ngôn ngữ / 语言:**
 [English](README_EN.md) | [Tiếng Việt](README_VI.md) | [한국어](README_KO.md) | [日本語](README_JA.md) | [中文（简体）](README_ZH.md)
 
+<img width="800" height="800" alt="image" src="https://github.com/user-attachments/assets/32e85501-567d-4896-a7e4-bb4b098a30a6" />
+
+## Preview
+
+| Japanese → Romaji | Korean → Romaja | Chinese → Pinyin |
+| ----------------- | --------------- | ---------------- |
+|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/e9b7f1f5-0c3c-474d-8fe1-8e2e37552bfb" />|<img width="1919" height="1018" alt="image" src="https://github.com/user-attachments/assets/e8b56a5e-621e-420f-be68-ffc69e3236c1" />|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/a9e36436-9027-4fbe-a31d-2ffc27d97574" />|
+
+<img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/51520969-7a8f-44e5-bf70-3262e9d658c7" />
+
+<img width="498" height="367" alt="image" src="https://github.com/user-attachments/assets/31a5b810-ee06-447d-91f4-1e463a601dee" />
 ---
 
 > A personalized version of **Lyrics Plus** for Spicetify, rebuilt to focus on high-quality lyric translation, ideal for Vietnamese users. Connects to any OpenAI-compatible LLM endpoint — Google Gemini/Gemma, OpenRouter, OpenAI, DeepSeek, Anthropic Claude, or local Ollama.
@@ -142,3 +153,4 @@ This app works beautifully with:
 ---
 
 *This project is under active development. Please report any issues!*
+
