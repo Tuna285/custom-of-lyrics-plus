@@ -5,15 +5,6 @@
 
 <img width="800" height="800" alt="image" src="https://github.com/user-attachments/assets/32e85501-567d-4896-a7e4-bb4b098a30a6" />
 
-## Preview
-
-| Japanese → Romaji | Korean → Romaja | Chinese → Pinyin |
-| ----------------- | --------------- | ---------------- |
-|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/e9b7f1f5-0c3c-474d-8fe1-8e2e37552bfb" />|<img width="1919" height="1018" alt="image" src="https://github.com/user-attachments/assets/e8b56a5e-621e-420f-be68-ffc69e3236c1" />|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/a9e36436-9027-4fbe-a31d-2ffc27d97574" />|
-
-<img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/51520969-7a8f-44e5-bf70-3262e9d658c7" />
-
-<img width="498" height="367" alt="image" src="https://github.com/user-attachments/assets/31a5b810-ee06-447d-91f4-1e463a601dee" />
 ---
 
 > A personalized version of **Lyrics Plus** for Spicetify, rebuilt to focus on high-quality lyric translation, ideal for Vietnamese users. Connects to any OpenAI-compatible LLM endpoint — Google Gemini/Gemma, OpenRouter, OpenAI, DeepSeek, Anthropic Claude, or local Ollama.
@@ -38,6 +29,11 @@ Connects to any OpenAI-compatible LLM endpoint (Google Gemini/Gemma, OpenRouter,
 - **Response format** — Choose Prompt Engineering (universal) or JSON Schema (stricter parsing on capable models, with automatic fallback if unsupported).
 - **High quality** — Prompts tuned for musical context, preserving meaning and emotion.
 
+
+| Japanese → Romaji | Korean → Romaja | Chinese → Pinyin |
+| ----------------- | --------------- | ---------------- |
+|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/e9b7f1f5-0c3c-474d-8fe1-8e2e37552bfb" />|<img width="1919" height="1018" alt="image" src="https://github.com/user-attachments/assets/e8b56a5e-621e-420f-be68-ffc69e3236c1" />|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/a9e36436-9027-4fbe-a31d-2ffc27d97574" />|
+
 ### 2. Mini Lyrics in Picture-in-Picture
 
 Inject synchronized lyrics directly into Spotify's native Picture-in-Picture mini player so you can read along while working in any other app. Toggle from the PiP settings panel or with `Ctrl+Shift+M`.
@@ -45,6 +41,9 @@ Inject synchronized lyrics directly into Spotify's native Picture-in-Picture min
 ### 3. Video Background
 
 Animated YouTube music-video backdrops for the lyrics page. Adjustable scale, dim, and blur — pairs nicely with the transparent mode and any Spicetify theme.
+
+
+<img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/51520969-7a8f-44e5-bf70-3262e9d658c7" />
 
 ### 4. Modern Interface & Optimized Experience
 
@@ -85,6 +84,9 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 2. Copy the `lyrics-plus` folder to Spicetify's CustomApps directory:
    - **Windows:** `%LocalAppData%\spicetify\CustomApps`
    - **MacOS/Linux:** `~/.config/spicetify/CustomApps`
+
+<img width="498" height="367" alt="image" src="https://github.com/user-attachments/assets/31a5b810-ee06-447d-91f4-1e463a601dee" />
+
 3. Run in terminal:
    ```bash
    spicetify config custom_apps lyrics-plus

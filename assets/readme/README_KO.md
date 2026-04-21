@@ -5,15 +5,6 @@
 
 <img width="800" height="800" alt="image" src="https://github.com/user-attachments/assets/32e85501-567d-4896-a7e4-bb4b098a30a6" />
 
-## 미리보기
-
-| Japanese → Romaji | Korean → Romaja | Chinese → Pinyin |
-| ----------------- | --------------- | ---------------- |
-|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/e9b7f1f5-0c3c-474d-8fe1-8e2e37552bfb" />|<img width="1919" height="1018" alt="image" src="https://github.com/user-attachments/assets/e8b56a5e-621e-420f-be68-ffc69e3236c1" />|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/a9e36436-9027-4fbe-a31d-2ffc27d97574" />|
-
-<img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/51520969-7a8f-44e5-bf70-3262e9d658c7" />
-
-<img width="498" height="367" alt="image" src="https://github.com/user-attachments/assets/31a5b810-ee06-447d-91f4-1e463a601dee" />
 ---
 
 > Spicetify를 위한 **Lyrics Plus** 커스텀 버전으로, 고품질 가사 번역에 초점을 맞추어 재구성되었습니다. 주로 베트남 사용자를 위해 최적화되었으며, OpenAI 호환 LLM 엔드포인트에 연결됩니다 — Google Gemini/Gemma, OpenRouter, OpenAI, DeepSeek, Anthropic Claude, 또는 로컬 Ollama.
@@ -38,6 +29,10 @@ OpenAI 호환 LLM 엔드포인트(Google Gemini/Gemma, OpenRouter, OpenAI, DeepS
 - **응답 형식** — 프롬프트 엔지니어링(범용) 또는 JSON 스키마(지원 모델에서 더 엄격한 파싱, 미지원 시 자동 폴백) 선택.
 - **고품질** — 음악적 맥락에 맞게 튜닝된 프롬프트로 의미와 감정 보존.
 
+| Japanese → Romaji | Korean → Romaja | Chinese → Pinyin |
+| ----------------- | --------------- | ---------------- |
+|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/e9b7f1f5-0c3c-474d-8fe1-8e2e37552bfb" />|<img width="1919" height="1018" alt="image" src="https://github.com/user-attachments/assets/e8b56a5e-621e-420f-be68-ffc69e3236c1" />|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/a9e36436-9027-4fbe-a31d-2ffc27d97574" />|
+
 ### 2. Picture-in-Picture 미니 가사
 
 Spotify의 네이티브 PiP 미니 플레이어에 동기화된 가사를 직접 삽입하여 다른 앱에서 작업하면서 가사를 읽을 수 있습니다. PiP 설정 패널 또는 `Ctrl+Shift+M`으로 토글.
@@ -45,6 +40,8 @@ Spotify의 네이티브 PiP 미니 플레이어에 동기화된 가사를 직접
 ### 3. 비디오 배경
 
 가사 페이지를 위한 YouTube 뮤직비디오 애니메이션 배경. 크기, 밝기, 블러 조정 가능 — 투명 모드 및 모든 Spicetify 테마와 잘 어울립니다.
+
+<img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/51520969-7a8f-44e5-bf70-3262e9d658c7" />
 
 ### 4. 모던 인터페이스 & 최적화된 경험
 
@@ -85,6 +82,9 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 2. `lyrics-plus` 폴더를 Spicetify의 CustomApps 디렉토리에 복사:
    - **Windows:** `%LocalAppData%\spicetify\CustomApps`
    - **MacOS/Linux:** `~/.config/spicetify/CustomApps`
+
+<img width="498" height="367" alt="image" src="https://github.com/user-attachments/assets/31a5b810-ee06-447d-91f4-1e463a601dee" />
+
 3. 터미널에서 실행:
    ```bash
    spicetify config custom_apps lyrics-plus

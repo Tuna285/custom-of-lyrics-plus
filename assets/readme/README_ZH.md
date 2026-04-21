@@ -5,15 +5,6 @@
 
 <img width="800" height="800" alt="image" src="https://github.com/user-attachments/assets/32e85501-567d-4896-a7e4-bb4b098a30a6" />
 
-## Preview
-
-| Japanese → Romaji | Korean → Romaja | Chinese → Pinyin |
-| ----------------- | --------------- | ---------------- |
-|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/e9b7f1f5-0c3c-474d-8fe1-8e2e37552bfb" />|<img width="1919" height="1018" alt="image" src="https://github.com/user-attachments/assets/e8b56a5e-621e-420f-be68-ffc69e3236c1" />|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/a9e36436-9027-4fbe-a31d-2ffc27d97574" />|
-
-<img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/51520969-7a8f-44e5-bf70-3262e9d658c7" />
-
-<img width="498" height="367" alt="image" src="https://github.com/user-attachments/assets/31a5b810-ee06-447d-91f4-1e463a601dee" />
 ---
 
 > 专为 Spicetify 打造的 **Lyrics Plus** 定制版本，专注于高质量歌词翻译，主要面向越南用户。可连接任何兼容 OpenAI 的 LLM 端点 —— Google Gemini/Gemma、OpenRouter、OpenAI、DeepSeek、Anthropic Claude 或本地 Ollama。
@@ -38,6 +29,11 @@
 - **响应格式** —— 选择提示词工程（通用）或 JSON Schema（在支持的模型上更严格解析，不支持时自动回退）。
 - **高质量** —— 针对音乐语境调优的提示词，保留意义和情感。
 
+
+| Japanese → Romaji | Korean → Romaja | Chinese → Pinyin |
+| ----------------- | --------------- | ---------------- |
+|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/e9b7f1f5-0c3c-474d-8fe1-8e2e37552bfb" />|<img width="1919" height="1018" alt="image" src="https://github.com/user-attachments/assets/e8b56a5e-621e-420f-be68-ffc69e3236c1" />|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/a9e36436-9027-4fbe-a31d-2ffc27d97574" />|
+
 ### 2. 画中画迷你歌词
 
 将同步歌词直接注入 Spotify 原生画中画迷你播放器，让您在使用其他应用时也能跟着歌词唱。从 PiP 设置面板或使用 `Ctrl+Shift+M` 切换。
@@ -45,6 +41,9 @@
 ### 3. 视频背景
 
 为歌词页面提供 YouTube MV 动态背景。可调节缩放、亮度和模糊 —— 与透明模式和任意 Spicetify 主题完美搭配。
+
+
+<img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/51520969-7a8f-44e5-bf70-3262e9d658c7" />
 
 ### 4. 现代界面与优化体验
 
@@ -85,6 +84,8 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 2. 将 `lyrics-plus` 文件夹复制到 Spicetify 的 CustomApps 目录：
    - **Windows：** `%LocalAppData%\spicetify\CustomApps`
    - **MacOS/Linux：** `~/.config/spicetify/CustomApps`
+<img width="498" height="367" alt="image" src="https://github.com/user-attachments/assets/31a5b810-ee06-447d-91f4-1e463a601dee" />
+
 3. 在终端中运行：
    ```bash
    spicetify config custom_apps lyrics-plus
