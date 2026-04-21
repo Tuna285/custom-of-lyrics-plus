@@ -20,6 +20,7 @@ window.LANG_EN = {
     "translation": "Translation",
     "providers": "Providers",
     "background": "Background",
+    "appearance": "Appearance",
     "advanced": "Advanced"
   },
   "sections": {
@@ -30,7 +31,9 @@ window.LANG_EN = {
     "serviceOrder": "Service Order & Toggle",
     "corsProxy": "CORS Proxy Template",
     "videoBackground": "Video Background",
-    "generalBackground": "General Background"
+    "generalBackground": "General Background",
+    "appearanceColors": "Colors",
+    "appearanceButton": "Button Style"
   },
   "settings": {
     "language": {
@@ -171,8 +174,51 @@ window.LANG_EN = {
       "desc": "Loaded lyrics are cached in memory...",
       "button": "Clear memory cache"
     },
+    "uiSwitchOnColor": {
+      "label": "Toggle active color",
+      "desc": "Color of enabled circular toggle buttons."
+    },
+    "uiSwitchOffColor": {
+      "label": "Toggle inactive color",
+      "desc": "Color of disabled/inactive circular toggle buttons."
+    },
+    "uiAccentColor": {
+      "label": "Accent/hover outline color",
+      "desc": "Border and glow color used for focus/hover outlines in settings controls."
+    },
+    "uiButtonBgColor": {
+      "label": "Modal button background",
+      "desc": "Background color for modal action buttons."
+    },
+    "uiButtonTextColor": {
+      "label": "Modal button text",
+      "desc": "Text/icon color for modal action buttons."
+    },
+    "uiFabBgColor": {
+      "label": "Quick button background",
+      "desc": "Background color of in-player quick action buttons."
+    },
+    "uiFabIconColor": {
+      "label": "Quick button icon",
+      "desc": "Icon color of in-player quick action buttons."
+    },
+    "providerTokenPlaceholder": "Paste provider token here",
+    "workerUrlPlaceholder": "Cloudflare Worker URL (e.g., https://...)",
     "corsProxyDesc": "Use this to bypass CORS restrictions. Replace the URL with your cors proxy server of your choice. <code>{url}</code> will be replaced with the request URL.",
-    "corsProxyDefault": "Spotify will reload its webview after applying. Leave empty to restore default: <code>https://cors-proxy.spicetify.app/{url}</code>"
+    "corsProxyDefault": "Spotify will reload its webview after applying. Leave empty to restore default: <code>https://cors-proxy.spicetify.app/{url}</code>",
+    "activeColor": {
+      "label": "Active lyric color",
+      "desc": "Color of the currently playing line."
+    },
+    "inactiveColor": {
+      "label": "Inactive lyric color",
+      "desc": "Color of non-playing lyric lines."
+    },
+    "highlightColor": {
+      "label": "Accent color",
+      "desc": "Color for buttons and UI highlights."
+    },
+    "usingThemeColor": "Using theme default"
   },
   "buttons": {
     "clearCache": "Clear all cached lyrics",
@@ -181,15 +227,16 @@ window.LANG_EN = {
     "refreshingToken": "Refreshing token...",
     "tokenRefreshed": "Token refreshed",
     "tooManyAttempts": "Too many attempts",
-    "failedRefreshToken": "Failed to refresh token"
+    "failedRefreshToken": "Failed to refresh token",
+    "resetToTheme": "Reset"
   },
   "providers": {
-    "local": { "name": "local" },
-    "musixmatch": { "name": "musixmatch" },
-    "netease": { "name": "netease" },
-    "lrclib": { "name": "lrclib" },
-    "spotify": { "name": "spotify" },
-    "genius": { "name": "genius" }
+    "local": { "name": "local", "desc": "Provide lyrics from cache/local files loaded from previous Spotify sessions." },
+    "musixmatch": { "name": "musixmatch", "desc": "Fully compatible with Spotify. Requires a token from the official Musixmatch app. If lyrics fail to load, refresh the token via the <code>Refresh Token</code> button. A CORS proxy may be required." },
+    "netease": { "name": "netease", "desc": "Lyrics sourced from Netease Cloud Music. Requires a Cloudflare Worker URL." },
+    "lrclib": { "name": "lrclib", "desc": "Lyrics sourced from lrclib.net. Supports both synced and unsynced lyrics. Free and open-source." },
+    "spotify": { "name": "spotify", "desc": "Lyrics sourced from the official Spotify API." },
+    "genius": { "name": "genius", "desc": "Unsynced lyrics sourced from Genius." }
   },
   "notifications": {
     "translatedIn": "Translated in {duration}",

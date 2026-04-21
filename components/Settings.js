@@ -16,6 +16,16 @@ const SwapButton = ({ icon, disabled, onClick }) => {
 	);
 };
 
+const UI_COLOR_DEFAULTS = {
+	"ui-switch-on-color": "#1ed760",
+	"ui-switch-off-color": "rgba(255,255,255,0.16)",
+	"ui-button-bg-color": "rgba(255,255,255,0.08)",
+	"ui-button-text-color": "#ffffff",
+	"ui-fab-bg-color": "rgba(20,20,20,0.72)",
+	"ui-fab-icon-color": "#1ed760",
+	"ui-accent-color": "#1ed760",
+};
+
 const CacheButton = () => {
 	const [count, setCount] = useState(0);
 	const [isLoading, setIsLoading] = useState(false);
@@ -37,16 +47,18 @@ const CacheButton = () => {
 			localStorage.removeItem("lyrics-plus:local-lyrics");
 			localStorage.removeItem("lyrics-plus:cached-uris"); // Clear count proxy
 			setCount(0);
-			Spicetify.showNotification("All lyrics cache cleared!", false, 2000);
+			Spicetify.showNotification(getText("notifications.cacheClearedShort"), false, 2000);
 		} catch (e) {
 			console.error("Failed to clear cache:", e);
-			Spicetify.showNotification("Failed to clear cache", true, 2000);
+			Spicetify.showNotification(getText("notifications.translationFailed"), true, 2000);
 		} finally {
 			setIsLoading(false);
 		}
 	};
 
-	const text = isLoading ? "Clearing..." : (count > 0 ? `Clear (${count}) cached lyrics` : "No cached lyrics");
+	const text = count > 0
+		? getText("buttons.clearCache")
+		: getText("buttons.noCache");
 
 	return react.createElement(
 		"button",
@@ -56,20 +68,29 @@ const CacheButton = () => {
 };
 
 const RefreshTokenButton = ({ setTokenCallback }) => {
-	const [buttonText, setButtonText] = useState("Refresh token");
+	const [status, setStatus] = useState("idle");
+	const buttonTextByStatus = {
+		idle: getText("buttons.refreshToken"),
+		loading: getText("buttons.refreshingToken"),
+		success: getText("buttons.tokenRefreshed"),
+		rateLimit: getText("buttons.tooManyAttempts"),
+		error: getText("buttons.failedRefreshToken"),
+	};
+	const buttonText = buttonTextByStatus[status] || buttonTextByStatus.idle;
+
 	useEffect(() => {
-		if (buttonText === "Refreshing token...") {
+		if (status === "loading") {
 			Spicetify.CosmosAsync.get("https://apic-desktop.musixmatch.com/ws/1.1/token.get?app_id=web-desktop-app-v1.0", null, { authority: "apic-desktop.musixmatch.com" })
 				.then(({ message: response }) => {
-					if (response.header.status_code === 200 && response.body.user_token) { setTokenCallback(response.body.user_token); setButtonText("Token refreshed"); }
-					else if (response.header.status_code === 401) { setButtonText("Too many attempts"); }
-					else { setButtonText("Failed to refresh token"); console.error("Failed to refresh token", response); }
+					if (response.header.status_code === 200 && response.body.user_token) { setTokenCallback(response.body.user_token); setStatus("success"); }
+					else if (response.header.status_code === 401) { setStatus("rateLimit"); }
+					else { setStatus("error"); console.error("Failed to refresh token", response); }
 				})
-				.catch((error) => { setButtonText("Failed to refresh token"); console.error("Failed to refresh token", error); });
+				.catch((error) => { setStatus("error"); console.error("Failed to refresh token", error); });
 		}
-	}, [buttonText]);
+	}, [status]);
 
-	return react.createElement("button", { className: "btn", onClick: () => setButtonText("Refreshing token..."), disabled: buttonText !== "Refresh token" }, buttonText);
+	return react.createElement("button", { className: "btn", onClick: () => setStatus("loading"), disabled: status !== "idle" }, buttonText);
 };
 
 const ConfigButton = ({ name, text, onChange = () => { } }) => {
@@ -265,7 +286,32 @@ const ConfigRange = ({ name, defaultValue, min = 0, max = 100, step = 5, onChang
 	);
 };
 
+const ConfigColor = ({ name, defaultValue, onChange = () => { }, resetValue = "#ffffff" }) => {
+	const [value, setValue] = useState(defaultValue || resetValue);
 
+	useEffect(() => {
+		setValue(defaultValue || resetValue);
+	}, [defaultValue, resetValue]);
+
+	const handleColorChange = (e) => {
+		const v = e.target.value;
+		setValue(v);
+		onChange(v);
+	};
+
+	const handleReset = () => {
+		setValue(resetValue);
+		onChange(resetValue);
+	};
+
+	return react.createElement("div", { className: "setting-row" },
+		react.createElement("label", { className: "col description" }, name),
+		react.createElement("div", { className: "col action lp-color-action" },
+			react.createElement("input", { type: "color", value, onChange: handleColorChange, className: "lp-color-swatch" }),
+			react.createElement("button", { className: "btn lp-color-reset-btn", onClick: handleReset }, getText("buttons.resetToTheme"))
+		)
+	);
+};
 
 const ConfigHotkey = ({ name, defaultValue, onChange = () => { } }) => {
 	const [value, setValue] = useState(defaultValue);
@@ -301,16 +347,27 @@ const ServiceAction = ({ item, setTokenCallback }) => {
 const ServiceOption = ({ item, onToggle, onSwap, isFirst = false, isLast = false, onTokenChange = null }) => {
 	const [token, setToken] = useState(item.token);
 	const [active, setActive] = useState(item.on);
+	const providerNamePath = `providers.${item.name}.name`;
+	const providerDescPath = `providers.${item.name}.desc`;
+	const localizedName = getText(providerNamePath);
+	const localizedDesc = getText(providerDescPath);
+	const displayName = localizedName === providerNamePath ? item.name : localizedName;
+	const displayDesc = localizedDesc === providerDescPath ? item.desc : localizedDesc;
 
 	const setTokenCallback = useCallback((token) => { setToken(token); onTokenChange(item.name, token); }, [item.token]);
 	const toggleActive = useCallback(() => {
 		if (item.name === "genius" && spotifyVersion >= "1.2.31") return;
 		const state = !active; setActive(state); onToggle(item.name, state);
 	}, [active]);
+	const tokenPlaceholder = getText("settings.providerTokenPlaceholder", {}, `Paste ${item.name} token`);
+	const workerPlaceholder = getText("settings.workerUrlPlaceholder", {}, "Cloudflare Worker URL (e.g., https://...)");
 
-	return react.createElement("div", null,
-		react.createElement("div", { className: "setting-row" },
-			react.createElement("h3", { className: "col description" }, item.name),
+	return react.createElement("div", { className: "setting-group" },
+		react.createElement("div", { className: "setting-row provider-row" },
+			react.createElement("div", { className: "col description provider-meta" },
+				react.createElement("h3", { className: "provider-title" }, displayName),
+				react.createElement("p", { className: "setting-desc provider-desc", dangerouslySetInnerHTML: { __html: displayDesc } })
+			),
 			react.createElement("div", { className: "col action" },
 				react.createElement(ServiceAction, { item, setTokenCallback }),
 				react.createElement(SwapButton, { icon: Spicetify.SVGIcons["chart-up"], onClick: () => onSwap(item.name, -1), disabled: isFirst }),
@@ -318,10 +375,18 @@ const ServiceOption = ({ item, onToggle, onSwap, isFirst = false, isLast = false
 				react.createElement(ButtonSVG, { icon: Spicetify.SVGIcons.check, active, onClick: toggleActive })
 			)
 		),
-		react.createElement("span", { dangerouslySetInnerHTML: { __html: item.desc } }),
-		item.token !== undefined && react.createElement("input", { placeholder: `Place your ${item.name} token here`, value: token, onChange: (event) => setTokenCallback(event.target.value) }),
+		item.token !== undefined && react.createElement("div", { className: "provider-input-row" },
+			react.createElement("input", {
+				className: "provider-token-input",
+				placeholder: tokenPlaceholder,
+				value: token,
+				onChange: (event) => setTokenCallback(event.target.value),
+				autoComplete: "off",
+				spellCheck: false
+			})
+		),
 		item.name === "netease" && react.createElement("input", { 
-			placeholder: "Cloudflare Worker URL (e.g., https://...)", 
+			placeholder: workerPlaceholder,
 			value: CONFIG.visual["netease-worker-url"], 
 			onChange: (e) => {
 				const val = e.target.value;
@@ -330,7 +395,8 @@ const ServiceOption = ({ item, onToggle, onSwap, isFirst = false, isLast = false
 				// Update provider instance if it exists
 				if (window.ProviderNetease) window.ProviderNetease.setWorkerUrl(val);
 			},
-			style: { marginTop: "5px", width: "100%" }
+			className: "provider-token-input",
+			style: { margin: "0 16px 12px 16px", width: "calc(100% - 32px)" }
 		})
 	);
 };
@@ -383,9 +449,9 @@ const OptionList = ({ type, items, onChange }) => {
 	return itemList.map((item) => {
 		if (!item || (item.when && !item.when())) return;
 		const onChangeItem = item.onChange || onChange;
-		return react.createElement("div", null,
+		return react.createElement("div", { className: "setting-group" },
 			react.createElement(item.type, { ...item, name: item.desc, defaultValue: CONFIG.visual[item.key], onChange: (value) => { onChangeItem(item.key, value); forceUpdate({}); } }),
-			item.info && react.createElement("span", { dangerouslySetInnerHTML: { __html: item.info } })
+			item.info && react.createElement("p", { className: "setting-desc", dangerouslySetInnerHTML: { __html: item.info } })
 		);
 	});
 };
@@ -409,11 +475,11 @@ const CollapsibleSection = ({ title, defaultOpen = true, children }) => {
 
 const ConfigHelper = () => {
 	const [activeTab, setActiveTab] = useState("general");
-	const tabKeys = ["general", "translation", "providers", "background", "advanced"];
+	const tabKeys = ["general", "translation", "providers", "background", "appearance", "advanced"];
 
 	// General Settings
 	const generalSettings = [
-		{ desc: getText("settings.language.label"), key: "ui-language", info: getText("settings.language.desc"), type: ConfigSelection, options: { "en": "English", "vi": "Tiếng Việt" }, onChange: (name, value) => { CONFIG.visual[name] = value; ConfigUtils.setPersisted(`${APP_NAME}:visual:${name}`, value); Spicetify.PopupModal.hide(); setTimeout(() => openConfig(), 100); } },
+		{ desc: getText("settings.language.label"), key: "ui-language", info: getText("settings.language.desc"), type: ConfigSelection, options: { "en": "English", "vi": "Tiếng Việt", "ko": "한국어", "ja": "日本語", "zh": "中文（简体）" }, onChange: (name, value) => { CONFIG.visual[name] = value; ConfigUtils.setPersisted(`${APP_NAME}:visual:${name}`, value); lyricContainerUpdate?.(); Spicetify.PopupModal.hide(); setTimeout(() => openConfig(), 100); } },
 		{ desc: getText("settings.playbarButton.label"), key: "playbar-button", info: getText("settings.playbarButton.desc"), type: ConfigSlider },
 		{ desc: getText("settings.globalDelay.label"), info: getText("settings.globalDelay.desc"), key: "global-delay", type: ConfigAdjust, min: -10000, max: 10000, step: 250 },
 		{ desc: getText("settings.fontSize.label"), info: getText("settings.fontSize.desc"), key: "font-size", type: ConfigAdjust, min: fontSizeLimit.min, max: fontSizeLimit.max, step: fontSizeLimit.step },
@@ -555,6 +621,26 @@ const ConfigHelper = () => {
 			];
 			content = react.createElement(OptionList, { items: bgSettings, onChange });
 			break;
+		case "appearance": {
+			const appearanceSettings = [
+				{ desc: getText("contextMenu.lyricPos"), key: "lyric-position", type: ConfigRange, min: 0, max: 100, step: 5 },
+				{ desc: getText("contextMenu.dualGenius"), key: "dual-genius", type: ConfigSlider },
+			];
+			const buttonColorSettings = [
+				{ desc: getText("settings.uiSwitchOnColor.label"), key: "ui-switch-on-color", type: ConfigColor, info: getText("settings.uiSwitchOnColor.desc"), resetValue: UI_COLOR_DEFAULTS["ui-switch-on-color"] },
+				{ desc: getText("settings.uiSwitchOffColor.label"), key: "ui-switch-off-color", type: ConfigColor, info: getText("settings.uiSwitchOffColor.desc"), resetValue: UI_COLOR_DEFAULTS["ui-switch-off-color"] },
+				{ desc: getText("settings.uiAccentColor.label"), key: "ui-accent-color", type: ConfigColor, info: getText("settings.uiAccentColor.desc"), resetValue: UI_COLOR_DEFAULTS["ui-accent-color"] },
+				{ desc: getText("settings.uiButtonBgColor.label"), key: "ui-button-bg-color", type: ConfigColor, info: getText("settings.uiButtonBgColor.desc"), resetValue: UI_COLOR_DEFAULTS["ui-button-bg-color"] },
+				{ desc: getText("settings.uiButtonTextColor.label"), key: "ui-button-text-color", type: ConfigColor, info: getText("settings.uiButtonTextColor.desc"), resetValue: UI_COLOR_DEFAULTS["ui-button-text-color"] },
+				{ desc: getText("settings.uiFabBgColor.label"), key: "ui-fab-bg-color", type: ConfigColor, info: getText("settings.uiFabBgColor.desc"), resetValue: UI_COLOR_DEFAULTS["ui-fab-bg-color"] },
+				{ desc: getText("settings.uiFabIconColor.label"), key: "ui-fab-icon-color", type: ConfigColor, info: getText("settings.uiFabIconColor.desc"), resetValue: UI_COLOR_DEFAULTS["ui-fab-icon-color"] },
+			];
+			content = react.createElement("div", null,
+				react.createElement(CollapsibleSection, { title: getText("sections.displayControls") }, react.createElement(OptionList, { items: appearanceSettings, onChange })),
+				react.createElement(CollapsibleSection, { title: getText("sections.appearanceButton") }, react.createElement(OptionList, { items: buttonColorSettings, onChange }))
+			);
+			break;
+		}
 		case "advanced":
 			const advSettings = [
 				{ desc: getText("settings.debugMode.label"), key: "debug-mode", info: getText("settings.debugMode.desc"), type: ConfigSlider },
@@ -565,10 +651,12 @@ const ConfigHelper = () => {
 			];
 			content = react.createElement("div", null,
 				react.createElement(OptionList, { items: advSettings, onChange }),
-				react.createElement("h2", { style: { marginTop: 20 } }, getText("sections.corsProxy")),
-				react.createElement("span", { dangerouslySetInnerHTML: { __html: getText("settings.corsProxyDesc") } }),
+				react.createElement("div", { className: "cors-proxy-section" },
+				react.createElement("h2", null, getText("sections.corsProxy")),
+				react.createElement("p", { className: "setting-desc cors-proxy-desc", dangerouslySetInnerHTML: { __html: getText("settings.corsProxyDesc") } }),
 				react.createElement(corsProxyTemplate),
-				react.createElement("span", { dangerouslySetInnerHTML: { __html: getText("settings.corsProxyDefault") } })
+				react.createElement("p", { className: "setting-desc cors-proxy-desc", dangerouslySetInnerHTML: { __html: getText("settings.corsProxyDefault") } })
+			)
 			);
 			break;
 	}
@@ -587,7 +675,18 @@ const ConfigHelper = () => {
 function openConfig() {
 	const configContainer = react.createElement(
 		"div",
-		{ id: `${APP_NAME}-config-container` },
+		{
+			id: `${APP_NAME}-config-container`,
+			style: {
+				"--lp-ui-switch-on": CONFIG.visual["ui-switch-on-color"] || UI_COLOR_DEFAULTS["ui-switch-on-color"],
+				"--lp-ui-switch-off": CONFIG.visual["ui-switch-off-color"] || UI_COLOR_DEFAULTS["ui-switch-off-color"],
+				"--lp-ui-btn-bg": CONFIG.visual["ui-button-bg-color"] || UI_COLOR_DEFAULTS["ui-button-bg-color"],
+				"--lp-ui-btn-text": CONFIG.visual["ui-button-text-color"] || UI_COLOR_DEFAULTS["ui-button-text-color"],
+				"--lp-fab-bg": CONFIG.visual["ui-fab-bg-color"] || UI_COLOR_DEFAULTS["ui-fab-bg-color"],
+				"--lp-fab-icon": CONFIG.visual["ui-fab-icon-color"] || UI_COLOR_DEFAULTS["ui-fab-icon-color"],
+				"--lp-ui-accent": CONFIG.visual["ui-accent-color"] || UI_COLOR_DEFAULTS["ui-accent-color"],
+			}
+		},
 		react.createElement("style", {
 			dangerouslySetInnerHTML: {
 				__html: `
@@ -598,16 +697,59 @@ function openConfig() {
 	max-height: 70vh;
 	font-family: var(--font-family, CircularSp, CircularSp-Arab, CircularSp-Hebr, CircularSp-Cyrl, CircularSp-Grek, CircularSp-Deva, var(--fallback-fonts, sans-serif));
 }
+#${APP_NAME}-config-container .setting-group {
+	border-bottom: 1px solid rgba(255,255,255,.05);
+	border-radius: 6px;
+	transition: background 0.15s ease;
+}
+#${APP_NAME}-config-container .setting-group:hover { background: rgba(255,255,255,.03); }
 #${APP_NAME}-config-container .setting-row {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) auto;
 	gap: 16px;
 	align-items: center;
 	padding: 12px 16px;
-	border-bottom: 1px solid rgba(255,255,255,.05);
 	min-height: 50px;
 }
-#${APP_NAME}-config-container .setting-row:hover { background: rgba(255,255,255,.03); }
+#${APP_NAME}-config-container .setting-group .setting-row:hover { background: transparent; }
+#${APP_NAME}-config-container .setting-group:has(.setting-desc) .setting-row { padding-bottom: 6px; }
+#${APP_NAME}-config-container .setting-desc {
+	display: block;
+	margin: 0;
+	padding: 0 16px 10px 16px;
+	font-size: 11.5px;
+	line-height: 1.5;
+	opacity: 0.45;
+	color: var(--spice-subtext, var(--spice-text));
+}
+#${APP_NAME}-config-container .setting-desc code {
+	font-family: monospace;
+	background: rgba(255,255,255,.08);
+	padding: 1px 4px;
+	border-radius: 3px;
+	font-size: 10.5px;
+}
+#${APP_NAME}-config-container .provider-row {
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: start;
+	padding-bottom: 10px;
+}
+#${APP_NAME}-config-container .provider-meta { display: flex; flex-direction: column; gap: 4px; }
+#${APP_NAME}-config-container .provider-title { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; }
+#${APP_NAME}-config-container .provider-desc {
+	padding: 0;
+	font-size: 13px;
+	line-height: 1.55;
+	opacity: 0.66;
+	max-width: 720px;
+}
+#${APP_NAME}-config-container .provider-input-row { padding: 0 16px 12px 16px; }
+#${APP_NAME}-config-container .provider-token-input {
+	width: 100%;
+	min-width: 0;
+	font-family: var(--font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+	font-size: 12.5px;
+}
 #${APP_NAME}-config-container .col.description { font-weight: 500; font-size: 14px; opacity: .9; }
 #${APP_NAME}-config-container .col.action { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
 #${APP_NAME}-config-container input, #${APP_NAME}-config-container select {
@@ -621,8 +763,17 @@ function openConfig() {
 }
 #${APP_NAME}-config-container input:focus, #${APP_NAME}-config-container select:focus {
 	background: rgba(255,255,255,.12);
-	border-color: rgba(255,255,255,.2);
+	border-color: var(--lp-ui-accent, var(--spice-button));
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--lp-ui-accent, var(--spice-button)) 30%, transparent);
 	outline: none;
+}
+#${APP_NAME}-config-container select {
+	background: rgba(46,46,46,.9);
+	border-color: rgba(255,255,255,.16);
+}
+#${APP_NAME}-config-container select option {
+	background: #2b2b2b;
+	color: #f2f2f2;
 }
 #${APP_NAME}-config-container .lp-combo-action { width: 100%; max-width: 360px; }
 #${APP_NAME}-config-container .lp-combo-input {
@@ -631,11 +782,18 @@ function openConfig() {
 	font-family: var(--font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
 	font-size: 12.5px;
 }
-#${APP_NAME}-config-container h2 { font-size: 18px; margin: 0 0 16px; font-weight: 700; }
+#${APP_NAME}-config-container h2 { font-size: 13px; margin: 0 0 4px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.6; }
+.cors-proxy-section { padding: 16px 16px 8px; border-top: 1px solid rgba(255,255,255,.05); margin-top: 8px; }
+.cors-proxy-section .cors-proxy-desc { padding: 0 0 10px 0; font-size: 12px; opacity: 0.5; line-height: 1.55; }
+.cors-proxy-section input { width: 100%; margin-top: 4px; box-sizing: border-box; }
 
 /* Tabs */
 .config-tabs {
 	display: flex;
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	background: linear-gradient(180deg, rgba(18,18,18,0.95), rgba(18,18,18,0.88));
 	border-bottom: 1px solid rgba(255,255,255,.1);
 	margin: 0 0 16px;
 	padding: 0 20px;
@@ -646,7 +804,11 @@ function openConfig() {
 	cursor: pointer;
 	opacity: 0.7;
 	border-bottom: 2px solid transparent;
-	transition: all 0.2s;
+	transition:
+		opacity 0.16s ease,
+		background-color 0.16s ease,
+		border-bottom-color 0.16s ease,
+		color 0.16s ease;
 	font-weight: 600;
 	font-size: 14px;
 	white-space: nowrap;
@@ -682,6 +844,20 @@ function openConfig() {
 .config-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 4px; }
 
 .small-info { font-size: 12px; opacity: 0.7; margin-top: 4px; display: block; }
+.lp-color-action { gap: 10px !important; }
+#${APP_NAME}-config-container input[type="color"].lp-color-swatch {
+	width: 36px !important;
+	height: 36px !important;
+	padding: 2px !important;
+	border-radius: 8px !important;
+	border: 1px solid rgba(255,255,255,.2) !important;
+	cursor: pointer !important;
+	background: none !important;
+	min-width: unset !important;
+}
+#${APP_NAME}-config-container input[type="color"].lp-color-swatch::-webkit-color-swatch-wrapper { padding: 0; border-radius: 6px; }
+#${APP_NAME}-config-container input[type="color"].lp-color-swatch::-webkit-color-swatch { border: none; border-radius: 6px; }
+
 `
 			}
 		}),
@@ -689,7 +865,7 @@ function openConfig() {
 	);
 
 	Spicetify.PopupModal.display({
-		title: "Lyrics Plus Settings",
+		title: getText("modal.title"),
 		content: configContainer,
 		isLarge: true,
 	});
