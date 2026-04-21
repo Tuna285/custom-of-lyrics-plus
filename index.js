@@ -9,6 +9,12 @@ const { useState, useEffect, useCallback, useMemo, useRef } = react;
 const reactDOM = Spicetify.ReactDOM;
 const spotifyVersion = Spicetify.Platform.version;
 
+const getReactDOM = () => (Spicetify && Spicetify.ReactDOM) || window.ReactDOM || reactDOM;
+const createPortalSafe = (node, target) => {
+	const reactDOMRef = getReactDOM();
+	if (!reactDOMRef?.createPortal || !target) return node;
+	return reactDOMRef.createPortal(node, target);
+};
 
 // Initialize App
 function render() {
@@ -2859,8 +2865,8 @@ infoFromTrack(track) {
 			})
 		);
 
-		if (this.state.isFullscreen) return reactDOM.createPortal(out, this.fullscreenContainer);
-		if (fadLyricsContainer) return reactDOM.createPortal(out, fadLyricsContainer);
+		if (this.state.isFullscreen) return createPortalSafe(out, this.fullscreenContainer);
+		if (fadLyricsContainer) return createPortalSafe(out, fadLyricsContainer);
 		return out;
 	}
 }
