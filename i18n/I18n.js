@@ -92,7 +92,6 @@ window.LANG_UI_OVERRIDES = {
 		"contextMenu.trackDelay": "트랙 지연",
 		"contextMenu.preTrans": "사전 번역",
 		"contextMenu.uAutoScroll": "자동 스크롤",
-		"contextMenu.dualGenius": "듀얼 패널",
 		"contextMenu.provider": "번역 제공자",
 		"contextMenu.translationDisplay.replace": "원문 대체",
 		"contextMenu.translationDisplay.below": "원문 아래",
@@ -222,7 +221,6 @@ window.LANG_UI_OVERRIDES = {
 		"contextMenu.trackDelay": "トラック遅延",
 		"contextMenu.preTrans": "先行翻訳",
 		"contextMenu.uAutoScroll": "自動スクロール",
-		"contextMenu.dualGenius": "デュアルパネル",
 		"contextMenu.provider": "翻訳プロバイダー",
 		"contextMenu.translationDisplay.replace": "原文置換",
 		"contextMenu.translationDisplay.below": "原文の下",
@@ -352,7 +350,6 @@ window.LANG_UI_OVERRIDES = {
 		"contextMenu.trackDelay": "歌曲延迟",
 		"contextMenu.preTrans": "预翻译",
 		"contextMenu.uAutoScroll": "自动滚动",
-		"contextMenu.dualGenius": "双面板",
 		"contextMenu.provider": "翻译提供源",
 		"contextMenu.translationDisplay.replace": "替换原文",
 		"contextMenu.translationDisplay.below": "显示在原文下方",
@@ -483,40 +480,32 @@ window.LANG_UI_OVERRIDES_PROVIDER_AND_CORS = {
 		"settings.corsProxyDefault": "적용 후 Spotify 웹뷰가 다시 로드됩니다. 기본값으로 되돌리려면 비워두세요: <code>https://cors-proxy.spicetify.app/{url}</code>",
 		"providers.local.desc": "이전 Spotify 세션에서 불러온 캐시/로컬 파일의 가사를 제공합니다.",
 		"providers.musixmatch.desc": "Spotify와 완전 호환됩니다. 공식 Musixmatch 앱의 토큰이 필요합니다. 가사 로드가 실패하면 <code>토큰 새로고침</code>으로 갱신하세요. CORS 프록시가 필요할 수 있습니다.",
-		"providers.netease.desc": "Netease Cloud Music에서 가사를 가져옵니다. Cloudflare Worker URL이 필요합니다.",
 		"providers.lrclib.desc": "lrclib.net 가사를 사용합니다. 싱크/비싱크 가사를 모두 지원하며 무료 오픈소스입니다.",
 		"providers.spotify.desc": "Spotify 공식 API에서 가사를 가져옵니다.",
-		"providers.genius.desc": "Genius에서 비싱크 가사를 가져옵니다."
 	},
 	ja: {
 		"settings.corsProxyDesc": "CORS 制限を回避するために使用します。任意のプロキシ URL に置き換えてください。<code>{url}</code> は実際のリクエスト URL に置換されます。",
 		"settings.corsProxyDefault": "適用後に Spotify の WebView が再読み込みされます。既定値に戻すには空欄にしてください: <code>https://cors-proxy.spicetify.app/{url}</code>",
 		"providers.local.desc": "過去の Spotify セッションで取得したキャッシュ/ローカルファイルから歌詞を提供します。",
 		"providers.musixmatch.desc": "Spotify と完全互換です。公式 Musixmatch アプリのトークンが必要です。失敗する場合は <code>トークン更新</code> を実行してください。CORS プロキシが必要な場合があります。",
-		"providers.netease.desc": "Netease Cloud Music 由来の歌詞を使用します。Cloudflare Worker URL が必要です。",
 		"providers.lrclib.desc": "lrclib.net の歌詞を使用します。同期/非同期の両方に対応し、無料のオープンソースです。",
 		"providers.spotify.desc": "Spotify 公式 API の歌詞を使用します。",
-		"providers.genius.desc": "Genius の非同期歌詞を使用します。"
 	},
 	zh: {
 		"settings.corsProxyDesc": "用于绕过 CORS 限制。请替换为你自己的代理服务器 URL。<code>{url}</code> 会被替换为真实请求 URL。",
 		"settings.corsProxyDefault": "应用后 Spotify WebView 会重新加载。留空可恢复默认值：<code>https://cors-proxy.spicetify.app/{url}</code>",
 		"providers.local.desc": "从先前 Spotify 会话加载的缓存/本地文件提供歌词。",
 		"providers.musixmatch.desc": "与 Spotify 完全兼容。需要官方 Musixmatch App 的 token。若加载失败，请点击 <code>刷新令牌</code>。某些环境下可能需要 CORS 代理。",
-		"providers.netease.desc": "歌词来源于 Netease Cloud Music。需要 Cloudflare Worker URL。",
 		"providers.lrclib.desc": "歌词来源于 lrclib.net，支持同步与非同步歌词，免费且开源。",
 		"providers.spotify.desc": "歌词来源于 Spotify 官方 API。",
-		"providers.genius.desc": "歌词来源于 Genius（非同步）。"
 	},
 	vi: {
 		"settings.corsProxyDesc": "Dùng để vượt giới hạn CORS. Hãy thay bằng URL proxy bạn muốn. <code>{url}</code> sẽ được thay bằng URL request thực tế.",
 		"settings.corsProxyDefault": "Sau khi áp dụng, Spotify sẽ tải lại webview. Để về mặc định, hãy để trống: <code>https://cors-proxy.spicetify.app/{url}</code>",
 		"providers.local.desc": "Cung cấp lời bài hát từ cache/tệp cục bộ đã tải ở các phiên Spotify trước.",
 		"providers.musixmatch.desc": "Tương thích đầy đủ với Spotify. Cần token từ ứng dụng Musixmatch chính thức. Nếu lỗi tải lời, hãy bấm <code>Refresh token</code>. Có thể cần CORS proxy.",
-		"providers.netease.desc": "Lời bài hát lấy từ Netease Cloud Music. Cần URL Cloudflare Worker.",
 		"providers.lrclib.desc": "Lời bài hát từ lrclib.net. Hỗ trợ cả synced và unsynced, miễn phí và mã nguồn mở.",
 		"providers.spotify.desc": "Lời bài hát từ Spotify API chính thức.",
-		"providers.genius.desc": "Lời bài hát unsynced từ Genius."
 	}
 };
 
@@ -534,25 +523,21 @@ window.LANG_UI_OVERRIDES_ACCENT = {
 		"settings.uiAccentColor.label": "강조/호버 테두리 색상",
 		"settings.uiAccentColor.desc": "설정 컨트롤의 포커스/호버 테두리와 글로우 색상입니다.",
 		"settings.providerTokenPlaceholder": "제공자 토큰을 입력하세요",
-		"settings.workerUrlPlaceholder": "Cloudflare Worker URL (예: https://...)"
 	},
 	ja: {
 		"settings.uiAccentColor.label": "アクセント/ホバー枠色",
 		"settings.uiAccentColor.desc": "設定コントロールのフォーカス/ホバー枠とグローの色です。",
 		"settings.providerTokenPlaceholder": "プロバイダートークンを入力",
-		"settings.workerUrlPlaceholder": "Cloudflare Worker URL（例: https://...）"
 	},
 	zh: {
 		"settings.uiAccentColor.label": "强调/悬停描边颜色",
 		"settings.uiAccentColor.desc": "设置控件的聚焦/悬停描边与发光颜色。",
 		"settings.providerTokenPlaceholder": "请输入提供方令牌",
-		"settings.workerUrlPlaceholder": "Cloudflare Worker URL（例如：https://...）"
 	},
 	vi: {
 		"settings.uiAccentColor.label": "Mau vien nhan/hover",
 		"settings.uiAccentColor.desc": "Mau vien focus/hover va glow cho cac control trong settings.",
 		"settings.providerTokenPlaceholder": "Dan token nha cung cap vao day",
-		"settings.workerUrlPlaceholder": "Cloudflare Worker URL (vi du: https://...)"
 	}
 };
 

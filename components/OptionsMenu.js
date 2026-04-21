@@ -560,7 +560,6 @@ const AdjustmentsMenu = react.memo(({ mode }) => {
 
 		// Mode Specific
 		{ desc: getText("contextMenu.uAutoScroll"), key: "unsynced-auto-scroll", type: ConfigSlider, when: () => mode === UNSYNCED },
-		{ desc: getText("contextMenu.dualGenius"), key: "dual-genius", type: ConfigSlider, when: () => mode === GENIUS },
 	];
 
 	const onChange = (name, value) => {

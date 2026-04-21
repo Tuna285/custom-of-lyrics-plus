@@ -20,7 +20,8 @@ window.LANG_VI = {
     "general": "Chung",
     "translation": "Dịch thuật",
     "providers": "Nguồn nhạc",
-    "background": "Giao diện",
+    "background": "Hình nền",
+    "appearance": "Giao diện",
     "advanced": "Nâng cao"
   },
   "sections": {
@@ -187,10 +188,8 @@ window.LANG_VI = {
   "providers": {
     "local": { "name": "local" },
     "musixmatch": { "name": "Musixmatch" },
-    "netease": { "name": "Netease" },
     "lrclib": { "name": "LRCLIB" },
     "spotify": { "name": "Spotify" },
-    "genius": { "name": "Genius" }
   },
   "notifications": {
     "translatedIn": "Dịch xong trong {duration}",
@@ -232,7 +231,6 @@ window.LANG_VI = {
     "trackDelay": "Chỉnh delay bài hát",
     "preTrans": "Dịch trước",
     "uAutoScroll": "Unsynced: Tự động cuộn",
-    "dualGenius": "Chia đôi màn hình",
     "conversions": "Chuyển đổi",
     "translationDisplay": {
       "replace": "Thay thế lời gốc",

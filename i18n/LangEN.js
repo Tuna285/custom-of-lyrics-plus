@@ -203,7 +203,6 @@ window.LANG_EN = {
       "desc": "Icon color of in-player quick action buttons."
     },
     "providerTokenPlaceholder": "Paste provider token here",
-    "workerUrlPlaceholder": "Cloudflare Worker URL (e.g., https://...)",
     "corsProxyDesc": "Use this to bypass CORS restrictions. Replace the URL with your cors proxy server of your choice. <code>{url}</code> will be replaced with the request URL.",
     "corsProxyDefault": "Spotify will reload its webview after applying. Leave empty to restore default: <code>https://cors-proxy.spicetify.app/{url}</code>",
     "activeColor": {
@@ -233,10 +232,8 @@ window.LANG_EN = {
   "providers": {
     "local": { "name": "local", "desc": "Provide lyrics from cache/local files loaded from previous Spotify sessions." },
     "musixmatch": { "name": "musixmatch", "desc": "Fully compatible with Spotify. Requires a token from the official Musixmatch app. If lyrics fail to load, refresh the token via the <code>Refresh Token</code> button. A CORS proxy may be required." },
-    "netease": { "name": "netease", "desc": "Lyrics sourced from Netease Cloud Music. Requires a Cloudflare Worker URL." },
     "lrclib": { "name": "lrclib", "desc": "Lyrics sourced from lrclib.net. Supports both synced and unsynced lyrics. Free and open-source." },
-    "spotify": { "name": "spotify", "desc": "Lyrics sourced from the official Spotify API." },
-    "genius": { "name": "genius", "desc": "Unsynced lyrics sourced from Genius." }
+    "spotify": { "name": "spotify", "desc": "Lyrics sourced from the official Spotify API." }
   },
   "notifications": {
     "translatedIn": "Translated in {duration}",
@@ -278,7 +275,6 @@ window.LANG_EN = {
     "trackDelay": "Track delay",
     "preTrans": "Pre-translation",
     "uAutoScroll": "Unsynced: Auto-scroll",
-    "dualGenius": "Dual panel",
     "conversions": "Conversions",
     "translationDisplay": {
       "replace": "Replace original",

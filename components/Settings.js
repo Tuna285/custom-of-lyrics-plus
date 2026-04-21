@@ -288,18 +288,57 @@ const ConfigRange = ({ name, defaultValue, min = 0, max = 100, step = 5, onChang
 
 const ConfigColor = ({ name, defaultValue, onChange = () => { }, resetValue = "#ffffff" }) => {
 	const [value, setValue] = useState(defaultValue || resetValue);
+	const debounceRef = react.useRef(null);
+	const pendingValueRef = react.useRef(null);
+
+	const flushPending = useCallback(() => {
+		if (pendingValueRef.current === null) return;
+		onChange(pendingValueRef.current);
+		pendingValueRef.current = null;
+	}, [onChange]);
+
+	const scheduleChange = useCallback((nextValue) => {
+		pendingValueRef.current = nextValue;
+		if (debounceRef.current) {
+			clearTimeout(debounceRef.current);
+		}
+		debounceRef.current = setTimeout(() => {
+			flushPending();
+			debounceRef.current = null;
+		}, 120);
+	}, [flushPending]);
 
 	useEffect(() => {
 		setValue(defaultValue || resetValue);
 	}, [defaultValue, resetValue]);
 
+	useEffect(() => () => {
+		if (debounceRef.current) {
+			clearTimeout(debounceRef.current);
+		}
+		flushPending();
+	}, [flushPending]);
+
 	const handleColorChange = (e) => {
 		const v = e.target.value;
 		setValue(v);
-		onChange(v);
+		scheduleChange(v);
+	};
+
+	const handleCommit = () => {
+		if (debounceRef.current) {
+			clearTimeout(debounceRef.current);
+			debounceRef.current = null;
+		}
+		flushPending();
 	};
 
 	const handleReset = () => {
+		if (debounceRef.current) {
+			clearTimeout(debounceRef.current);
+			debounceRef.current = null;
+		}
+		pendingValueRef.current = null;
 		setValue(resetValue);
 		onChange(resetValue);
 	};
@@ -307,7 +346,7 @@ const ConfigColor = ({ name, defaultValue, onChange = () => { }, resetValue = "#
 	return react.createElement("div", { className: "setting-row" },
 		react.createElement("label", { className: "col description" }, name),
 		react.createElement("div", { className: "col action lp-color-action" },
-			react.createElement("input", { type: "color", value, onChange: handleColorChange, className: "lp-color-swatch" }),
+			react.createElement("input", { type: "color", value, onChange: handleColorChange, onBlur: handleCommit, className: "lp-color-swatch" }),
 			react.createElement("button", { className: "btn lp-color-reset-btn", onClick: handleReset }, getText("buttons.resetToTheme"))
 		)
 	);
@@ -356,11 +395,21 @@ const ServiceOption = ({ item, onToggle, onSwap, isFirst = false, isLast = false
 
 	const setTokenCallback = useCallback((token) => { setToken(token); onTokenChange(item.name, token); }, [item.token]);
 	const toggleActive = useCallback(() => {
-		if (item.name === "genius" && spotifyVersion >= "1.2.31") return;
 		const state = !active; setActive(state); onToggle(item.name, state);
 	}, [active]);
 	const tokenPlaceholder = getText("settings.providerTokenPlaceholder", {}, `Paste ${item.name} token`);
-	const workerPlaceholder = getText("settings.workerUrlPlaceholder", {}, "Cloudflare Worker URL (e.g., https://...)");
+	const tokenInput = item.token !== undefined
+		? react.createElement("div", { className: "provider-input-row" },
+			react.createElement("input", {
+				className: "provider-token-input",
+				placeholder: tokenPlaceholder,
+				value: token,
+				onChange: (event) => setTokenCallback(event.target.value),
+				autoComplete: "off",
+				spellCheck: false
+			})
+		)
+		: null;
 
 	return react.createElement("div", { className: "setting-group" },
 		react.createElement("div", { className: "setting-row provider-row" },
@@ -375,29 +424,7 @@ const ServiceOption = ({ item, onToggle, onSwap, isFirst = false, isLast = false
 				react.createElement(ButtonSVG, { icon: Spicetify.SVGIcons.check, active, onClick: toggleActive })
 			)
 		),
-		item.token !== undefined && react.createElement("div", { className: "provider-input-row" },
-			react.createElement("input", {
-				className: "provider-token-input",
-				placeholder: tokenPlaceholder,
-				value: token,
-				onChange: (event) => setTokenCallback(event.target.value),
-				autoComplete: "off",
-				spellCheck: false
-			})
-		),
-		item.name === "netease" && react.createElement("input", { 
-			placeholder: workerPlaceholder,
-			value: CONFIG.visual["netease-worker-url"], 
-			onChange: (e) => {
-				const val = e.target.value;
-				CONFIG.visual["netease-worker-url"] = val;
-				ConfigUtils.setPersisted("lyrics-plus:visual:netease-worker-url", val);
-				// Update provider instance if it exists
-				if (window.ProviderNetease) window.ProviderNetease.setWorkerUrl(val);
-			},
-			className: "provider-token-input",
-			style: { margin: "0 16px 12px 16px", width: "calc(100% - 32px)" }
-		})
+		tokenInput
 	);
 };
 
@@ -624,7 +651,6 @@ const ConfigHelper = () => {
 		case "appearance": {
 			const appearanceSettings = [
 				{ desc: getText("contextMenu.lyricPos"), key: "lyric-position", type: ConfigRange, min: 0, max: 100, step: 5 },
-				{ desc: getText("contextMenu.dualGenius"), key: "dual-genius", type: ConfigSlider },
 			];
 			const buttonColorSettings = [
 				{ desc: getText("settings.uiSwitchOnColor.label"), key: "ui-switch-on-color", type: ConfigColor, info: getText("settings.uiSwitchOnColor.desc"), resetValue: UI_COLOR_DEFAULTS["ui-switch-on-color"] },
@@ -790,31 +816,42 @@ function openConfig() {
 /* Tabs */
 .config-tabs {
 	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	box-sizing: border-box;
+	max-width: 100%;
 	position: sticky;
 	top: 0;
 	z-index: 2;
-	background: linear-gradient(180deg, rgba(18,18,18,0.95), rgba(18,18,18,0.88));
+	background: var(--spice-main, rgba(18,18,18,0.94));
 	border-bottom: 1px solid rgba(255,255,255,.1);
 	margin: 0 0 16px;
-	padding: 0 20px;
-	overflow-x: auto;
+	padding: 8px 16px 10px;
+	overflow: visible;
 }
 .config-tab {
-	padding: 12px 16px;
+	flex: 1 1 112px;
+	min-width: 0;
+	padding: 8px 12px;
 	cursor: pointer;
 	opacity: 0.7;
-	border-bottom: 2px solid transparent;
+	border: 1px solid transparent;
+	border-radius: 999px;
 	transition:
 		opacity 0.16s ease,
 		background-color 0.16s ease,
-		border-bottom-color 0.16s ease,
+		border-color 0.16s ease,
 		color 0.16s ease;
 	font-weight: 600;
 	font-size: 14px;
-	white-space: nowrap;
+	text-align: center;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	line-height: 1.2;
 }
 .config-tab:hover { opacity: 1; background: rgba(255,255,255,.05); }
-.config-tab.active { opacity: 1; border-bottom-color: var(--spice-text); color: var(--spice-text); }
+.config-tab.active { opacity: 1; border-color: rgba(255,255,255,.25); background: rgba(255,255,255,.08); color: var(--spice-text); }
 
 /* Collapsible Sections */
 .config-section { margin-bottom: 24px; }
