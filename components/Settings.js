@@ -836,10 +836,8 @@ function openConfig() {
 	position: sticky;
 	top: 0;
 	z-index: 2;
-	background: var(--spice-main, rgba(18,18,18,0.7));
-	backdrop-filter: blur(16px);
-	-webkit-backdrop-filter: blur(16px);
-	border-bottom: 1px solid rgba(255,255,255,.1);
+	background: transparent;
+	border-bottom: 1px solid rgba(255,255,255,.05);
 	margin: 0 0 16px;
 	padding: 8px 16px 10px;
 	overflow: visible;

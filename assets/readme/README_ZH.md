@@ -1,7 +1,7 @@
 # Lyric Plus Translate
 
 **Language / 言語 / 언어 / Ngôn ngữ / 语言:**
-[English](README_EN.md) | [Tiếng Việt](README_VI.md) | [한국어](README_KO.md) | [日本語](README_JA.md) | [中文（简体）](README_ZH.md)
+[English](../../README.md) | [Tiếng Việt](../../README_VI.md) | [한국어](README_KO.md) | [日本語](README_JA.md) | [中文（简体）](README_ZH.md)
 
 <img width="800" height="800" alt="image" src="https://github.com/user-attachments/assets/32e85501-567d-4896-a7e4-bb4b098a30a6" />
 
