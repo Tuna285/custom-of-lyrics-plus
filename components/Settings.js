@@ -80,13 +80,25 @@ const RefreshTokenButton = ({ setTokenCallback }) => {
 
 	useEffect(() => {
 		if (status === "loading") {
-			Spicetify.CosmosAsync.get("https://apic-desktop.musixmatch.com/ws/1.1/token.get?app_id=web-desktop-app-v1.0", null, { authority: "apic-desktop.musixmatch.com" })
+			Spicetify.CosmosAsync.get("https://apic-appmobile.musixmatch.com/ws/1.1/token.get?app_id=mac-ios-v2.0", null, {
+				Host: "apic-appmobile.musixmatch.com",
+				authority: "apic-appmobile.musixmatch.com",
+				"X-Cookie": "x-mxm-token-guid=",
+				"x-mxm-app-version": "10.1.1",
+				"X-User-Agent": "Musixmatch/2025120901 CFNetwork/3860.300.31 Darwin/25.2.0",
+				"Accept-Language": "en-US,en;q=0.9",
+				Connection: "keep-alive",
+				Accept: "application/json",
+			})
 				.then(({ message: response }) => {
 					if (response.header.status_code === 200 && response.body.user_token) { setTokenCallback(response.body.user_token); setStatus("success"); }
 					else if (response.header.status_code === 401) { setStatus("rateLimit"); }
 					else { setStatus("error"); console.error("Failed to refresh token", response); }
 				})
 				.catch((error) => { setStatus("error"); console.error("Failed to refresh token", error); });
+		} else if (status === "error" || status === "rateLimit" || status === "success") {
+			const timer = setTimeout(() => setStatus("idle"), 3000);
+			return () => clearTimeout(timer);
 		}
 	}, [status]);
 

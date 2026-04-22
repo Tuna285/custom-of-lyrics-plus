@@ -578,7 +578,12 @@ const GeminiClient = {
         // Larger LLMs sometimes emit the full N-line draft once, then start restating
         // the entire thing inside the FINAL REPLY channel ("Pass 3" audit pattern).
         // This burns the token budget, hits provider caps, and slows perceived latency.
-        // Detect the start of a 2nd full draft in content and stop the stream.
+        //
+        // We do NOT wait for Pass 3/4 to finish — we **cut the stream as soon** as a
+        // second `<1>` opens after `<2>` (first full draft boundary), keep `contentBuf`
+        // up to that point, then `reader.cancel()` and return. User gets the first
+        // draft immediately; we avoid aborting the whole `fetch` (which felt like a
+        // hard failure / wasted wait).
         //
         // Only enabled for tag-based output (prompt mode) with N >= 3 lines.
         // Reasoning-channel redrafts are NOT auto-aborted (risk of losing answer if
@@ -681,7 +686,8 @@ const GeminiClient = {
 
             contentBuf = contentBuf.slice(0, secondOpen);
             earlyAbortReason = "content-redraft";
-            try { localController.abort(); } catch (_) { }
+            // Reader cancel is done in the SSE loop (await reader.cancel()) so we don't
+            // abort the whole request — that produced AbortError noise and felt like blocking.
         };
         // ────────────────────────────────────────────────────────────────────────
 
@@ -725,14 +731,19 @@ const GeminiClient = {
                 checkRedraftAbort();
                 checkReasoningRedraftAnnounce();
                 checkReasoningSilentRedraft();
-                if (earlyAbortReason) break;
+                if (earlyAbortReason) {
+                    try { await reader.cancel(); } catch (_) { /* already closed */ }
+                    break;
+                }
             }
         } catch (e) {
-            // If WE aborted on purpose, swallow the AbortError and finalize gracefully.
-            // Real user/timeout aborts (no earlyAbortReason set) re-throw.
+            // Legacy path: if something still aborts the fetch while earlyAbortReason is set.
             const isAbort = e && (e.name === "AbortError" || e.code === 20 || /aborted/i.test(e.message || ""));
             if (!isAbort || !earlyAbortReason) throw e;
             DebugLogger.log(`[Lyrics+] Stream aborted early: ${earlyAbortReason} — kept first complete draft, dropped redraft.`);
+        }
+        if (earlyAbortReason === "content-redraft") {
+            DebugLogger.log(`[Lyrics+] Pass 3/4 redraft suppressed — first draft returned immediately (stream cut, not blocked).`);
         }
         // Flush any tail bytes
         try { buffer += decoder.decode(); } catch (_) { }
@@ -1008,7 +1019,18 @@ const GeminiClient = {
         const { cleaned: cleanedRaw, reasoningContent: fromContent } = this.stripReasoningBlocks(raw);
         const fromFields = this.extractReasoningFromMessage(message);
         const reasoningContent = [fromContent, fromFields].filter(Boolean).join("\n\n");
-        if (!cleanedRaw) throw new Error("Empty response after stripping thinking blocks");
+
+        // Models sometimes put the entire deliverable (including `<1>...</N>`) *inside*
+        // `<thought>...</thought>`. Stripping then removes everything → empty `cleanedRaw`.
+        // Fall back to parsing the collected thinking text (same as UI "reasoning" body).
+        let parseSource = String(cleanedRaw || "").trim();
+        if (!parseSource && String(fromContent || "").trim()) {
+            parseSource = String(fromContent).trim();
+        }
+        if (!parseSource && String(fromFields || "").trim()) {
+            parseSource = String(fromFields).trim();
+        }
+        if (!parseSource) throw new Error("Empty response after stripping thinking blocks");
 
         let result;
         if (responseMode === "json_schema") {
@@ -1019,10 +1041,10 @@ const GeminiClient = {
             // Always route through extractGeminiJson — its bracket-balanced slicer + object-key
             // extraction handles all of the above cleanly. Falls back to tag/numbered parsing if
             // the model ignored the JSON instruction entirely (e.g. Gemma without strict mode).
-            result = this.extractGeminiJson(cleanedRaw);
+            result = this.extractGeminiJson(parseSource);
         } else {
             // Prompt Engineering: parse compact tags / numbered list / JSON / line split
-            result = this.extractGeminiJson(cleanedRaw);
+            result = this.extractGeminiJson(parseSource);
         }
 
         const duration = Date.now() - startTime;

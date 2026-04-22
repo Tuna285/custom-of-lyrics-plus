@@ -231,7 +231,8 @@ function buildTaskThinkingRules(finalOutputLabel, effort = "low") {
 2) Do not output chain-of-thought, scratchpad lists, or reasoning tags in the reply. Do not paste the full source lyrics again before the deliverable.
 3) The final ${finalOutputLabel} must appear once and comprise the entire message.
 4) Translate the source DIRECTLY to Vietnamese. Do not route through English, romaji, pinyin, or any other intermediate language — source quote and Vietnamese are the only allowed pair in any notes.
-5) Produce the Vietnamese for each line ONCE in the FINAL REPLY. The full set of tags must appear EXACTLY ONCE, and ONLY in the final reply.`;
+5) Produce the Vietnamese for each line ONCE in the FINAL REPLY. The full set of tags must appear EXACTLY ONCE, and ONLY in the final reply.
+6) **DELIVERABLE POSITION — CRITICAL.** The <1>...</N> tags (the ${finalOutputLabel}) MUST appear OUTSIDE and AFTER any <thought>, <think>, or reasoning block. NEVER place <1>...</N> inside <thought>...</thought>. If you open <thought>, you MUST close </thought> BEFORE writing the first <1>. Parsers strip <thought> blocks entirely; tags placed inside are lost.`;
 
     if (effort === "high") {
         // Top-tier models on high effort — let them think freely.
