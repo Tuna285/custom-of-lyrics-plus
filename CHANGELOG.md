@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-04-21
+
+### Added
+
+- **Multi-language UI** — Settings interface now supports 5 languages: English, Tiếng Việt, 한국어, 日本語, 中文（简体）. Language files: `i18n/LangKO.js`, `i18n/LangJA.js`, `i18n/LangZH.js` (previously only EN + VI existed). Switch via Settings → General → Language.
+- **Appearance tab** — New dedicated tab in the settings modal for color customization. Allows per-channel overrides for Active lyric color, Inactive lyric color, and Accent/highlight color. Color picker shows a native swatch; "Reset" button restores the Spicetify theme default (CSS variable) instantly without a reload.
+- **Provider descriptions** — All 6 lyric providers (local, musixmatch, netease, lrclib, spotify, genius) now display a translated description below their row in the Providers tab, fully localized in all 5 languages.
+- **Multi-language README** — Added `assets/readme/` directory with `README_EN.md`, `README_KO.md`, `README_JA.md`, `README_ZH.md`, `README_VI.md`. Each file has a language navigation bar at the top. Root `README.md` and `README_VI.md` link to this directory.
+- **`AGENTS.md`** — Architecture documentation for the project: global-scope concatenation model, `manifest.json` ↔ `install.ps1` sync invariant, deploy commands, commit conventions.
+
+### Changed
+
+- **Settings UI — description hierarchy**: Setting descriptions are now visually grouped with their control row inside a `.setting-group` wrapper. Descriptions render as a smaller, muted `<p>` below the row instead of as the row label. Hover effect applies to the whole group. Both `OptionList` and `ServiceOption` components updated.
+- **CORS proxy section**: Restructured with a section header (`h2`), description text above the input, and a note below — consistent with the rest of the settings layout.
+- **Modal title localized**: Settings modal title now uses `getText("modal.title")` so it renders in the active language (e.g. "Lyrics Plus 설정", "Lyrics Plus 設定", "Lyrics Plus 设置").
+- **i18n switch statement**: `getCurrentLang()` in `I18n.js` expanded from a binary `vi/en` check to a full `switch` covering `vi`, `ko`, `ja`, `zh`, with `en` as the default fallback.
+
 ## [1.4.2] - 2026-04-20
 
 ### Fixed

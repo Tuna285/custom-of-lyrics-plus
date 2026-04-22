@@ -9,6 +9,12 @@ const { useState, useEffect, useCallback, useMemo, useRef } = react;
 const reactDOM = Spicetify.ReactDOM;
 const spotifyVersion = Spicetify.Platform.version;
 
+const getReactDOM = () => (Spicetify && Spicetify.ReactDOM) || window.ReactDOM || reactDOM;
+const createPortalSafe = (node, target) => {
+	const reactDOMRef = getReactDOM();
+	if (!reactDOMRef?.createPortal || !target) return node;
+	return reactDOMRef.createPortal(node, target);
+};
 
 // Initialize App
 function render() {
@@ -2288,7 +2294,19 @@ infoFromTrack(track) {
 		this.configButton.register();
 
 		this.onFontSizeChange = (event) => {
+			const mode = this.state.mode !== -1 ? this.state.mode : this.getCurrentMode();
+			const isCompactSyncedMode = mode === SYNCED && !!CONFIG.visual["synced-compact"];
+
+			// In compact synced mode, wheel should never scroll Spotify root page.
+			if (!event.ctrlKey && isCompactSyncedMode) {
+				event.preventDefault();
+				event.stopPropagation();
+				return false;
+			}
+
 			if (!event.ctrlKey) return;
+			event.preventDefault();
+			event.stopPropagation();
 			const dir = event.deltaY < 0 ? 1 : -1;
 			let temp = CONFIG.visual["font-size"] + dir * fontSizeLimit.step;
 			if (temp < fontSizeLimit.min) {
@@ -2299,6 +2317,7 @@ infoFromTrack(track) {
 			CONFIG.visual["font-size"] = temp;
 			localStorage.setItem("lyrics-plus:visual:font-size", temp);
 			lyricContainerUpdate();
+			return false;
 		};
 
 		this.toggleFullscreen = () => {
@@ -2398,6 +2417,12 @@ infoFromTrack(track) {
 		"--animation-tempo": this.state.tempo,
 		"--video-blur": `${CONFIG.visual["video-background-blur"]}px`,
 		"--video-dim": `${CONFIG.visual["video-background-dim"]}%`,
+		"--lp-ui-switch-on": CONFIG.visual["ui-switch-on-color"],
+		"--lp-ui-switch-off": CONFIG.visual["ui-switch-off-color"],
+		"--lp-ui-btn-bg": CONFIG.visual["ui-button-bg-color"],
+		"--lp-ui-btn-text": CONFIG.visual["ui-button-text-color"],
+		"--lp-fab-bg": CONFIG.visual["ui-fab-bg-color"],
+		"--lp-fab-icon": CONFIG.visual["ui-fab-icon-color"],
 	};
 
 	if (CONFIG.visual["video-background"]) {
@@ -2486,6 +2511,12 @@ infoFromTrack(track) {
 			"--lyrics-align-text": CONFIG.visual.alignment,
 			"--lyrics-font-size": `${CONFIG.visual["font-size"]}px`,
 			"--animation-tempo": this.state.tempo,
+			"--lp-ui-switch-on": CONFIG.visual["ui-switch-on-color"],
+			"--lp-ui-switch-off": CONFIG.visual["ui-switch-off-color"],
+			"--lp-ui-btn-bg": CONFIG.visual["ui-button-bg-color"],
+			"--lp-ui-btn-text": CONFIG.visual["ui-button-text-color"],
+			"--lp-fab-bg": CONFIG.visual["ui-fab-bg-color"],
+			"--lp-fab-icon": CONFIG.visual["ui-fab-icon-color"],
 		};
 
 		let mode = this.getCurrentMode();
@@ -2667,7 +2698,7 @@ infoFromTrack(track) {
 						onClick: () => {
 							this.openVideoSettingsModal();
 						},
-						style: { color: "var(--spice-button)" }
+					style: { color: "var(--lp-fab-icon, var(--spice-button))" }
 					}, react.createElement("svg", {
 						width: 16, height: 16, viewBox: "0 0 16 16", fill: "currentColor",
 						dangerouslySetInnerHTML: { __html: '<path d="M14.5 13.5h-13A.5.5 0 011 13V3a.5.5 0 01.5-.5h13a.5.5 0 01.5.5v10a.5.5 0 01-.5.5zM2 12h12V4H2v8z"/><path d="M6 6l4 2-4 2V6z"/>' }
@@ -2682,7 +2713,7 @@ infoFromTrack(track) {
 						"button",
 						{
 							className: "lyrics-config-button",
-							style: { color: "var(--spice-button)" },
+					style: { color: "var(--lp-fab-icon, var(--spice-button))" },
 							onClick: () => {
 								const { synced, unsynced, karaoke, genius } = this.state;
 								if (!synced && !unsynced && !karaoke && !genius) {
@@ -2719,7 +2750,7 @@ infoFromTrack(track) {
 						"button",
 						{
 							className: "lyrics-config-button",
-							style: { color: "var(--spice-button)" },
+					style: { color: "var(--lp-fab-icon, var(--spice-button))" },
 							onClick: () => {
 								this.fileInputRef.current.click();
 							},
@@ -2769,7 +2800,7 @@ infoFromTrack(track) {
 						"button",
 						{
 							className: "lyrics-config-button",
-							style: { color: "var(--spice-button)" },
+					style: { color: "var(--lp-fab-icon, var(--spice-button))" },
 							onClick: () => {
 								// Use saved modeKey from lyricsSource() - this is the correct key for CONFIG lookup
 								const modeKey = this.modeKey || "gemini";
@@ -2803,7 +2834,7 @@ infoFromTrack(track) {
 						"button",
 						{
 							className: "lyrics-config-button",
-							style: { color: "var(--spice-button)" },
+					style: { color: "var(--lp-fab-icon, var(--spice-button))" },
 							onClick: () => {
 								openConfig();
 							},
@@ -2834,8 +2865,8 @@ infoFromTrack(track) {
 			})
 		);
 
-		if (this.state.isFullscreen) return reactDOM.createPortal(out, this.fullscreenContainer);
-		if (fadLyricsContainer) return reactDOM.createPortal(out, fadLyricsContainer);
+		if (this.state.isFullscreen) return createPortalSafe(out, this.fullscreenContainer);
+		if (fadLyricsContainer) return createPortalSafe(out, fadLyricsContainer);
 		return out;
 	}
 }

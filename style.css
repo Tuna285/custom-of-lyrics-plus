@@ -550,7 +550,8 @@
 }
 
 #lyrics-plus-config-container option {
-  background-color: var(--spice-button);
+  background-color: #2b2b2b;
+  color: #f2f2f2;
 }
 
 div.lyrics-tabBar-headerItemLink {
@@ -761,19 +762,103 @@ div.lyrics-tabBar-headerItemLink {
   color: var(--spice-text);
 }
 
+/* Setting group: wraps a row + its optional description */
+#lyrics-plus-config-container .setting-group {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+}
+
+#lyrics-plus-config-container .setting-group:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Description text — small and muted, below the control row */
+#lyrics-plus-config-container .setting-desc {
+  display: block;
+  margin: 0;
+  padding: 0 16px 10px 16px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  opacity: 0.45;
+  color: var(--spice-subtext, var(--spice-text));
+}
+
+#lyrics-plus-config-container .setting-desc code {
+  font-family: monospace;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 10.5px;
+}
+
 #lyrics-plus-config-container .setting-row {
   display: flex !important;
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03) !important;
   border-radius: 8px;
   transition: background-color 0.2s ease;
   gap: 16px;
 }
 
+/* Rows without a group wrapper (e.g. ServiceOption) keep their own border */
+#lyrics-plus-config-container > .setting-row,
+#lyrics-plus-config-container .config-section-content > .setting-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03) !important;
+}
+
 #lyrics-plus-config-container .setting-row:hover {
   background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* When row is inside a group, hover is on the group — suppress inner hover */
+#lyrics-plus-config-container .setting-group .setting-row:hover {
+  background-color: transparent;
+}
+
+/* Tighten bottom padding of row when a description follows */
+#lyrics-plus-config-container .setting-group:has(.setting-desc) .setting-row {
+  padding-bottom: 6px !important;
+}
+
+#lyrics-plus-config-container .provider-row {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: start !important;
+  padding-bottom: 10px !important;
+}
+
+#lyrics-plus-config-container .provider-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#lyrics-plus-config-container .provider-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+#lyrics-plus-config-container .provider-desc {
+  padding: 0 !important;
+  font-size: 13px !important;
+  line-height: 1.55 !important;
+  opacity: 0.66 !important;
+  max-width: 720px;
+}
+
+#lyrics-plus-config-container .provider-input-row {
+  padding: 0 16px 12px 16px;
+}
+
+#lyrics-plus-config-container .provider-token-input {
+  width: 100%;
+  min-width: 0;
+  font-family: var(--font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12.5px;
 }
 
 #lyrics-plus-config-container .col.description {
@@ -800,30 +885,40 @@ div.lyrics-tabBar-headerItemLink {
   padding: 8px 12px !important;
   font-size: 13px;
   height: 36px !important;
-  transition: all 0.2s ease;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
   outline: none;
 }
 
 #lyrics-plus-config-container input:focus,
 #lyrics-plus-config-container select:focus {
   background-color: rgba(255, 255, 255, 0.1) !important;
-  border-color: var(--spice-button) !important;
-  box-shadow: 0 0 0 2px rgba(var(--spice-rgb-button), 0.2);
+  border-color: var(--lp-ui-accent, var(--spice-button)) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lp-ui-accent, var(--spice-button)) 28%, transparent);
 }
 
 #lyrics-plus-config-container select {
   cursor: pointer;
   appearance: none;
   padding-right: 32px !important;
+  background-color: rgba(46, 46, 46, 0.9) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
   background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
   background-size: 10px;
 }
 
+#lyrics-plus-config-container select option {
+  background-color: #2b2b2b !important;
+  color: #f2f2f2 !important;
+}
+
 /* Buttons & Switches */
 #lyrics-plus-config-container button.switch {
-  background-color: rgba(255, 255, 255, 0.1) !important;
+  background-color: var(--lp-ui-switch-off, rgba(255, 255, 255, 0.1)) !important;
   border-radius: 50% !important;
   width: 32px !important;
   height: 32px !important;
@@ -831,29 +926,41 @@ div.lyrics-tabBar-headerItemLink {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition:
+    background-color 0.16s ease,
+    transform 0.16s ease,
+    box-shadow 0.16s ease;
   color: var(--spice-text);
 }
 
 #lyrics-plus-config-container button.switch:not(.disabled) {
-  background-color: var(--spice-button) !important;
-  color: var(--spice-main);
-  box-shadow: 0 2px 8px rgba(var(--spice-rgb-button), 0.4);
+  background-color: var(--lp-ui-switch-on, var(--spice-button)) !important;
+  color: var(--lp-ui-btn-text, #111);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--lp-ui-accent, var(--spice-button)) 42%, transparent);
 }
 
 #lyrics-plus-config-container button.switch:hover {
-  transform: scale(1.05);
+  transform: translateZ(0) scale(1.03);
+}
+
+#lyrics-plus-config-container button.switch svg {
+  filter:
+    drop-shadow(0 0 1px rgba(0, 0, 0, 0.9))
+    drop-shadow(0 0 1px rgba(255, 255, 255, 0.75));
 }
 
 #lyrics-plus-config-container button.btn {
-  background-color: transparent !important;
+  background-color: var(--lp-ui-btn-bg, transparent) !important;
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
   border-radius: 18px !important;
   padding: 6px 16px !important;
   font-size: 13px;
   font-weight: 600;
-  color: var(--spice-text) !important;
-  transition: all 0.2s ease;
+  color: var(--lp-ui-btn-text, var(--spice-text)) !important;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
 }
 
 #lyrics-plus-config-container button.btn:hover {
@@ -1024,10 +1131,11 @@ div.lyrics-tabBar-headerItemLink {
   z-index: var(--z-controls);
   /* Auto-hide functionality */
   opacity: 0;
-  transform: translateX(20px);
+  transform: translate3d(20px, 0, 0);
   transition:
-    opacity 0.3s ease,
-    transform 0.3s ease;
+    opacity 0.22s ease,
+    transform 0.22s ease;
+  will-change: opacity, transform;
 }
 
 .lyrics-config-button-container > * {
@@ -1063,11 +1171,11 @@ div.lyrics-tabBar-headerItemLink {
 
 .lyrics-config-button {
   align-items: center;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--lp-fab-bg, rgba(0, 0, 0, 0.5));
   border: 0;
   margin: 5px;
   border-radius: 4px;
-  color: #eee;
+  color: var(--lp-fab-icon, #eee);
   cursor: pointer;
   display: flex;
   gap: 8px;
@@ -1075,12 +1183,23 @@ div.lyrics-tabBar-headerItemLink {
   padding: 12px;
   height: 40px;
   width: 40px;
-  transition: all 0.2s ease;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    background-color 0.16s ease,
+    color 0.16s ease;
+  will-change: transform;
 }
 
 .lyrics-config-button:hover {
-  transform: scale(1.05);
-  box-shadow: 0 2px 8px rgba(var(--spice-rgb-button), 0.4);
+  transform: translateZ(0) scale(1.03);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
+}
+
+.lyrics-config-button svg {
+  filter:
+    drop-shadow(0 0 1px rgba(0, 0, 0, 0.9))
+    drop-shadow(0 0 1px rgba(255, 255, 255, 0.7));
 }
 
 .lyrics-config-button-container .main-contextMenu-menu {
@@ -1469,6 +1588,36 @@ div.lyrics-tabBar-headerItemLink {
 /* Fix: Hide scrollbar in lyrics background container */
 .os-scrollbar-vertical.os-theme-spotify {
   display: none !important;
+}
+
+/* Color picker in Appearance tab */
+.lp-color-action { gap: 10px !important; }
+#lyrics-plus-config-container input[type="color"].lp-color-swatch {
+  width: 36px !important;
+  height: 36px !important;
+  padding: 2px !important;
+  border-radius: 6px !important;
+  border: 2px solid rgba(255, 255, 255, 0.2) !important;
+  cursor: pointer !important;
+  background: none !important;
+  flex-shrink: 0;
+  min-width: unset !important;
+}
+#lyrics-plus-config-container input[type="color"].lp-color-swatch::-webkit-color-swatch-wrapper { padding: 0; border-radius: 4px; }
+#lyrics-plus-config-container input[type="color"].lp-color-swatch::-webkit-color-swatch { border: none; border-radius: 4px; }
+.lp-color-theme-label { font-size: 12px; opacity: 0.55; font-style: italic; }
+.lp-color-reset-btn { font-size: 12px !important; padding: 4px 10px !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lyrics-config-button-container,
+  .lyrics-config-button,
+  #lyrics-plus-config-container button.switch,
+  #lyrics-plus-config-container button.btn,
+  #lyrics-plus-config-container input,
+  #lyrics-plus-config-container select {
+    transition: none !important;
+    animation: none !important;
+  }
 }
 
 

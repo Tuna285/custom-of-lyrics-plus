@@ -108,6 +108,13 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
     const [position, setPosition] = useState(0);
     const activeLineEle = useRef();
     const lyricContainerEle = useRef();
+    const handleSyncedWheel = useCallback((event) => {
+        // Synced page is transform-driven (not scroll container).
+        // Prevent wheel from bubbling to Spotify root and scrolling the main page.
+        if (event.ctrlKey) return;
+        event.preventDefault();
+        event.stopPropagation();
+    }, []);
 
     useTrackPosition(() => {
         const newPos = Spicetify.Player.getProgress();
@@ -260,6 +267,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
         {
             className: "lyrics-lyricsContainer-SyncedLyricsPage",
             ref: lyricContainerEle,
+            onWheel: handleSyncedWheel,
         },
         react.createElement(
             "div",

@@ -118,18 +118,36 @@ const SettingRowDescription = ({ icon, text }) => {
 function openOptionsModal(title, items, onChange, eventType = null) {
 	const container = react.createElement(
 		"div",
-		{ id: `${APP_NAME}-config-container` },
+		{
+			id: `${APP_NAME}-config-container`,
+			style: {
+				"--lp-ui-switch-on": CONFIG.visual["ui-switch-on-color"] || "#1ed760",
+				"--lp-ui-switch-off": CONFIG.visual["ui-switch-off-color"] || "rgba(255,255,255,0.16)",
+				"--lp-ui-btn-bg": CONFIG.visual["ui-button-bg-color"] || "rgba(255,255,255,0.08)",
+				"--lp-ui-btn-text": CONFIG.visual["ui-button-text-color"] || "#ffffff",
+				"--lp-fab-bg": CONFIG.visual["ui-fab-bg-color"] || "rgba(20,20,20,0.72)",
+				"--lp-fab-icon": CONFIG.visual["ui-fab-icon-color"] || "#1ed760",
+			}
+		},
 		react.createElement("style", {
 			dangerouslySetInnerHTML: {
 				__html: `
-#${APP_NAME}-config-container { padding: 0 16px; }
+#${APP_NAME}-config-container {
+	padding: 8px 16px 14px;
+	background: linear-gradient(180deg, rgba(20,20,20,.92), rgba(20,20,20,.82));
+	border-radius: 10px;
+}
 #${APP_NAME}-config-container .setting-row {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) auto;
 	gap: 12px;
 	align-items: center;
-	padding: 8px 0;
+	padding: 10px 0;
 	border-bottom: 1px solid rgba(255,255,255,.06);
+}
+#${APP_NAME}-config-container .setting-row:hover {
+	background: rgba(255,255,255,.03);
+	border-radius: 8px;
 }
 #${APP_NAME}-config-container .setting-row-with-icon {
 	display: flex;
@@ -523,7 +541,7 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 			{
 				className: "lyrics-config-button",
 				onClick: open,
-				style: { color: "var(--spice-button)" }
+				style: { color: "var(--lp-fab-icon, var(--spice-button))" }
 			},
 			"⇄"
 		)
@@ -542,7 +560,6 @@ const AdjustmentsMenu = react.memo(({ mode }) => {
 
 		// Mode Specific
 		{ desc: getText("contextMenu.uAutoScroll"), key: "unsynced-auto-scroll", type: ConfigSlider, when: () => mode === UNSYNCED },
-		{ desc: getText("contextMenu.dualGenius"), key: "dual-genius", type: ConfigSlider, when: () => mode === GENIUS },
 	];
 
 	const onChange = (name, value) => {
@@ -581,7 +598,7 @@ const AdjustmentsMenu = react.memo(({ mode }) => {
 			{
 				className: "lyrics-config-button",
 				onClick: open,
-				style: { color: "var(--spice-button)" }
+				style: { color: "var(--lp-fab-icon, var(--spice-button))" }
 			},
 			react.createElement(
 				"svg",

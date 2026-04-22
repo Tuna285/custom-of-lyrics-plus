@@ -93,7 +93,11 @@ const TopBarContent = ({ links, activeLink, lockLink, switchCallback, lockCallba
 };
 
 const TabBarContext = ({ children }) => {
-	return reactDOM.createPortal(
+	const reactDOMRef = getReactDOM();
+	const target = document.querySelector(".main-topBar-topbarContentWrapper");
+	if (!reactDOMRef?.createPortal || !target) return children;
+
+	return reactDOMRef.createPortal(
 		react.createElement(
 			"div",
 			{
@@ -101,7 +105,7 @@ const TabBarContext = ({ children }) => {
 			},
 			children
 		),
-		document.querySelector(".main-topBar-topbarContentWrapper")
+		target
 	);
 };
 

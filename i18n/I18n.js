@@ -1,20 +1,655 @@
 // I18n.js - Localization Helper
 
+// Fallback strings for incomplete language packs.
+window.LANG_UI_OVERRIDES = {
+	ko: {
+		"tabs.general": "일반",
+		"tabs.translation": "번역",
+		"tabs.providers": "제공자",
+		"tabs.background": "배경",
+		"tabs.appearance": "외관",
+		"tabs.advanced": "고급",
+		"sections.displayControls": "표시 및 제어",
+		"sections.syncedOptions": "싱크 가사 옵션",
+		"sections.unsyncedOptions": "비싱크 가사 옵션",
+		"sections.geminiApi": "LLM API",
+		"sections.serviceOrder": "서비스 순서 및 토글",
+		"sections.corsProxy": "CORS 프록시 템플릿",
+		"sections.appearanceButton": "버튼 스타일",
+		"settings.language.label": "언어",
+		"settings.language.desc": "언어를 선택하세요 (완전 적용하려면 Spotify를 다시 실행하세요).",
+		"settings.playbarButton.label": "플레이바 버튼",
+		"settings.playbarButton.desc": "Spotify 가사 버튼을 Lyrics Plus로 교체합니다.",
+		"settings.globalDelay.label": "전체 지연",
+		"settings.globalDelay.desc": "모든 트랙에 적용되는 지연값(ms).",
+		"settings.fontSize.label": "글자 크기",
+		"settings.fontSize.desc": "(또는 메인 앱에서 Ctrl + 마우스 스크롤)",
+		"settings.alignment.label": "정렬",
+		"settings.alignment.options.left": "왼쪽",
+		"settings.alignment.options.center": "가운데",
+		"settings.alignment.options.right": "오른쪽",
+		"settings.fullscreenKey.label": "전체화면 단축키",
+		"settings.linesBefore.label": "컴팩트 싱크: 이전 줄 수",
+		"settings.linesAfter.label": "컴팩트 싱크: 다음 줄 수",
+		"settings.fadeBlur.label": "컴팩트 싱크: 흐림 효과",
+		"settings.unsyncedAutoScroll.label": "비싱크: 자동 스크롤",
+		"settings.unsyncedAutoScroll.desc": "재생 진행에 따라 자동으로 스크롤합니다. 수동 스크롤 시 5초간 일시 정지됩니다.",
+		"settings.apiEndpoint.label": "API 엔드포인트",
+		"settings.modelName.label": "모델 이름",
+		"settings.apiKey.label": "API 키",
+		"settings.apiKey2.label": "API 키 2",
+		"settings.responseMode.label": "응답 형식",
+		"settings.preTranslation.label": "사전 번역",
+		"settings.preTranslationTime.label": "사전 번역 시간",
+		"settings.disableQueue.label": "큐 비활성화 (병렬 요청)",
+		"settings.reasoningEffort.label": "추론 강도",
+		"settings.reasoningEffort.options.off": "끄기",
+		"settings.reasoningEffort.options.low": "낮음",
+		"settings.reasoningEffort.options.medium": "보통",
+		"settings.reasoningEffort.options.high": "높음",
+		"settings.transparentBackground.label": "투명 배경",
+		"settings.noise.label": "노이즈 레이어",
+		"settings.backgroundBrightness.label": "배경 밝기",
+		"settings.videoBackground.label": "비디오 배경",
+		"settings.videoBackgroundScale.label": "비디오 크기",
+		"settings.videoBackgroundDim.label": "비디오 밝기",
+		"settings.debugMode.label": "디버그 모드",
+		"settings.jaDetectThreshold.label": "일본어 감지 임계값",
+		"settings.hansDetectThreshold.label": "중국어 감지 임계값",
+		"settings.musixmatchLanguage.label": "Musixmatch 번역 언어",
+		"settings.clearMemoryCache.label": "메모리 캐시 지우기",
+		"settings.clearMemoryCache.button": "메모리 캐시 지우기",
+		"settings.uiSwitchOnColor.label": "토글 활성 색상",
+		"settings.uiSwitchOnColor.desc": "켜진 원형 토글 버튼의 색상입니다.",
+		"settings.uiSwitchOffColor.label": "토글 비활성 색상",
+		"settings.uiSwitchOffColor.desc": "꺼진 원형 토글 버튼의 색상입니다.",
+		"settings.uiButtonBgColor.label": "모달 버튼 배경",
+		"settings.uiButtonBgColor.desc": "설정/옵션 모달 버튼 배경 색상입니다.",
+		"settings.uiButtonTextColor.label": "모달 버튼 텍스트",
+		"settings.uiButtonTextColor.desc": "설정/옵션 모달 버튼 텍스트와 아이콘 색상입니다.",
+		"settings.uiFabBgColor.label": "퀵 버튼 배경",
+		"settings.uiFabBgColor.desc": "플레이어 우측 하단 퀵 버튼 배경 색상입니다.",
+		"settings.uiFabIconColor.label": "퀵 버튼 아이콘",
+		"settings.uiFabIconColor.desc": "플레이어 우측 하단 퀵 버튼 아이콘 색상입니다.",
+		"buttons.clearCache": "캐시된 가사 지우기",
+		"buttons.noCache": "캐시 없음",
+		"buttons.refreshToken": "토큰 새로고침",
+		"buttons.refreshingToken": "토큰 새로고침 중...",
+		"buttons.tokenRefreshed": "토큰 갱신 완료",
+		"buttons.tooManyAttempts": "시도 횟수 초과",
+		"buttons.failedRefreshToken": "토큰 갱신 실패",
+		"buttons.resetToTheme": "초기화",
+		"contextMenu.adjustments": "조정",
+		"contextMenu.conversions": "변환",
+		"contextMenu.display": "표시",
+		"contextMenu.style": "스타일",
+		"contextMenu.pronoun": "호칭",
+		"contextMenu.langOverride": "언어 강제",
+		"contextMenu.displayMode": "표시 모드",
+		"contextMenu.displayMode2": "표시 모드 2",
+		"contextMenu.fontSize": "글자 크기",
+		"contextMenu.lyricPos": "가사 위치",
+		"contextMenu.trackDelay": "트랙 지연",
+		"contextMenu.preTrans": "사전 번역",
+		"contextMenu.uAutoScroll": "자동 스크롤",
+		"contextMenu.provider": "번역 제공자",
+		"contextMenu.translationDisplay.replace": "원문 대체",
+		"contextMenu.translationDisplay.below": "원문 아래",
+		"contextMenu.language.off": "끄기",
+		"contextMenu.language.zhHans": "중국어(간체)",
+		"contextMenu.language.zhHant": "중국어(번체)",
+		"contextMenu.language.ja": "일본어",
+		"contextMenu.language.ko": "한국어",
+		"contextMenu.modeBase.none": "없음",
+		"contextMenu.geminiModes.romaji": "로마자/병음 (AI)",
+		"contextMenu.geminiModes.vi": "베트남어 (AI)",
+		"contextMenu.styles.smart_adaptive": "스마트 적응형",
+		"contextMenu.styles.poetic_standard": "시적/로맨틱",
+		"contextMenu.styles.youth_story": "청춘/서사",
+		"contextMenu.styles.street_bold": "강렬/스트리트",
+		"contextMenu.styles.vintage_classic": "빈티지/클래식",
+		"contextMenu.styles.literal_study": "직역/학습",
+		"tooltips.adjustments": "조정",
+		"tooltips.conversion": "변환",
+		"tooltips.loadFile": "파일에서 가사 불러오기",
+		"tooltips.openSettings": "설정 열기",
+		"tooltips.videoSettings": "비디오 설정",
+		"tooltips.copy": "복사",
+		"tooltips.viewReasoning": "AI 추론 보기",
+		"videoModal.title": "비디오 배경 설정",
+		"videoModal.inputId": "YouTube 영상 ID 또는 URL:",
+		"videoModal.placeholder": "예: dQw4w9WgXcQ 또는 https://youtube.com/watch?v=...",
+		"videoModal.totalOffset": "전체 오프셋",
+		"videoModal.apply": "적용",
+		"videoModal.reset": "초기화",
+		"videoModal.detectedId": "감지된 ID",
+		"ui.translating": "번역 중...",
+		"ui.providedBy": "{provider} 제공 가사",
+		"ui.reasoningTitle": "AI 추론 과정",
+		"ui.reasoningTabTranslation": "번역",
+		"ui.reasoningTabPhonetic": "발음",
+		"ui.preTranslateChip": "다음: {title}",
+		"modal.title": "Lyrics Plus 설정"
+	},
+	ja: {
+		"tabs.general": "一般",
+		"tabs.translation": "翻訳",
+		"tabs.providers": "プロバイダー",
+		"tabs.background": "背景",
+		"tabs.appearance": "外観",
+		"tabs.advanced": "詳細",
+		"sections.displayControls": "表示と操作",
+		"sections.syncedOptions": "同期歌詞オプション",
+		"sections.unsyncedOptions": "非同期歌詞オプション",
+		"sections.geminiApi": "LLM API",
+		"sections.serviceOrder": "サービス順序とトグル",
+		"sections.corsProxy": "CORS プロキシテンプレート",
+		"sections.appearanceButton": "ボタンスタイル",
+		"settings.language.label": "言語",
+		"settings.language.desc": "表示言語を選択します（完全適用には Spotify 再起動が必要）。",
+		"settings.playbarButton.label": "プレイバー ボタン",
+		"settings.playbarButton.desc": "Spotify の歌詞ボタンを Lyrics Plus に置き換えます。",
+		"settings.globalDelay.label": "全体遅延",
+		"settings.globalDelay.desc": "全トラックに適用する遅延（ms）。",
+		"settings.fontSize.label": "フォントサイズ",
+		"settings.fontSize.desc": "（メインアプリで Ctrl + マウスホイール）",
+		"settings.alignment.label": "配置",
+		"settings.alignment.options.left": "左",
+		"settings.alignment.options.center": "中央",
+		"settings.alignment.options.right": "右",
+		"settings.fullscreenKey.label": "全画面ホットキー",
+		"settings.linesBefore.label": "コンパクト同期: 前の行数",
+		"settings.linesAfter.label": "コンパクト同期: 後の行数",
+		"settings.fadeBlur.label": "コンパクト同期: フェードぼかし",
+		"settings.unsyncedAutoScroll.label": "非同期: 自動スクロール",
+		"settings.unsyncedAutoScroll.desc": "再生進行に合わせて自動スクロールします。手動スクロール時は5秒停止します。",
+		"settings.apiEndpoint.label": "API エンドポイント",
+		"settings.modelName.label": "モデル名",
+		"settings.apiKey.label": "API キー",
+		"settings.apiKey2.label": "API キー 2",
+		"settings.responseMode.label": "応答形式",
+		"settings.preTranslation.label": "先行翻訳",
+		"settings.preTranslationTime.label": "先行翻訳時間",
+		"settings.disableQueue.label": "キュー無効化（並列）",
+		"settings.reasoningEffort.label": "推論強度",
+		"settings.reasoningEffort.options.off": "オフ",
+		"settings.reasoningEffort.options.low": "低",
+		"settings.reasoningEffort.options.medium": "中",
+		"settings.reasoningEffort.options.high": "高",
+		"settings.transparentBackground.label": "透明背景",
+		"settings.noise.label": "ノイズレイヤー",
+		"settings.backgroundBrightness.label": "背景明るさ",
+		"settings.videoBackground.label": "動画背景",
+		"settings.videoBackgroundScale.label": "動画スケール",
+		"settings.videoBackgroundDim.label": "動画明るさ",
+		"settings.debugMode.label": "デバッグモード",
+		"settings.jaDetectThreshold.label": "日本語検出しきい値",
+		"settings.hansDetectThreshold.label": "中国語検出しきい値",
+		"settings.musixmatchLanguage.label": "Musixmatch 翻訳言語",
+		"settings.clearMemoryCache.label": "メモリキャッシュ削除",
+		"settings.clearMemoryCache.button": "メモリキャッシュ削除",
+		"settings.uiSwitchOnColor.label": "トグル有効色",
+		"settings.uiSwitchOnColor.desc": "有効な丸型トグルボタンの色です。",
+		"settings.uiSwitchOffColor.label": "トグル無効色",
+		"settings.uiSwitchOffColor.desc": "無効な丸型トグルボタンの色です。",
+		"settings.uiButtonBgColor.label": "モーダルボタン背景",
+		"settings.uiButtonBgColor.desc": "設定/オプションモーダルのボタン背景色です。",
+		"settings.uiButtonTextColor.label": "モーダルボタン文字",
+		"settings.uiButtonTextColor.desc": "設定/オプションモーダルの文字とアイコン色です。",
+		"settings.uiFabBgColor.label": "クイックボタン背景",
+		"settings.uiFabBgColor.desc": "プレイヤー右下クイックボタンの背景色です。",
+		"settings.uiFabIconColor.label": "クイックボタンアイコン",
+		"settings.uiFabIconColor.desc": "プレイヤー右下クイックボタンのアイコン色です。",
+		"buttons.clearCache": "キャッシュ歌詞を削除",
+		"buttons.noCache": "キャッシュなし",
+		"buttons.refreshToken": "トークン更新",
+		"buttons.refreshingToken": "トークン更新中...",
+		"buttons.tokenRefreshed": "トークン更新完了",
+		"buttons.tooManyAttempts": "試行回数超過",
+		"buttons.failedRefreshToken": "トークン更新失敗",
+		"buttons.resetToTheme": "リセット",
+		"contextMenu.adjustments": "調整",
+		"contextMenu.conversions": "変換",
+		"contextMenu.display": "表示",
+		"contextMenu.style": "スタイル",
+		"contextMenu.pronoun": "代名詞モード",
+		"contextMenu.langOverride": "言語上書き",
+		"contextMenu.displayMode": "表示モード",
+		"contextMenu.displayMode2": "表示モード 2",
+		"contextMenu.fontSize": "フォントサイズ",
+		"contextMenu.lyricPos": "歌詞位置",
+		"contextMenu.trackDelay": "トラック遅延",
+		"contextMenu.preTrans": "先行翻訳",
+		"contextMenu.uAutoScroll": "自動スクロール",
+		"contextMenu.provider": "翻訳プロバイダー",
+		"contextMenu.translationDisplay.replace": "原文置換",
+		"contextMenu.translationDisplay.below": "原文の下",
+		"contextMenu.language.off": "オフ",
+		"contextMenu.language.zhHans": "中国語（簡体）",
+		"contextMenu.language.zhHant": "中国語（繁体）",
+		"contextMenu.language.ja": "日本語",
+		"contextMenu.language.ko": "韓国語",
+		"contextMenu.modeBase.none": "なし",
+		"contextMenu.geminiModes.romaji": "ローマ字/ピンイン (AI)",
+		"contextMenu.geminiModes.vi": "ベトナム語 (AI)",
+		"contextMenu.styles.smart_adaptive": "スマート適応",
+		"contextMenu.styles.poetic_standard": "詩的/ロマン",
+		"contextMenu.styles.youth_story": "青春/ナラティブ",
+		"contextMenu.styles.street_bold": "ストリート/力強い",
+		"contextMenu.styles.vintage_classic": "ヴィンテージ/クラシック",
+		"contextMenu.styles.literal_study": "逐語/学習向け",
+		"tooltips.adjustments": "調整",
+		"tooltips.conversion": "変換",
+		"tooltips.loadFile": "ファイルから歌詞を読み込む",
+		"tooltips.openSettings": "設定を開く",
+		"tooltips.videoSettings": "動画設定",
+		"tooltips.copy": "コピー",
+		"tooltips.viewReasoning": "AI推論を見る",
+		"videoModal.title": "動画背景設定",
+		"videoModal.inputId": "YouTube 動画 ID または URL:",
+		"videoModal.placeholder": "例: dQw4w9WgXcQ または https://youtube.com/watch?v=...",
+		"videoModal.totalOffset": "合計オフセット",
+		"videoModal.apply": "適用",
+		"videoModal.reset": "リセット",
+		"videoModal.detectedId": "検出 ID",
+		"ui.translating": "翻訳中...",
+		"ui.providedBy": "{provider} 提供歌詞",
+		"ui.reasoningTitle": "AI 推論プロセス",
+		"ui.reasoningTabTranslation": "翻訳",
+		"ui.reasoningTabPhonetic": "発音",
+		"ui.preTranslateChip": "次: {title}",
+		"modal.title": "Lyrics Plus 設定"
+	},
+	zh: {
+		"tabs.general": "常规",
+		"tabs.translation": "翻译",
+		"tabs.providers": "提供源",
+		"tabs.background": "背景",
+		"tabs.appearance": "外观",
+		"tabs.advanced": "高级",
+		"sections.displayControls": "显示与控制",
+		"sections.syncedOptions": "同步歌词选项",
+		"sections.unsyncedOptions": "非同步歌词选项",
+		"sections.geminiApi": "LLM API",
+		"sections.serviceOrder": "服务顺序与开关",
+		"sections.corsProxy": "CORS 代理模板",
+		"sections.appearanceButton": "按钮样式",
+		"settings.language.label": "语言",
+		"settings.language.desc": "选择界面语言（完全生效需重启 Spotify）。",
+		"settings.playbarButton.label": "播放栏按钮",
+		"settings.playbarButton.desc": "将 Spotify 歌词按钮替换为 Lyrics Plus。",
+		"settings.globalDelay.label": "全局延迟",
+		"settings.globalDelay.desc": "应用于所有歌曲的偏移（毫秒）。",
+		"settings.fontSize.label": "字体大小",
+		"settings.fontSize.desc": "（也可在主界面按 Ctrl + 鼠标滚轮）",
+		"settings.alignment.label": "对齐",
+		"settings.alignment.options.left": "左",
+		"settings.alignment.options.center": "中",
+		"settings.alignment.options.right": "右",
+		"settings.fullscreenKey.label": "全屏快捷键",
+		"settings.linesBefore.label": "紧凑同步：前置行数",
+		"settings.linesAfter.label": "紧凑同步：后置行数",
+		"settings.fadeBlur.label": "紧凑同步：淡出模糊",
+		"settings.unsyncedAutoScroll.label": "非同步：自动滚动",
+		"settings.unsyncedAutoScroll.desc": "根据歌曲进度自动滚动。手动滚动后暂停 5 秒。",
+		"settings.apiEndpoint.label": "API 端点",
+		"settings.modelName.label": "模型名称",
+		"settings.apiKey.label": "API 密钥",
+		"settings.apiKey2.label": "API 密钥 2",
+		"settings.responseMode.label": "响应格式",
+		"settings.preTranslation.label": "预翻译",
+		"settings.preTranslationTime.label": "预翻译时间",
+		"settings.disableQueue.label": "禁用队列（并行请求）",
+		"settings.reasoningEffort.label": "推理强度",
+		"settings.reasoningEffort.options.off": "关闭",
+		"settings.reasoningEffort.options.low": "低",
+		"settings.reasoningEffort.options.medium": "中",
+		"settings.reasoningEffort.options.high": "高",
+		"settings.transparentBackground.label": "透明背景",
+		"settings.noise.label": "噪点层",
+		"settings.backgroundBrightness.label": "背景亮度",
+		"settings.videoBackground.label": "视频背景",
+		"settings.videoBackgroundScale.label": "视频缩放",
+		"settings.videoBackgroundDim.label": "视频亮度",
+		"settings.debugMode.label": "调试模式",
+		"settings.jaDetectThreshold.label": "日语检测阈值",
+		"settings.hansDetectThreshold.label": "中文检测阈值",
+		"settings.musixmatchLanguage.label": "Musixmatch 翻译语言",
+		"settings.clearMemoryCache.label": "清除内存缓存",
+		"settings.clearMemoryCache.button": "清除内存缓存",
+		"settings.uiSwitchOnColor.label": "开关启用颜色",
+		"settings.uiSwitchOnColor.desc": "启用状态圆形开关按钮的颜色。",
+		"settings.uiSwitchOffColor.label": "开关禁用颜色",
+		"settings.uiSwitchOffColor.desc": "禁用状态圆形开关按钮的颜色。",
+		"settings.uiButtonBgColor.label": "模态按钮背景",
+		"settings.uiButtonBgColor.desc": "设置/选项弹窗按钮背景颜色。",
+		"settings.uiButtonTextColor.label": "模态按钮文字",
+		"settings.uiButtonTextColor.desc": "设置/选项弹窗按钮文字与图标颜色。",
+		"settings.uiFabBgColor.label": "快捷按钮背景",
+		"settings.uiFabBgColor.desc": "播放器右下角快捷按钮背景颜色。",
+		"settings.uiFabIconColor.label": "快捷按钮图标",
+		"settings.uiFabIconColor.desc": "播放器右下角快捷按钮图标颜色。",
+		"buttons.clearCache": "清除缓存歌词",
+		"buttons.noCache": "无缓存",
+		"buttons.refreshToken": "刷新令牌",
+		"buttons.refreshingToken": "正在刷新令牌...",
+		"buttons.tokenRefreshed": "令牌已刷新",
+		"buttons.tooManyAttempts": "尝试次数过多",
+		"buttons.failedRefreshToken": "令牌刷新失败",
+		"buttons.resetToTheme": "重置",
+		"contextMenu.adjustments": "调整",
+		"contextMenu.conversions": "转换",
+		"contextMenu.display": "显示",
+		"contextMenu.style": "风格",
+		"contextMenu.pronoun": "代词模式",
+		"contextMenu.langOverride": "语言覆盖",
+		"contextMenu.displayMode": "显示模式",
+		"contextMenu.displayMode2": "显示模式 2",
+		"contextMenu.fontSize": "字体大小",
+		"contextMenu.lyricPos": "歌词位置",
+		"contextMenu.trackDelay": "歌曲延迟",
+		"contextMenu.preTrans": "预翻译",
+		"contextMenu.uAutoScroll": "自动滚动",
+		"contextMenu.provider": "翻译提供源",
+		"contextMenu.translationDisplay.replace": "替换原文",
+		"contextMenu.translationDisplay.below": "显示在原文下方",
+		"contextMenu.language.off": "关闭",
+		"contextMenu.language.zhHans": "中文（简体）",
+		"contextMenu.language.zhHant": "中文（繁体）",
+		"contextMenu.language.ja": "日语",
+		"contextMenu.language.ko": "韩语",
+		"contextMenu.modeBase.none": "无",
+		"contextMenu.geminiModes.romaji": "罗马字/拼音 (AI)",
+		"contextMenu.geminiModes.vi": "越南语 (AI)",
+		"contextMenu.styles.smart_adaptive": "智能自适应",
+		"contextMenu.styles.poetic_standard": "诗意/浪漫",
+		"contextMenu.styles.youth_story": "青春/叙事",
+		"contextMenu.styles.street_bold": "街头/强烈",
+		"contextMenu.styles.vintage_classic": "复古/经典",
+		"contextMenu.styles.literal_study": "直译/学习",
+		"tooltips.adjustments": "调整",
+		"tooltips.conversion": "转换",
+		"tooltips.loadFile": "从文件加载歌词",
+		"tooltips.openSettings": "打开设置",
+		"tooltips.videoSettings": "视频设置",
+		"tooltips.copy": "复制",
+		"tooltips.viewReasoning": "查看 AI 推理",
+		"videoModal.title": "视频背景设置",
+		"videoModal.inputId": "YouTube 视频 ID 或 URL:",
+		"videoModal.placeholder": "例如: dQw4w9WgXcQ 或 https://youtube.com/watch?v=...",
+		"videoModal.totalOffset": "总偏移",
+		"videoModal.apply": "应用",
+		"videoModal.reset": "重置",
+		"videoModal.detectedId": "检测到的 ID",
+		"ui.translating": "翻译中...",
+		"ui.providedBy": "{provider} 提供歌词",
+		"ui.reasoningTitle": "AI 推理过程",
+		"ui.reasoningTabTranslation": "翻译",
+		"ui.reasoningTabPhonetic": "发音",
+		"ui.preTranslateChip": "下一首: {title}",
+		"modal.title": "Lyrics Plus 设置"
+	},
+	vi: {
+		"tabs.appearance": "Giao diện",
+		"sections.appearanceButton": "Kiểu nút",
+		"settings.uiSwitchOnColor.label": "Màu bật công tắc",
+		"settings.uiSwitchOnColor.desc": "Màu của nút công tắc tròn khi đang bật.",
+		"settings.uiSwitchOffColor.label": "Màu tắt công tắc",
+		"settings.uiSwitchOffColor.desc": "Màu của nút công tắc tròn khi đang tắt.",
+		"settings.uiButtonBgColor.label": "Nền nút modal",
+		"settings.uiButtonBgColor.desc": "Màu nền cho các nút trong modal cài đặt/tùy chọn.",
+		"settings.uiButtonTextColor.label": "Chữ nút modal",
+		"settings.uiButtonTextColor.desc": "Màu chữ và icon cho các nút trong modal cài đặt/tùy chọn.",
+		"settings.uiFabBgColor.label": "Nền nút nhanh",
+		"settings.uiFabBgColor.desc": "Màu nền của các nút thao tác nhanh ở góc dưới phải player.",
+		"settings.uiFabIconColor.label": "Icon nút nhanh",
+		"settings.uiFabIconColor.desc": "Màu icon của các nút thao tác nhanh ở góc dưới phải player."
+	}
+};
+
+// Additional localized descriptions for Settings modal.
+window.LANG_UI_OVERRIDES_DESC = {
+	ko: {
+		"settings.apiEndpoint.desc": "OpenAI 호환 API URL(<code>/v1/chat/completions</code>)을 설정합니다. 프리셋을 선택하거나 직접 URL을 입력하세요.",
+		"settings.modelName.desc": "사용할 LLM 모델 이름입니다. 목록에서 선택하거나 직접 입력할 수 있습니다.",
+		"settings.apiKey.desc": "번역에 사용하는 기본 API 키입니다.",
+		"settings.apiKey2.desc": "발음/로마자 변환용 보조 API 키입니다(선택 사항, 비우면 기본 키 사용).",
+		"settings.responseMode.desc": "'Prompt Engineering'은 모든 모델에서 동작합니다. 'JSON Schema'는 지원 모델에서 더 안정적인 구조화 출력을 제공합니다.",
+		"settings.preTranslation.desc": "곡 재생 전에 다음 곡 가사를 자동으로 미리 번역합니다.",
+		"settings.preTranslationTime.desc": "현재 곡 종료 몇 초 전에 다음 곡 번역을 시작할지 설정합니다.",
+		"settings.disableQueue.desc": "번역 요청을 큐 없이 병렬 처리합니다. 속도는 빨라지지만 제한에 더 빨리 도달할 수 있습니다.",
+		"settings.reasoningEffort.desc": "모델이 답변 전에 얼마나 깊게 추론할지 설정합니다. 낮을수록 빠르고 높을수록 느립니다.",
+		"settings.videoBackground.desc": "YouTube 비디오를 가사와 동기화된 배경으로 표시합니다.",
+		"settings.transparentBackground.desc": "켜면 Spicetify 테마 배경을 사용하고, 끄면 단색 배경을 사용합니다.",
+		"settings.debugMode.desc": "문제 해결을 위해 콘솔에 상세 로그를 출력합니다.",
+		"settings.jaDetectThreshold.desc": "가사에서 일본어로 판정하는 기준값입니다.",
+		"settings.hansDetectThreshold.desc": "중국어 간체/번체를 판정하는 기준값입니다.",
+		"settings.musixmatchLanguage.desc": "Musixmatch 번역에 사용할 대상 언어를 선택합니다.",
+		"settings.clearMemoryCache.desc": "메모리에 저장된 가사 캐시를 즉시 삭제합니다."
+	},
+	ja: {
+		"settings.apiEndpoint.desc": "OpenAI 互換 API URL（<code>/v1/chat/completions</code>）を設定します。プリセットを選ぶか、URL を直接入力してください。",
+		"settings.modelName.desc": "使用する LLM モデル名です。候補から選択するか、任意の名前を入力できます。",
+		"settings.apiKey.desc": "翻訳に使用するメイン API キーです。",
+		"settings.apiKey2.desc": "発音/ローマ字変換用の補助 API キーです（任意、未入力時はメインキーを使用）。",
+		"settings.responseMode.desc": "「Prompt Engineering」は全モデルで動作します。「JSON Schema」は対応モデルでより安定した構造化出力が得られます。",
+		"settings.preTranslation.desc": "曲の再生前に次の歌詞を自動で先行翻訳します。",
+		"settings.preTranslationTime.desc": "現在の曲が終わる何秒前から次の曲の翻訳を開始するか設定します。",
+		"settings.disableQueue.desc": "翻訳リクエストをキューせず並列処理します。高速ですが、レート制限に達しやすくなります。",
+		"settings.reasoningEffort.desc": "回答前の思考量を設定します。低いほど速く、高いほど時間がかかります。",
+		"settings.videoBackground.desc": "YouTube 動画を歌詞と同期した背景として表示します。",
+		"settings.transparentBackground.desc": "オンで Spicetify テーマ背景を使用、オフで単色背景を使用します。",
+		"settings.debugMode.desc": "トラブルシューティング用に詳細なコンソールログを有効化します。",
+		"settings.jaDetectThreshold.desc": "歌詞を日本語として判定するしきい値です。",
+		"settings.hansDetectThreshold.desc": "中国語の簡体/繁体を判定するしきい値です。",
+		"settings.musixmatchLanguage.desc": "Musixmatch 翻訳の対象言語を選択します。",
+		"settings.clearMemoryCache.desc": "メモリ上の歌詞キャッシュを削除します。"
+	},
+	zh: {
+		"settings.apiEndpoint.desc": "设置 OpenAI 兼容 API URL（<code>/v1/chat/completions</code>）。可选择预设或手动输入 URL。",
+		"settings.modelName.desc": "填写要使用的 LLM 模型名称。可从常用模型中选择或手动输入。",
+		"settings.apiKey.desc": "用于翻译的主 API Key。",
+		"settings.apiKey2.desc": "用于发音/罗马字转换的辅助 API Key（可选，留空则使用主 Key）。",
+		"settings.responseMode.desc": "“Prompt Engineering” 适用于所有模型；“JSON Schema” 需模型支持，但结构化输出更稳定。",
+		"settings.preTranslation.desc": "在歌曲开始播放前自动预翻译下一首歌词。",
+		"settings.preTranslationTime.desc": "设置在当前歌曲结束前多少秒开始预翻译下一首。",
+		"settings.disableQueue.desc": "翻译请求不排队，直接并行处理。速度更快，但更容易触发速率限制。",
+		"settings.reasoningEffort.desc": "控制模型回答前的思考强度。越低越快，越高越慢。",
+		"settings.videoBackground.desc": "启用与歌词同步的 YouTube 视频背景。",
+		"settings.transparentBackground.desc": "开启后使用 Spicetify 主题背景，关闭后使用纯色背景。",
+		"settings.debugMode.desc": "为排查问题启用详细控制台日志。",
+		"settings.jaDetectThreshold.desc": "判定歌词为日语的阈值。",
+		"settings.hansDetectThreshold.desc": "判定中文简体/繁体的阈值。",
+		"settings.musixmatchLanguage.desc": "选择 Musixmatch 翻译的目标语言。",
+		"settings.clearMemoryCache.desc": "清除当前保存在内存中的歌词缓存。"
+	}
+};
+
+Object.keys(window.LANG_UI_OVERRIDES_DESC).forEach((code) => {
+	window.LANG_UI_OVERRIDES[code] = Object.assign(
+		{},
+		window.LANG_UI_OVERRIDES[code] || {},
+		window.LANG_UI_OVERRIDES_DESC[code] || {}
+	);
+});
+
+// Missing Advanced CORS descriptions + Provider descriptions.
+window.LANG_UI_OVERRIDES_PROVIDER_AND_CORS = {
+	ko: {
+		"settings.corsProxyDesc": "CORS 제한 우회를 위해 사용합니다. 원하는 프록시 서버 URL로 바꾸세요. <code>{url}</code>이 실제 요청 URL로 치환됩니다.",
+		"settings.corsProxyDefault": "적용 후 Spotify 웹뷰가 다시 로드됩니다. 기본값으로 되돌리려면 비워두세요: <code>https://cors-proxy.spicetify.app/{url}</code>",
+		"providers.local.desc": "이전 Spotify 세션에서 불러온 캐시/로컬 파일의 가사를 제공합니다.",
+		"providers.musixmatch.desc": "Spotify와 완전 호환됩니다. 공식 Musixmatch 앱의 토큰이 필요합니다. 가사 로드가 실패하면 <code>토큰 새로고침</code>으로 갱신하세요. CORS 프록시가 필요할 수 있습니다.",
+		"providers.lrclib.desc": "lrclib.net 가사를 사용합니다. 싱크/비싱크 가사를 모두 지원하며 무료 오픈소스입니다.",
+		"providers.spotify.desc": "Spotify 공식 API에서 가사를 가져옵니다.",
+	},
+	ja: {
+		"settings.corsProxyDesc": "CORS 制限を回避するために使用します。任意のプロキシ URL に置き換えてください。<code>{url}</code> は実際のリクエスト URL に置換されます。",
+		"settings.corsProxyDefault": "適用後に Spotify の WebView が再読み込みされます。既定値に戻すには空欄にしてください: <code>https://cors-proxy.spicetify.app/{url}</code>",
+		"providers.local.desc": "過去の Spotify セッションで取得したキャッシュ/ローカルファイルから歌詞を提供します。",
+		"providers.musixmatch.desc": "Spotify と完全互換です。公式 Musixmatch アプリのトークンが必要です。失敗する場合は <code>トークン更新</code> を実行してください。CORS プロキシが必要な場合があります。",
+		"providers.lrclib.desc": "lrclib.net の歌詞を使用します。同期/非同期の両方に対応し、無料のオープンソースです。",
+		"providers.spotify.desc": "Spotify 公式 API の歌詞を使用します。",
+	},
+	zh: {
+		"settings.corsProxyDesc": "用于绕过 CORS 限制。请替换为你自己的代理服务器 URL。<code>{url}</code> 会被替换为真实请求 URL。",
+		"settings.corsProxyDefault": "应用后 Spotify WebView 会重新加载。留空可恢复默认值：<code>https://cors-proxy.spicetify.app/{url}</code>",
+		"providers.local.desc": "从先前 Spotify 会话加载的缓存/本地文件提供歌词。",
+		"providers.musixmatch.desc": "与 Spotify 完全兼容。需要官方 Musixmatch App 的 token。若加载失败，请点击 <code>刷新令牌</code>。某些环境下可能需要 CORS 代理。",
+		"providers.lrclib.desc": "歌词来源于 lrclib.net，支持同步与非同步歌词，免费且开源。",
+		"providers.spotify.desc": "歌词来源于 Spotify 官方 API。",
+	},
+	vi: {
+		"settings.corsProxyDesc": "Dùng để vượt giới hạn CORS. Hãy thay bằng URL proxy bạn muốn. <code>{url}</code> sẽ được thay bằng URL request thực tế.",
+		"settings.corsProxyDefault": "Sau khi áp dụng, Spotify sẽ tải lại webview. Để về mặc định, hãy để trống: <code>https://cors-proxy.spicetify.app/{url}</code>",
+		"providers.local.desc": "Cung cấp lời bài hát từ cache/tệp cục bộ đã tải ở các phiên Spotify trước.",
+		"providers.musixmatch.desc": "Tương thích đầy đủ với Spotify. Cần token từ ứng dụng Musixmatch chính thức. Nếu lỗi tải lời, hãy bấm <code>Refresh token</code>. Có thể cần CORS proxy.",
+		"providers.lrclib.desc": "Lời bài hát từ lrclib.net. Hỗ trợ cả synced và unsynced, miễn phí và mã nguồn mở.",
+		"providers.spotify.desc": "Lời bài hát từ Spotify API chính thức.",
+	}
+};
+
+Object.keys(window.LANG_UI_OVERRIDES_PROVIDER_AND_CORS).forEach((code) => {
+	window.LANG_UI_OVERRIDES[code] = Object.assign(
+		{},
+		window.LANG_UI_OVERRIDES[code] || {},
+		window.LANG_UI_OVERRIDES_PROVIDER_AND_CORS[code] || {}
+	);
+});
+
+// Appearance accent color + provider input placeholder labels.
+window.LANG_UI_OVERRIDES_ACCENT = {
+	ko: {
+		"settings.uiAccentColor.label": "강조/호버 테두리 색상",
+		"settings.uiAccentColor.desc": "설정 컨트롤의 포커스/호버 테두리와 글로우 색상입니다.",
+		"settings.providerTokenPlaceholder": "제공자 토큰을 입력하세요",
+	},
+	ja: {
+		"settings.uiAccentColor.label": "アクセント/ホバー枠色",
+		"settings.uiAccentColor.desc": "設定コントロールのフォーカス/ホバー枠とグローの色です。",
+		"settings.providerTokenPlaceholder": "プロバイダートークンを入力",
+	},
+	zh: {
+		"settings.uiAccentColor.label": "强调/悬停描边颜色",
+		"settings.uiAccentColor.desc": "设置控件的聚焦/悬停描边与发光颜色。",
+		"settings.providerTokenPlaceholder": "请输入提供方令牌",
+	},
+	vi: {
+		"settings.uiAccentColor.label": "Mau vien nhan/hover",
+		"settings.uiAccentColor.desc": "Mau vien focus/hover va glow cho cac control trong settings.",
+		"settings.providerTokenPlaceholder": "Dan token nha cung cap vao day",
+	}
+};
+
+Object.keys(window.LANG_UI_OVERRIDES_ACCENT).forEach((code) => {
+	window.LANG_UI_OVERRIDES[code] = Object.assign(
+		{},
+		window.LANG_UI_OVERRIDES[code] || {},
+		window.LANG_UI_OVERRIDES_ACCENT[code] || {}
+	);
+});
+
+// Tooltip coverage for all supported UI languages.
+window.LANG_UI_OVERRIDES_TOOLTIPS = {
+	ko: {
+		"tooltips.conversion": "변환",
+		"tooltips.adjustments": "조정",
+		"tooltips.videoSettings": "비디오 설정",
+		"tooltips.cacheLyrics": "가사 캐시 저장",
+		"tooltips.lyricsCached": "가사 캐시됨",
+		"tooltips.loadFile": "파일에서 가사 불러오기",
+		"tooltips.resetCache": "번역 캐시 초기화",
+		"tooltips.openSettings": "설정 열기",
+		"tooltips.preTransNext": "다음 곡 사전 번역 완료",
+		"tooltips.preTranslateChip": "AI가 다음 곡을 백그라운드에서 준비 중입니다",
+		"tooltips.copy": "클립보드에 복사",
+		"tooltips.viewReasoning": "AI 추론 보기"
+	},
+	ja: {
+		"tooltips.conversion": "変換",
+		"tooltips.adjustments": "調整",
+		"tooltips.videoSettings": "動画設定",
+		"tooltips.cacheLyrics": "歌詞をキャッシュ",
+		"tooltips.lyricsCached": "歌詞をキャッシュ済み",
+		"tooltips.loadFile": "ファイルから歌詞を読み込む",
+		"tooltips.resetCache": "翻訳キャッシュをリセット",
+		"tooltips.openSettings": "設定を開く",
+		"tooltips.preTransNext": "次の曲を先行翻訳済み",
+		"tooltips.preTranslateChip": "AIが次の曲をバックグラウンドで準備中です",
+		"tooltips.copy": "クリップボードにコピー",
+		"tooltips.viewReasoning": "AI推論を見る"
+	},
+	zh: {
+		"tooltips.conversion": "转换",
+		"tooltips.adjustments": "调整",
+		"tooltips.videoSettings": "视频设置",
+		"tooltips.cacheLyrics": "缓存歌词",
+		"tooltips.lyricsCached": "歌词已缓存",
+		"tooltips.loadFile": "从文件加载歌词",
+		"tooltips.resetCache": "重置翻译缓存",
+		"tooltips.openSettings": "打开设置",
+		"tooltips.preTransNext": "下一首已预翻译",
+		"tooltips.preTranslateChip": "AI 正在后台准备下一首歌曲",
+		"tooltips.copy": "复制到剪贴板",
+		"tooltips.viewReasoning": "查看 AI 推理"
+	},
+	vi: {
+		"tooltips.conversion": "Chuyen doi",
+		"tooltips.adjustments": "Tinh chinh",
+		"tooltips.videoSettings": "Cai dat video",
+		"tooltips.cacheLyrics": "Luu cache loi bai hat",
+		"tooltips.lyricsCached": "Da luu cache loi bai hat",
+		"tooltips.loadFile": "Tai loi bai hat tu tep",
+		"tooltips.resetCache": "Dat lai cache dich",
+		"tooltips.openSettings": "Mo cai dat",
+		"tooltips.preTransNext": "Bai tiep theo da duoc dich truoc",
+		"tooltips.preTranslateChip": "AI dang chuan bi bai tiep theo o nen",
+		"tooltips.copy": "Sao chep vao clipboard",
+		"tooltips.viewReasoning": "Xem lap luan AI"
+	}
+};
+
+Object.keys(window.LANG_UI_OVERRIDES_TOOLTIPS).forEach((code) => {
+	window.LANG_UI_OVERRIDES[code] = Object.assign(
+		{},
+		window.LANG_UI_OVERRIDES[code] || {},
+		window.LANG_UI_OVERRIDES_TOOLTIPS[code] || {}
+	);
+});
+
 // Get current language object
 window.getCurrentLang = () => {
 	// CONFIG might not be loaded yet, so check localStorage manually first or fall back safely
 	const langCode = CONFIG?.visual?.["ui-language"] || localStorage.getItem("lyrics-plus:visual:ui-language") || "en";
-	return langCode === "vi" ? window.LANG_VI : window.LANG_EN;
+	switch (langCode) {
+		case "vi": return window.LANG_VI;
+		case "ko": return window.LANG_KO;
+		case "ja": return window.LANG_JA;
+		case "zh": return window.LANG_ZH;
+		default:   return window.LANG_EN;
+	}
 };
 
 // Get localized text
-window.getText = (path, replacements = {}) => {
+window.getText = (path, replacements = {}, fallbackValue = null) => {
+	const applyReplacements = (input) => {
+		if (typeof input !== "string" || Object.keys(replacements).length === 0) return input;
+		let out = input;
+		for (const [k, v] of Object.entries(replacements)) {
+			out = out.replace(`{${k}}`, v);
+		}
+		return out;
+	};
+
 	const lang = window.getCurrentLang();
+	const langCode = lang?.meta?.code || "en";
 	const keys = path.split(".");
 	let value = lang;
 	for (const key of keys) {
 		value = value?.[key];
 		if (value === undefined) {
+			const override = window.LANG_UI_OVERRIDES?.[langCode]?.[path];
+			if (override !== undefined) return applyReplacements(override);
 			// Fallback to English if current language is not English
 			if (lang !== window.LANG_EN) {
 				let enValue = window.LANG_EN;
@@ -22,16 +657,11 @@ window.getText = (path, replacements = {}) => {
 					enValue = enValue?.[enKey];
 					if (enValue === undefined) break;
 				}
-				if (enValue !== undefined) return enValue;
+				if (enValue !== undefined) return applyReplacements(enValue);
 			}
-			return path;
+			return applyReplacements(fallbackValue !== null ? fallbackValue : path);
 		}
 	}
 	// Handle replacements like {duration}, {lines}
-	if (typeof value === "string" && Object.keys(replacements).length > 0) {
-		for (const [k, v] of Object.entries(replacements)) {
-			value = value.replace(`{${k}}`, v);
-		}
-	}
-	return value;
+	return applyReplacements(value);
 };
