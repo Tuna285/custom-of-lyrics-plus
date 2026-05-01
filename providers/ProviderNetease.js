@@ -1,32 +1,10 @@
-/**
- * ProviderNetease.js — NetEase Cloud Music (网易云音乐) Lyrics Provider
- *
- * Calls music.163.com DIRECTLY from the Spotify Electron renderer process.
- * Electron does NOT enforce browser CORS policy, so no proxy is needed.
- *
- * Requires a session Cookie from music.163.com (paste in Settings).
- * The cookie is long-lived (months) and only needs occasional refresh.
- *
- * Strategy (Option C):
- *   1. Auto-fetch with fuzzy matching (title+artist+duration scoring).
- *   2. Silent fallback on low-confidence matches.
- *   3. Manual search modal for native-script queries.
- */
-
 const ProviderNetease = (() => {
-
-    // ─── NetEase HTTP Helpers ────────────────────────────────────────────────
-
     const BASE_HEADERS = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         "Referer":    "https://music.163.com",
         "Origin":     "https://music.163.com",
     };
 
-    /**
-     * Search NetEase for songs.
-     * Uses Spicetify.CosmosAsync to bypass browser CORS rules.
-     */
     async function searchSongs(query, limit = 5) {
         const url = `http://music.163.com/api/search/get?s=${encodeURIComponent(query)}&type=1&offset=0&limit=${limit}`;
         const headers = { ...BASE_HEADERS };
@@ -40,9 +18,6 @@ const ProviderNetease = (() => {
         }
     }
 
-    /**
-     * Fetch LRC lyrics for a song ID.
-     */
     async function fetchLyricsById(id) {
         const url = `http://music.163.com/api/song/lyric?id=${id}&lv=1&kv=1&tv=-1`;
         const headers = { ...BASE_HEADERS };
@@ -55,8 +30,6 @@ const ProviderNetease = (() => {
             throw new Error(`NetEase lyric failed: ${e.message}`);
         }
     }
-
-    // ─── Fuzzy Match ─────────────────────────────────────────────────────────
 
     function levenshtein(a, b) {
         const s1 = (a || "").toLowerCase().trim();
@@ -87,8 +60,6 @@ const ProviderNetease = (() => {
 
     const SCORE_THRESHOLD = 0.28;
 
-    // ─── LRC Parser ──────────────────────────────────────────────────────────
-
     function parseLRC(lrcText) {
         if (!lrcText?.trim()) return null;
         if (typeof Utils !== "undefined" && Utils.parseLocalLyrics) {
@@ -114,12 +85,6 @@ const ProviderNetease = (() => {
         return result.length ? result : null;
     }
 
-    // ─── Main Provider ────────────────────────────────────────────────────────
-
-    /**
-     * Auto-find and return lyrics for a track.
-     * @param {TrackInfo} info
-     */
     async function findLyrics(info) {
         const err = (msg) => ({ error: msg, uri: info.uri });
 
@@ -169,12 +134,6 @@ const ProviderNetease = (() => {
         }
     }
 
-    // ─── Manual Search Modal ─────────────────────────────────────────────────
-
-    /**
-     * Opens a popup for manual NetEase search.
-     * @param {function(object)} onFound — called with the lyrics result
-     */
     function openManualSearchModal(onFound) {
         const react  = Spicetify.React;
         const track  = Spicetify.Player.data?.item;
