@@ -107,13 +107,13 @@ const CONFIG = {
         "active-color": ConfigUtils.getPersisted("lyrics-plus:visual:active-color") || "var(--spice-text)",
         "inactive-color": ConfigUtils.getPersisted("lyrics-plus:visual:inactive-color") || "rgba(var(--spice-rgb-subtext),0.5)",
         "highlight-color": ConfigUtils.getPersisted("lyrics-plus:visual:highlight-color") || "var(--spice-button)",
-        "ui-switch-on-color": ConfigUtils.getPersisted("lyrics-plus:visual:ui-switch-on-color") || "#1ed760",
-        "ui-switch-off-color": ConfigUtils.getPersisted("lyrics-plus:visual:ui-switch-off-color") || "rgba(255,255,255,0.16)",
-        "ui-button-bg-color": ConfigUtils.getPersisted("lyrics-plus:visual:ui-button-bg-color") || "rgba(255,255,255,0.08)",
-        "ui-button-text-color": ConfigUtils.getPersisted("lyrics-plus:visual:ui-button-text-color") || "#ffffff",
-        "ui-fab-bg-color": ConfigUtils.getPersisted("lyrics-plus:visual:ui-fab-bg-color") || "rgba(20,20,20,0.72)",
-        "ui-fab-icon-color": ConfigUtils.getPersisted("lyrics-plus:visual:ui-fab-icon-color") || "#1ed760",
-        "ui-accent-color": ConfigUtils.getPersisted("lyrics-plus:visual:ui-accent-color") || "#1ed760",
+        "ui-switch-on-color": ConfigUtils.getPersisted("lyrics-plus:visual:ui-switch-on-color") || "",
+        "ui-switch-off-color": ConfigUtils.getPersisted("lyrics-plus:visual:ui-switch-off-color") || "",
+        "ui-button-bg-color": ConfigUtils.getPersisted("lyrics-plus:visual:ui-button-bg-color") || "",
+        "ui-button-text-color": ConfigUtils.getPersisted("lyrics-plus:visual:ui-button-text-color") || "",
+        "ui-fab-bg-color": ConfigUtils.getPersisted("lyrics-plus:visual:ui-fab-bg-color") || "",
+        "ui-fab-icon-color": ConfigUtils.getPersisted("lyrics-plus:visual:ui-fab-icon-color") || "",
+        "ui-accent-color": ConfigUtils.getPersisted("lyrics-plus:visual:ui-accent-color") || "",
         alignment: ConfigUtils.getPersisted("lyrics-plus:visual:alignment") || "center",
         "lines-before": ConfigUtils.getPersisted("lyrics-plus:visual:lines-before") || "0",
         "lines-after": ConfigUtils.getPersisted("lyrics-plus:visual:lines-after") || "2",
@@ -136,7 +136,7 @@ const CONFIG = {
         "gemini-api-key-romaji": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key-romaji") || "",
         "gemini:endpoint": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:endpoint") || "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
         "gemini:model": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:model") || "gemma-4-26b-a4b-it",
-        "gemini:response-mode": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:response-mode") || "prompt",
+        "gemini:response-mode": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:response-mode") || "json_schema",
         // Reasoning effort: "off" | "low" | "medium" | "high"
         // Migration from legacy boolean `gemini:disable-thinking`:
         //   true  → "off"       (preserve explicit opt-out)
@@ -156,7 +156,6 @@ const CONFIG = {
         "pre-translation-time": ConfigUtils.getPersisted("lyrics-plus:visual:pre-translation-time") || "30",
         "global-delay": Number(ConfigUtils.getPersisted("lyrics-plus:visual:global-delay")) || 0,
         delay: 0,
-        "netease-worker-url": ConfigUtils.getPersisted("lyrics-plus:visual:netease-worker-url") || "https://netease-worker.tuan4651050308.workers.dev",
         "video-background": ConfigUtils.get("lyrics-plus:visual:video-background", false),
         "video-background-server": localStorage.getItem("lyrics-plus:visual:video-background-server") || "http://localhost:8000",
         "video-background-blur": Number(localStorage.getItem("lyrics-plus:visual:video-background-blur")) || 0,
@@ -187,6 +186,12 @@ const CONFIG = {
             desc: "Provide lyrics from cache/local files loaded from previous Spotify sessions.",
             modes: [SYNCED, UNSYNCED],
         },
+        netease: {
+            on: ConfigUtils.get("lyrics-plus:provider:netease:on"),
+            desc: "Lyrics sourced from NetEase Cloud Music (网易云音乐). Excellent coverage for indie JP/KR/CN artists. Requires a session Cookie from music.163.com to be pasted below.",
+            token: localStorage.getItem("lyrics-plus:provider:netease:token") || "",
+            modes: [SYNCED, UNSYNCED],
+        },
     },
     providersOrder: localStorage.getItem("lyrics-plus:services-order"),
     modes: ["synced", "unsynced"],
@@ -199,11 +204,31 @@ CONFIG.visual["video-background-dim"] = Number.parseInt(CONFIG.visual["video-bac
 
 try {
     CONFIG.providersOrder = JSON.parse(CONFIG.providersOrder);
-    if (!Array.isArray(CONFIG.providersOrder) || Object.keys(CONFIG.providers).length !== CONFIG.providersOrder.length) {
-        throw "";
+    if (!Array.isArray(CONFIG.providersOrder)) throw "";
+
+    // Migration for existing users: Ensure netease is at 3rd position and turned ON
+    if (!CONFIG.providersOrder.includes("netease")) {
+        CONFIG.providersOrder.splice(2, 0, "netease");
+        CONFIG.providers.netease.on = true;
+        localStorage.setItem("lyrics-plus:provider:netease:on", "true");
+        localStorage.setItem("lyrics-plus:services-order", JSON.stringify(CONFIG.providersOrder));
+    }
+
+    // Catch any other missing providers
+    const missing = Object.keys(CONFIG.providers).filter(p => !CONFIG.providersOrder.includes(p));
+    if (missing.length > 0) {
+        CONFIG.providersOrder.push(...missing);
+        localStorage.setItem("lyrics-plus:services-order", JSON.stringify(CONFIG.providersOrder));
     }
 } catch {
-    CONFIG.providersOrder = Object.keys(CONFIG.providers);
+    // Default order for new users
+    CONFIG.providersOrder = ["spotify", "musixmatch", "netease", "lrclib", "local"];
+    
+    // Ensure all providers are turned ON by default for new users
+    Object.keys(CONFIG.providers).forEach(p => {
+        CONFIG.providers[p].on = true;
+        localStorage.setItem(`lyrics-plus:provider:${p}:on`, "true");
+    });
     localStorage.setItem("lyrics-plus:services-order", JSON.stringify(CONFIG.providersOrder));
 }
 
@@ -225,7 +250,6 @@ const emptyState = {
     genius2: null,
     currentLyrics: null,
     visualizerGranularity: "medium", // low, medium, high
-    neteaseWorkerUrl: "https://netease-worker.tuan4651050308.workers.dev",
     preTranslated: false,
 };
 

@@ -284,6 +284,13 @@ window.LANG_VI = {
     "copy": "Sao chép",
     "viewReasoning": "Xem quá trình suy nghĩ"
   },
+  "providers": {
+    "local": { "name": "local", "desc": "Cung cấp lời bài hát từ cache/tệp cục bộ đã tải ở các phiên Spotify trước." },
+    "musixmatch": { "name": "musixmatch", "desc": "Tương thích đầy đủ với Spotify. Cần token từ ứng dụng Musixmatch chính thức. Nếu lỗi tải lời, hãy bấm <code>Refresh token</code>. Có thể cần CORS proxy." },
+    "lrclib": { "name": "lrclib", "desc": "Lời bài hát từ lrclib.net. Hỗ trợ cả synced và unsynced, miễn phí và mã nguồn mở." },
+    "spotify": { "name": "spotify", "desc": "Lời bài hát từ Spotify API chính thức." },
+    "netease": { "name": "NetEase", "desc": "Lời bài hát từ NetEase Cloud Music. Phủ sóng tốt cho các nghệ sĩ Indie JP/KR/CN. Yêu cầu Cookie phiên bản web (music.163.com)." }
+  },
   "videoModal": {
     "title": "Cài đặt Video Background",
     "topVideos": "Top Video Phù hợp",

@@ -16,12 +16,18 @@ const LRCParser = {
         // Remove metadata tags [ti:...] [ar:...]
         const rawLines = lyrics.replaceAll(/\[[a-zA-Z]+:.+\]/g, "").trim();
         // Handle newlines for both Windows (\r\n) and Unix (\n), remove empty lines
-        const lines = rawLines.replace(/\r\n/g, "\n").split("\n").map(line => line.trim()).filter(line => line !== "");
+        const lines = rawLines.replace(/\r\n/g, "\n").split("\n").map(line => line.trim()).filter(line => {
+            if (!line) return false;
+            // Remove metadata lines (credits/composer etc.)
+            const textOnly = line.replace(/\[[^\]]+\]/g, "").trim();
+            const isMetadata = /^(作词|作曲|编曲|演唱|制作|人声|后期|混音|母带|作詞|作曲|編曲|歌詞|Lyricist|Composer|Arranger|Producer|Lyrics|Vocals|Mixer|Mastering|Lời|Nhạc|Phối khí|Trình bày|Sáng tác)\s*[:：]/i.test(textOnly);
+            return !isMetadata;
+        });
 
         console.log(`[Lyrics+] Found ${lines.length} non-empty lines`);
 
         const syncedTimestamp = /\[([0-9:.]+)\]/;
-        const karaokeTimestamp = /<([0-9:.]+)>/;
+        const karaokeTimestamp = /<([0-9:.]+)> /;
         const unsynced = [];
 
         const isSynced = lines.some(line => syncedTimestamp.test(line));
@@ -29,10 +35,21 @@ const LRCParser = {
         const isKaraoke = lines.some(line => karaokeTimestamp.test(line));
         const karaoke = isKaraoke ? [] : null;
 
+        // Shared regex for cleaning timestamps from text
+        const TIMESTAMP_CLEAN_RE = /\[\d{1,3}:\d{1,3}[:.]\d+\]/g;
+
         function timestampToMs(timestamp) {
             // Normalize timestamp by removing [], <>
-            const parts = timestamp.replace(/[\[\]<>]/g, "").split(":");
-            return parts.length === 2 ? Number(parts[0]) * 60 * 1000 + Number(parts[1]) * 1000 : 0;
+            const parts = timestamp.replace(/[\[\]<>]/g, "").split(/[:\.]/);
+            if (parts.length >= 3) {
+                // LRC standard is usually mm:ss.xx (3 parts after split: [mm, ss, xx])
+                // Some providers use [mm:ss:xx] (also 3 parts)
+                return (Number(parts[0]) * 60 + Number(parts[1])) * 1000 + Number(parts[2].padEnd(3, "0").slice(0, 3));
+            }
+            if (parts.length === 2) {
+                return Number(parts[0]) * 60 * 1000 + Number(parts[1]) * 1000;
+            }
+            return 0;
         }
 
         function parseKaraokeLine(line, startTime) {
@@ -52,8 +69,8 @@ const LRCParser = {
         for (const [i, line] of lines.entries()) {
             const timeMatch = line.match(syncedTimestamp);
             const time = timeMatch?.[1];
-            // Use global regex to remove ALL timestamps from the text content
-            let lyricContent = line.replace(/\[\d{1,3}:\d{1,3}(\.\d+)?\]/g, "").trim();
+            // Use shared regex to remove ALL timestamps from the text content
+            let lyricContent = line.replace(TIMESTAMP_CLEAN_RE, "").trim();
             const lyric = lyricContent.replaceAll(/<([0-9:.]+)>/g, "").trim();
 
             if (isSynced && time) {

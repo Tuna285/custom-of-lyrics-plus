@@ -233,7 +233,8 @@ window.LANG_EN = {
     "local": { "name": "local", "desc": "Provide lyrics from cache/local files loaded from previous Spotify sessions." },
     "musixmatch": { "name": "musixmatch", "desc": "Fully compatible with Spotify. Requires a token from the official Musixmatch app. If lyrics fail to load, refresh the token via the <code>Refresh Token</code> button. A CORS proxy may be required." },
     "lrclib": { "name": "lrclib", "desc": "Lyrics sourced from lrclib.net. Supports both synced and unsynced lyrics. Free and open-source." },
-    "spotify": { "name": "spotify", "desc": "Lyrics sourced from the official Spotify API." }
+    "spotify": { "name": "spotify", "desc": "Lyrics sourced from the official Spotify API." },
+    "netease": { "name": "NetEase", "desc": "Lyrics sourced from NetEase Cloud Music. Excellent coverage for indie JP/KR/CN artists. Requires a session Cookie from music.163.com." }
   },
   "notifications": {
     "translatedIn": "Translated in {duration}",

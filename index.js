@@ -2417,12 +2417,13 @@ infoFromTrack(track) {
 		"--animation-tempo": this.state.tempo,
 		"--video-blur": `${CONFIG.visual["video-background-blur"]}px`,
 		"--video-dim": `${CONFIG.visual["video-background-dim"]}%`,
-		"--lp-ui-switch-on": CONFIG.visual["ui-switch-on-color"],
-		"--lp-ui-switch-off": CONFIG.visual["ui-switch-off-color"],
-		"--lp-ui-btn-bg": CONFIG.visual["ui-button-bg-color"],
-		"--lp-ui-btn-text": CONFIG.visual["ui-button-text-color"],
-		"--lp-fab-bg": CONFIG.visual["ui-fab-bg-color"],
-		"--lp-fab-icon": CONFIG.visual["ui-fab-icon-color"],
+		"--lp-ui-switch-on": CONFIG.visual["ui-switch-on-color"] || "var(--spice-button)",
+		"--lp-ui-switch-off": CONFIG.visual["ui-switch-off-color"] || "rgba(var(--spice-rgb-subtext), 0.2)",
+		"--lp-ui-btn-bg": CONFIG.visual["ui-button-bg-color"] || "var(--spice-button-disabled, rgba(255,255,255,0.08))",
+		"--lp-ui-btn-text": CONFIG.visual["ui-button-text-color"] || "var(--spice-text)",
+		"--lp-fab-bg": CONFIG.visual["ui-fab-bg-color"] || "rgba(var(--spice-rgb-main, 20, 20, 20), 0.72)",
+		"--lp-fab-icon": CONFIG.visual["ui-fab-icon-color"] || "var(--spice-button)",
+		"--lp-ui-accent": CONFIG.visual["ui-accent-color"] || "var(--spice-button)",
 	};
 
 	if (CONFIG.visual["video-background"]) {
@@ -2689,6 +2690,43 @@ infoFromTrack(track) {
 					currentLang: CONFIG.visual["ui-language"]
 				}),
 				react.createElement(AdjustmentsMenu, { mode, currentLang: CONFIG.visual["ui-language"] }),
+				// NetEase Manual Search Button
+				react.createElement(
+					Spicetify.ReactComponent.TooltipWrapper,
+					{ label: "Tìm Lyrics trên NetEase" },
+					react.createElement("button", {
+						className: "lyrics-config-button",
+						onClick: () => {
+							if (typeof ProviderNetease !== "undefined") {
+								ProviderNetease.openManualSearchModal((result) => {
+									// Force re-processing by invalidating previous state
+									this.lastProcessedUri = null;
+									this.lastProcessedMode = null;
+									if (this._dmResults) delete this._dmResults[result.uri];
+
+									this.setState({
+										provider: result.provider,
+										copyright: result.copyright,
+										synced: result.synced,
+										unsynced: result.unsynced,
+										neteaseTranslation: result.neteaseTranslation,
+										isLoading: false,
+										error: null
+									}, () => {
+										// Persist selection to cache so it doesn't revert on reload
+										if (typeof CacheManager !== "undefined") {
+											CacheManager.set(result.uri, {
+												...result,
+												isCached: true
+											});
+										}
+									});
+								});
+							}
+						},
+						style: { color: "var(--lp-fab-icon, var(--spice-button))", fontWeight: "bold", fontSize: "16px", transform: "translateY(-1px)" }
+					}, "N")
+				),
 				// Video Background Settings Button
 				CONFIG.visual["video-background"] && react.createElement(
 					Spicetify.ReactComponent.TooltipWrapper,

@@ -79,6 +79,7 @@ $filesToDownload = @(
     "components/Components.js",
     "providers/ProviderLRCLIB.js",
     "providers/ProviderMusixmatch.js",
+    "providers/ProviderNetease.js",
     "providers/Providers.js",
     "components/SyncedLyrics.js",
     "components/UnsyncedLyrics.js",

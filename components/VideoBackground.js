@@ -5,6 +5,10 @@ const VideoBackground = ({ trackUri, brightness, blurAmount, scale, videoInfo })
     const [isPlayerReady, setIsPlayerReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(Spicetify.Player.isPlaying());
     const [isAdPlaying, setIsAdPlaying] = useState(false); // Hide video during ads
+    const [hasStartedPlaying, setHasStartedPlaying] = useState(false); // Hide UI flash
+    const [isUIFlashing, setIsUIFlashing] = useState(false); // Hide video when resuming from background tab
+    const hasStartedPlayingRef = useRef(false);
+    const uiFlashTimeoutRef = useRef(null);
     const containerRef = useRef(null);
     const playerRef = useRef(null);
     const lastSeekAttemptRef = useRef({ time: 0, attempts: 0 });
@@ -47,6 +51,8 @@ const VideoBackground = ({ trackUri, brightness, blurAmount, scale, videoInfo })
         // Note: Player destruction is handled by videoInfo change effect.
         // We only reset auxiliary state here to prevent black screen on lyrics load.
         setIsAdPlaying(false);
+        setHasStartedPlaying(false);
+        hasStartedPlayingRef.current = false;
     }, [trackUri]);
 
     // Initialize Player when videoInfo is available
@@ -95,8 +101,7 @@ const VideoBackground = ({ trackUri, brightness, blurAmount, scale, videoInfo })
                     iv_load_policy: 3,
                     modestbranding: 1,
                     mute: 1,
-                    playlist: videoInfo.video_id,
-                    loop: 1,
+                    playsinline: 1,
                     origin: window.location.origin,
                     adformat: "0_0",
                     suppress_ads: 1,
@@ -115,6 +120,27 @@ const VideoBackground = ({ trackUri, brightness, blurAmount, scale, videoInfo })
                     onStateChange: (event) => {
                         const state = event.data;
                         const player = event.target;
+                        
+                        if (state === 2 && Spicetify.Player.isPlaying()) {
+                            // Chromium suspended the iframe while Spotify is still playing
+                            setIsUIFlashing(true);
+                            if (uiFlashTimeoutRef.current) clearTimeout(uiFlashTimeoutRef.current);
+                        }
+
+                        if (state === 1) {
+                            if (uiFlashTimeoutRef.current) clearTimeout(uiFlashTimeoutRef.current);
+                            uiFlashTimeoutRef.current = setTimeout(() => {
+                                setIsUIFlashing(false);
+                            }, 400); // Wait for YouTube play button animation to finish fading
+                            setHasStartedPlaying(true);
+                            hasStartedPlayingRef.current = true;
+                        }
+
+                        // Manual loop (since we removed playlist/loop to hide UI controls)
+                        if (state === 0) {
+                            player.seekTo(0);
+                            player.playVideo();
+                        }
                         
                         // Detect ads via states or getAdState
                         const isAd = [105, 106, 107, 108, 109, 110, 111].includes(state) || 
@@ -142,6 +168,7 @@ const VideoBackground = ({ trackUri, brightness, blurAmount, scale, videoInfo })
         initPlayer();
 
         return () => {
+            if (uiFlashTimeoutRef.current) clearTimeout(uiFlashTimeoutRef.current);
             if (playerRef.current) {
                 try { playerRef.current.destroy(); } catch (e) {}
                 playerRef.current = null;
@@ -162,9 +189,13 @@ const VideoBackground = ({ trackUri, brightness, blurAmount, scale, videoInfo })
             // Pause/Play sync
             if (!spotifyIsPlaying) {
                 if (player.getPlayerState() === 1) {
-                    player.pauseVideo();
+                    if (hasStartedPlayingRef.current) {
+                        player.pauseVideo();
+                    }
+                } else if (!hasStartedPlayingRef.current) {
+                    player.playVideo(); // Force play to bypass YouTube UI
                 }
-                return;
+                if (hasStartedPlayingRef.current) return;
             } else {
                 if (player.getPlayerState() !== 1) {
                     player.playVideo();
@@ -317,7 +348,7 @@ const VideoBackground = ({ trackUri, brightness, blurAmount, scale, videoInfo })
             }
         }),
         // Loading indicator
-        !isPlayerReady && videoInfo && Spicetify.React.createElement(LoadingIndicator),
+        (!isPlayerReady || !hasStartedPlaying || isUIFlashing) && videoInfo && Spicetify.React.createElement(LoadingIndicator),
         // Video container - hide during ads
         Spicetify.React.createElement("div", {
             ref: containerRef,
@@ -330,7 +361,7 @@ const VideoBackground = ({ trackUri, brightness, blurAmount, scale, videoInfo })
                 minWidth: "100%",
                 minHeight: "100%",
                 transform: `translate(-50%, -50%) scale(${scale || (blurValue ? 1.05 : 1)})`,
-                opacity: isPlayerReady && !isAdPlaying ? 1 : 0, // Keep visible when paused, hide during ads
+                opacity: isPlayerReady && hasStartedPlaying && !isAdPlaying && !isUIFlashing ? 1 : 0, // Hide during ads and UI flashes
                 transition: "opacity 0.5s ease",
                 pointerEvents: "none",
                 filter: blurValue ? `blur(${blurValue}px)` : "none",

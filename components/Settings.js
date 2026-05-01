@@ -17,13 +17,13 @@ const SwapButton = ({ icon, disabled, onClick }) => {
 };
 
 const UI_COLOR_DEFAULTS = {
-	"ui-switch-on-color": "#1ed760",
-	"ui-switch-off-color": "rgba(255,255,255,0.16)",
-	"ui-button-bg-color": "rgba(255,255,255,0.08)",
-	"ui-button-text-color": "#ffffff",
-	"ui-fab-bg-color": "rgba(20,20,20,0.72)",
-	"ui-fab-icon-color": "#1ed760",
-	"ui-accent-color": "#1ed760",
+	"ui-switch-on-color": "",
+	"ui-switch-off-color": "",
+	"ui-button-bg-color": "",
+	"ui-button-text-color": "",
+	"ui-fab-bg-color": "",
+	"ui-fab-icon-color": "",
+	"ui-accent-color": "",
 };
 
 const CacheButton = () => {
@@ -298,7 +298,7 @@ const ConfigRange = ({ name, defaultValue, min = 0, max = 100, step = 5, onChang
 	);
 };
 
-const ConfigColor = ({ name, defaultValue, onChange = () => { }, resetValue = "#ffffff" }) => {
+const ConfigColor = ({ name, defaultValue, onChange = () => { }, resetValue = "" }) => {
 	const [value, setValue] = useState(defaultValue || resetValue);
 	const debounceRef = react.useRef(null);
 	const pendingValueRef = react.useRef(null);
@@ -358,7 +358,7 @@ const ConfigColor = ({ name, defaultValue, onChange = () => { }, resetValue = "#
 	return react.createElement("div", { className: "setting-row" },
 		react.createElement("label", { className: "col description" }, name),
 		react.createElement("div", { className: "col action lp-color-action" },
-			react.createElement("input", { type: "color", value, onChange: handleColorChange, onBlur: handleCommit, className: "lp-color-swatch" }),
+			react.createElement("input", { type: "color", value: value || "#000000", onChange: handleColorChange, onBlur: handleCommit, className: "lp-color-swatch" }),
 			react.createElement("button", { className: "btn lp-color-reset-btn", onClick: handleReset }, getText("buttons.resetToTheme"))
 		)
 	);
@@ -654,6 +654,7 @@ const ConfigHelper = () => {
 				{ desc: getText("settings.videoBackground.label"), key: "video-background", type: ConfigSlider, info: getText("settings.videoBackground.desc") },
 				{ desc: getText("settings.videoBackgroundScale.label"), key: "video-background-scale", type: ConfigAdjust, min: 1, max: 2, step: 0.1, defaultValue: 1.1 },
 				{ desc: getText("settings.videoBackgroundDim.label"), key: "video-background-dim", type: ConfigAdjust, min: 0, max: 100, step: 10, defaultValue: 50 },
+				{ desc: getText("settings.videoBackgroundBlur.label") || "Độ mờ Video", key: "video-background-blur", type: ConfigAdjust, min: 0, max: 80, step: 2, defaultValue: 0 },
 				{ desc: getText("settings.transparentBackground.label"), key: "transparent-background", type: ConfigSlider, info: getText("settings.transparentBackground.desc") },
 				{ desc: getText("settings.noise.label"), key: "noise", type: ConfigSlider },
 				{ desc: getText("settings.backgroundBrightness.label"), key: "background-brightness", type: ConfigAdjust, min: 0, max: 100, step: 10 },
@@ -716,13 +717,13 @@ function openConfig() {
 		{
 			id: `${APP_NAME}-config-container`,
 			style: {
-				"--lp-ui-switch-on": CONFIG.visual["ui-switch-on-color"] || UI_COLOR_DEFAULTS["ui-switch-on-color"],
-				"--lp-ui-switch-off": CONFIG.visual["ui-switch-off-color"] || UI_COLOR_DEFAULTS["ui-switch-off-color"],
-				"--lp-ui-btn-bg": CONFIG.visual["ui-button-bg-color"] || UI_COLOR_DEFAULTS["ui-button-bg-color"],
-				"--lp-ui-btn-text": CONFIG.visual["ui-button-text-color"] || UI_COLOR_DEFAULTS["ui-button-text-color"],
-				"--lp-fab-bg": CONFIG.visual["ui-fab-bg-color"] || UI_COLOR_DEFAULTS["ui-fab-bg-color"],
-				"--lp-fab-icon": CONFIG.visual["ui-fab-icon-color"] || UI_COLOR_DEFAULTS["ui-fab-icon-color"],
-				"--lp-ui-accent": CONFIG.visual["ui-accent-color"] || UI_COLOR_DEFAULTS["ui-accent-color"],
+				"--lp-ui-switch-on": CONFIG.visual["ui-switch-on-color"] || "var(--spice-button)",
+				"--lp-ui-switch-off": CONFIG.visual["ui-switch-off-color"] || "rgba(var(--spice-rgb-subtext), 0.2)",
+				"--lp-ui-btn-bg": CONFIG.visual["ui-button-bg-color"] || "var(--spice-button-disabled, rgba(255,255,255,0.08))",
+				"--lp-ui-btn-text": CONFIG.visual["ui-button-text-color"] || "var(--spice-text)",
+				"--lp-fab-bg": CONFIG.visual["ui-fab-bg-color"] || "rgba(var(--spice-rgb-main, 20, 20, 20), 0.72)",
+				"--lp-fab-icon": CONFIG.visual["ui-fab-icon-color"] || "var(--spice-button)",
+				"--lp-ui-accent": CONFIG.visual["ui-accent-color"] || "var(--spice-button)",
 			}
 		},
 		react.createElement("style", {

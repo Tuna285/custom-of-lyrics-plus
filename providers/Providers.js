@@ -145,7 +145,17 @@ const Providers = {
 
 		return result;
 	},
+	netease: async (info) => {
+		try {
+			const data = await ProviderNetease.findLyrics(info);
+			if (data.error) return { error: data.error, uri: info.uri };
+			return data;
+		} catch (e) {
+			return { error: `NetEase: ${e.message}`, uri: info.uri };
+		}
+	},
 };
 
 // Expose to global scope
 window.Providers = Providers;
+

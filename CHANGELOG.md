@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-05-01
+
+### Added
+
+- **NetEase Cloud Music Provider** — Integrated as a high-quality synced lyrics source. Supports automatic matching and manual search via popup modal. Supports internal NetEase translations (`tlyric`).
+- **Video Background Blur** — New slider in Settings → Appearance to adjust background blur intensity for better lyric readability.
+
+### Changed
+
+- **Theme Consistency** — Removed all hardcoded hex colors (`#1ed760`, etc.). UI elements (buttons, highlights) now dynamically inherit from the active Spicetify theme variables (`--spice-button`, `--spice-text`, etc.).
+- **LRC Parser Upgrade** — Enhanced robustness to handle NetEase's non-standard timestamp formats (e.g., `[mm:ss:xx]`) and unified timestamp removal to prevent display artifacts.
+
+### Fixed
+
+- **Metadata Decluttering** — Automatically detects and removes artist credit lines (Composer, Lyricist, etc.) from NetEase lyrics to provide a cleaner listening experience.
+- **Manual Search Persistence** — Fixed an issue where manually selected lyrics wouldn't apply or survive re-renders. Manual selections are now persisted in the IDB cache.
+
 ## [1.5.0] - 2026-04-21
 
 ### Added
