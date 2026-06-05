@@ -174,7 +174,7 @@ openVideoSettingsModal() {
 				setSearchLoading(true);
 				try {
 					const query = `${info.artist} - ${info.title}`;
-					const results = await VideoManager.searchMultipleVideos(query, info.uri);
+					const results = await VideoManager.searchMultipleVideos(query, info.uri, info);
 					if (isMounted) {
 						setSearchResults(results);
 					}

@@ -53,6 +53,97 @@ const VideoManager = {
     },
 
     /**
+     * Score search result video by comparing duration and title metadata.
+     * @private
+     */
+    _scoreVideo(video, artist, title, targetDurationSec) {
+        let score = 0;
+        const videoTitle = (video.title || "").toLowerCase();
+        const videoAuthor = (video.author || "").toLowerCase();
+        const cleanArtist = (artist || "").toLowerCase();
+        const cleanTitle = (title || "").toLowerCase();
+
+        // 1. Duration Matching (Huge Boost)
+        if (targetDurationSec > 0 && video.lengthSeconds > 0) {
+            const diff = Math.abs(video.lengthSeconds - targetDurationSec);
+            if (diff <= 6) {
+                score += 150; // Perfect match
+            } else if (diff <= 12) {
+                score += 100; // Close match
+            } else if (diff <= 25) {
+                score += 40;  // Marginal match
+            } else if (diff > 90) {
+                score -= 80;  // Too short (anime cut) or too long (1 hour loop)
+            }
+        }
+
+        // 2. Keyword Matching (Title & Author)
+        if (cleanArtist) {
+            // Split multiple artists
+            const artistParts = cleanArtist.split(/,|\s+feat\.?\s+|&/gi).map(a => a.trim()).filter(Boolean);
+            let artistMatched = false;
+            for (const part of artistParts) {
+                if (part.length > 2 && (videoTitle.includes(part) || videoAuthor.includes(part))) {
+                    score += 50;
+                    artistMatched = true;
+                    break;
+                }
+            }
+            
+            // Handle Japanese/Romaji artist names mappings
+            if (!artistMatched) {
+                const mappings = {
+                    "yorushika": ["ヨルシカ"],
+                    "radwimps": ["ラッドウィンプS", "ラッドウィンプス"],
+                    "lisa": ["リサ"],
+                    "yoasobi": ["ヨアソビ"],
+                    "kanda": ["神田"],
+                    "utada hikaru": ["宇多田ヒカル"],
+                    "kenshi yonezu": ["米津玄師"],
+                    "aimyon": ["あいみょん"]
+                };
+                for (const [eng, japs] of Object.entries(mappings)) {
+                    if (cleanArtist.includes(eng)) {
+                        for (const jap of japs) {
+                            if (videoTitle.includes(jap) || videoAuthor.includes(jap)) {
+                                score += 50;
+                                artistMatched = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (artistMatched) break;
+                }
+            }
+        }
+
+        // Title match
+        if (cleanTitle && videoTitle.includes(cleanTitle)) {
+            score += 60;
+        }
+
+        // Official Video Indicators
+        const officialKeywords = ["official", "mv", "music video", "official video", "pv"];
+        if (officialKeywords.some(kw => videoTitle.includes(kw))) {
+            score += 30;
+        }
+
+        // Negative Keywords
+        const negativeKeywords = [
+            "cover", "guitar", "piano", "drum", "8bit", "karaoke", "instrumental", 
+            "reaction", "dance", "1 hour", "loop", "react", "tutorial", "synthesia",
+            "bass", "violin", "vietsub", "sub", "lyrics", "parody", "remix"
+        ];
+        for (const kw of negativeKeywords) {
+            if (videoTitle.includes(kw) && !cleanTitle.includes(kw)) {
+                score -= 80;
+            }
+        }
+
+        return score;
+    },
+
+    /**
      * Search YouTube directly by scraping the search results page.
      * 100% serverless, CORS-bypassed in Spotify client, bypasses broken public API instances.
      */
@@ -247,7 +338,7 @@ const VideoManager = {
     /**
      * Search YouTube via public Invidious instances, returning multiple candidates
      */
-    async searchMultipleVideos(query, trackUri = null) {
+    async searchMultipleVideos(query, trackUri = null, trackInfo = null) {
         if (trackUri && this._lastSearchUri === trackUri && this._lastSearchResults.length > 0) {
             console.log(`[VideoManager] Returning cached multi-search results for: ${trackUri}`);
             return this._lastSearchResults;
@@ -256,6 +347,10 @@ const VideoManager = {
         const instances = await this._getDynamicInvidiousInstances();
         const toTest = instances.slice(0, 6);
         
+        const artist = trackInfo?.artist || "";
+        const title = trackInfo?.title || "";
+        const targetDurationSec = trackInfo?.duration ? trackInfo.duration / 1000 : 0;
+
         for (const instance of toTest) {
             const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video`;
             console.log(`[VideoManager] Multi-search via Invidious instance: ${instance}`);
@@ -274,21 +369,38 @@ const VideoManager = {
                 
                 const data = await response.json();
                 if (Array.isArray(data)) {
-                    const videos = data
+                    let videos = data
                         .filter(item => item.type === "video" && item.videoId)
-                        .slice(0, 5)
                         .map(item => ({
                             videoId: item.videoId,
                             title: item.title,
                             author: item.author || "",
                             lengthSeconds: item.lengthSeconds || 0
                         }));
+
                     if (videos.length > 0) {
+                        // Apply scoring algorithm to rank results
+                        videos = videos.map(video => ({
+                            ...video,
+                            score: this._scoreVideo(video, artist, title, targetDurationSec)
+                        }));
+
+                        // Sort descending by relevance score
+                        videos.sort((a, b) => b.score - a.score);
+
+                        // Take the top 5 candidates
+                        const top5 = videos.slice(0, 5).map(({ videoId, title, author, lengthSeconds }) => ({
+                            videoId,
+                            title,
+                            author,
+                            lengthSeconds
+                        }));
+
                         if (trackUri) {
                             this._lastSearchUri = trackUri;
-                            this._lastSearchResults = videos;
+                            this._lastSearchResults = top5;
                         }
-                        return videos;
+                        return top5;
                     }
                 }
             } catch (e) {
