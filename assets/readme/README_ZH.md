@@ -3,6 +3,10 @@
 **Language / 言語 / 언어 / Ngôn ngữ / 语言:**
 [English](../../README.md) | [Tiếng Việt](../../README_VI.md) | [한국어](README_KO.md) | [日本語](README_JA.md) | [中文（简体）](README_ZH.md)
 
+[![Ko-fi](https://img.shields.io/badge/Donate-Ko--fi-F16061?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/gunjoutuna)
+
+
+
 <img width="800" height="800" alt="image" src="https://github.com/user-attachments/assets/32e85501-567d-4896-a7e4-bb4b098a30a6" />
 
 ---
@@ -134,6 +138,14 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 - 原版 [lyrics-plus](https://github.com/spicetify/cli/tree/main/CustomApps/lyrics-plus) by Spicetify team
 - 翻译支持：任意兼容 OpenAI 的 LLM（Google Gemini/Gemma、OpenRouter、OpenAI、DeepSeek、Anthropic、Ollama、…）
 - 罗马字转换：[Kuroshiro](https://github.com/hexenq/kuroshiro)、[Aromanize](https://github.com/fujaru/aromanize-js)、[OpenCC](https://github.com/BYVoid/OpenCC)
+
+---
+
+<p align="center">
+  <a href="https://ko-fi.com/gunjoutuna" target="_blank">
+    <img src="https://storage.ko-fi.com/cdn/brandasset/kofi_bg_tag_dark.png" alt="Buy Me a Coffee at ko-fi.com" height="36" style="height: 36px !important; border-radius: 8px;">
+  </a>
+</p>
 
 ---
 
