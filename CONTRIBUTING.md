@@ -48,7 +48,7 @@ lyrics-plus/
 ├── index.js                   ← Entry point: render(), LyricsContainer (React class)
 ├── manifest.json              ← Spicetify metadata + subfiles load order
 ├── style.css / variables.css  ← CSS styles
-├── version.json               ← { "version": "1.6.0", "releaseDate": "..." }
+├── version.json               ← { "version": "1.7.0", "releaseDate": "2026-06-05" }
 ├── types.d.ts                 ← TypeScript type definitions (JSDoc reference only)
 │
 ├── utils/                     ← Core utilities (load đầu tiên)
@@ -74,7 +74,7 @@ lyrics-plus/
 │   ├── Translator.js          ← Coordinator cho kuroshiro/kuromoji/openCC/pinyin-pro
 │   ├── IDBCache.js            ← Low-level IndexedDB wrapper
 │   ├── UpdateService.js       ← Check & download updates từ GitHub
-│   └── AdBlocker.js           ← Chặn quảng cáo
+│   └── AdBlocker.js           ← Chặn quảng cáo YouTube cho Video Background
 │
 ├── providers/                 ← Lyrics data sources
 │   ├── Providers.js           ← Facade: spotify, musixmatch, lrclib, local, netease
@@ -484,7 +484,7 @@ window.MyComponent = MyComponent;
 //   - Cancel tất cả pending requests khi track thay đổi
 
 const result = await GeminiClient.callGemini({
-    model: "gemma-4-26b-a4b-it",
+    model: "gemini-3.1-flash-lite",
     messages: [...],
     // ...
 });
@@ -538,7 +538,7 @@ const buttonStyle = {
 ```json
 {
     "version": "1.7.0",
-    "releaseDate": "2026-05-10"
+    "releaseDate": "2026-06-05"
 }
 ```
 
@@ -682,7 +682,7 @@ Dùng `Spicetify.CosmosAsync` thay vì `fetch()` trực tiếp. Spotify Electron
 ### Dịch không hoạt động
 
 1. Kiểm tra API key đã được cấu hình trong Settings → Translation
-2. Kiểm tra model được chọn có hỗ trợ không (Gemma 4 26B A4B là default)
+2. Kiểm tra model được chọn có hỗ trợ không (mặc định: `gemini-3.1-flash-lite`)
 3. Mở DevTools Console xem có lỗi 429 (rate limit) hoặc lỗi API không
 4. Nếu dùng endpoint custom, đảm bảo endpoint tương thích OpenAI API format
 
@@ -695,4 +695,4 @@ Dùng `Spicetify.CosmosAsync` thay vì `fetch()` trực tiếp. Spotify Electron
 
 ---
 
-*Tài liệu được cập nhật lần cuối: 2026-05-05*
+*Tài liệu được cập nhật lần cuối: 2026-06-05*
