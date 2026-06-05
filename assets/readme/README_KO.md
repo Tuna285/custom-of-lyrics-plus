@@ -136,16 +136,6 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 
 ---
 
-## 추천
-
-이 앱과 잘 어울리는 것들:
-
-- 테마: sanoojes의 **[Spicetify Lucid](https://github.com/sanoojes/spicetify-lucid)**.
-- TV 모드 및 전체화면 모드: **[Spicetify Creator 제작](https://github.com/daksh2k/Spicetify-stuff/tree/master/Extensions/full-screen)**.
-*(둘 다 Spicetify Marketplace에서 설치 가능)*
-
----
-
 ## 라이선스
 
 [LGPL-2.1](../../LICENSE)

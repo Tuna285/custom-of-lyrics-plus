@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-06-05
+
+### Added
+
+- **Multi-Video Background Options** — Added the option to display and choose from the top 5 matching videos in the Video Background settings.
+- **Prompt Type Safety** — Added comprehensive JSDoc type annotations across all prompt builder functions in `utils/Prompts.js`.
+
+### Changed
+
+- **Invidious Migration** — Migrated the background video search architecture from `ivLyrics` client-side proxy to direct `Invidious` API queries.
+- **Improved UI Localization** — Achieved more complete and synchronized UI localization across languages (localizing all remaining notifications and NetEase modal strings, and wrapping setting titles to a single line).
+
+### Fixed
+
+- **NetEase Provider Refactoring** — Corrected and simplified the NetEase API search flow by removing deprecated music download functions and prioritizing clean lyrics matching.
+- **Chorus Translation Repetition** — Fixed translation prompt rules to exempt verbatim repeated lines (choruses and hooks) from Hán-Việt word repetition limits, ensuring consistent translation.
+- **Duplicate Search Queries** — Resolved redundant network calls by caching background search results and sharing them directly with the settings modal.
+
 ## [1.6.0] - 2026-05-01
 
 ### Added

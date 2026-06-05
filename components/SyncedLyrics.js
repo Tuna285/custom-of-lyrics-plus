@@ -161,12 +161,19 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
 
                 if (canInsert) {
                     const estDur = estimateLineDuration(currentLine, timingStats);
+                    const text = currentLine.originalText || currentLine.text || "";
+                    const len = typeof text === "string" ? text.trim().length : 0;
+                    // Dynamic safety floor ratio based on character length.
+                    // Short lines (ad-libs, held vowels like "Ooh", "Yeah", "Ah") have highly unreliable
+                    // durations and are often held much longer. We apply a stricter ratio floor.
+                    const ratio = len < 10 ? 0.75 : len < 20 ? 0.70 : LINE_END_INTERVAL_FLOOR_RATIO;
+
                     // Safety: even if char-estimate says the line ends very early, assume the
-                    // singer held it for at least LINE_END_INTERVAL_FLOOR_RATIO of the interval.
+                    // singer held it for at least `ratio` of the interval.
                     // This is the key fix for the "♪ appears mid-line" bug on ballads / held notes.
                     const lineEnd = currentLine.startTime + Math.max(
                         estDur,
-                        interval * LINE_END_INTERVAL_FLOOR_RATIO
+                        interval * ratio
                     );
                     const insertTime = lineEnd + IDLE_GRACE_MS;
                     if (nextLine.startTime - insertTime >= IDLE_MIN_VISIBLE_MS) {
@@ -363,9 +370,9 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
                         {
                             onContextMenu: (event) => {
                                 event.preventDefault();
-                                Spicetify.Platform.ClipboardAPI.copy(Utils.convertParsedToLRC(lyrics).original)
-                                    .then(() => Spicetify.showNotification("✓ Lyrics copied to clipboard", false, 2000))
-                                    .catch(() => Spicetify.showNotification("Failed to copy lyrics to clipboard", true, 2000));
+                                Spicetify.Platform.ClipboardAPI.copy(Utils.convertParsedToLRC(lyrics, CONFIG.visual["translate:display-mode"] === "below").original)
+                                    .then(() => Spicetify.showNotification("✓ " + getText("notifications.lyricsCopied"), false, 2000))
+                                    .catch(() => Spicetify.showNotification(getText("notifications.lyricsCopyFailed"), true, 2000));
                             },
                             // For Furigana/Hiragana HTML strings
                             ...(typeof mainText === "string" && !isKara ? { dangerouslySetInnerHTML: { __html: Utils.rubyTextToHTML(mainText) } } : {}),
@@ -438,12 +445,25 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
             }
 
             if (currentLine && nextLine && currentLine.startTime && nextLine.startTime) {
-                const estDur = estimateLineDuration(currentLine, timingStats);
-                const gap = nextLine.startTime - (currentLine.startTime + estDur);
-
+                const interval = nextLine.startTime - currentLine.startTime;
                 // Auto-gap detector with adaptive threshold + grace period.
-                if (gap > timingStats.gapThreshold && !isNoteLineObject(currentLine) && !isNoteLineObject(nextLine)) {
-                    const insertTime = currentLine.startTime + estDur + IDLE_GRACE_MS;
+                const canInsert =
+                    interval > timingStats.gapThreshold &&
+                    !isNoteLineObject(currentLine) &&
+                    !isNoteLineObject(nextLine);
+
+                if (canInsert) {
+                    const estDur = estimateLineDuration(currentLine, timingStats);
+                    const text = currentLine.originalText || currentLine.text || "";
+                    const len = typeof text === "string" ? text.trim().length : 0;
+                    // Dynamic safety floor ratio based on character length.
+                    const ratio = len < 10 ? 0.75 : len < 20 ? 0.70 : LINE_END_INTERVAL_FLOOR_RATIO;
+
+                    const lineEnd = currentLine.startTime + Math.max(
+                        estDur,
+                        interval * ratio
+                    );
+                    const insertTime = lineEnd + IDLE_GRACE_MS;
                     if (nextLine.startTime - insertTime >= IDLE_MIN_VISIBLE_MS) {
                         processed.push({
                             text: "♪",
@@ -626,12 +646,14 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
                     {
                         onContextMenu: (event) => {
                             event.preventDefault();
-                            Spicetify.Platform.ClipboardAPI.copy(Utils.convertParsedToLRC(lyrics, belowMode).original)
-                                .then(() => Spicetify.showNotification("✓ Lyrics copied to clipboard", false, 2000))
-                                .catch(() => Spicetify.showNotification("Failed to copy lyrics to clipboard", true, 2000));
+                            Spicetify.Platform.ClipboardAPI.copy(Utils.convertParsedToLRC(lyrics, CONFIG.visual["translate:display-mode"] === "below").original)
+                                .then(() => Spicetify.showNotification("✓ " + getText("notifications.lyricsCopied"), false, 2000))
+                                .catch(() => Spicetify.showNotification(getText("notifications.lyricsCopyFailed"), true, 2000));
                         },
+                        // For Furigana/Hiragana HTML strings
+                        ...(typeof mainText === "string" && !isKara ? { dangerouslySetInnerHTML: { __html: Utils.rubyTextToHTML(mainText) } } : {}),
                     },
-                    !isKara ? mainText : react.createElement(KaraokeLine, { text: mainText, startTime, position, isActive })
+                    !isKara ? (typeof mainText === "string" ? null : mainText) : react.createElement(KaraokeLine, { text: mainText, startTime, position, isActive })
                 ),
                 subText && react.createElement("p", {
                     className: "lyrics-lyricsContainer-LyricsLine-sub",

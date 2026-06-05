@@ -90,16 +90,19 @@ const TranslationUtils = {
             const translationsSame = normalizedTrans1 && normalizedTrans2 &&
                 (normalizedTrans1 === normalizedTrans2 || this.areTranslationsSimilar(translation1, translation2));
 
+            const displayMode = (typeof CONFIG !== "undefined" && CONFIG?.visual) ? CONFIG.visual["translate:display-mode"] : "replace";
+            const allowSameAsOriginal = displayMode === "replace";
+
             let finalText = null;
             let finalText2 = null;
 
             if (translationsSame) {
-                if (!trans1SameAsOriginal) {
+                if (!trans1SameAsOriginal || allowSameAsOriginal) {
                     finalText = translation1 || translation2;
                 }
             } else {
-                if (!trans1SameAsOriginal && translation1) finalText = translation1;
-                if (!trans2SameAsOriginal && translation2) finalText2 = translation2;
+                if ((!trans1SameAsOriginal || allowSameAsOriginal) && translation1) finalText = translation1;
+                if ((!trans2SameAsOriginal || allowSameAsOriginal) && translation2) finalText2 = translation2;
                 if (!finalText && finalText2) { finalText = finalText2; finalText2 = null; }
             }
 

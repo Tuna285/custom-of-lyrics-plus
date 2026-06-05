@@ -32,7 +32,9 @@ window.LANG_VI = {
     "serviceOrder": "Thứ tự Dịch vụ",
     "corsProxy": "CORS Proxy Template",
     "videoBackground": "Video Background",
-    "generalBackground": "Nền chung"
+    "generalBackground": "Nền chung",
+    "appearanceColors": "Màu sắc Giao diện",
+    "appearanceButton": "Kiểu Nút"
   },
   "settings": {
     "language": {
@@ -173,8 +175,50 @@ window.LANG_VI = {
       "desc": "Xóa lời bài hát đang lưu trong RAM.",
       "button": "Xóa Cache"
     },
+    "uiSwitchOnColor": {
+      "label": "Màu công tắc khi bật",
+      "desc": "Màu của nút công tắc tròn khi ở trạng thái kích hoạt."
+    },
+    "uiSwitchOffColor": {
+      "label": "Màu công tắc khi tắt",
+      "desc": "Màu của nút công tắc tròn khi ở trạng thái tắt/không kích hoạt."
+    },
+    "uiAccentColor": {
+      "label": "Màu viền nổi bật (Hover)",
+      "desc": "Màu viền và hiệu ứng phát sáng khi di chuột (hover) hoặc focus vào cấu hình."
+    },
+    "uiButtonBgColor": {
+      "label": "Nền nút bấm cửa sổ",
+      "desc": "Màu nền của các nút hành động trong cửa sổ modal."
+    },
+    "uiButtonTextColor": {
+      "label": "Chữ trên nút bấm cửa sổ",
+      "desc": "Màu chữ hoặc biểu tượng của các nút hành động trong cửa sổ modal."
+    },
+    "uiFabBgColor": {
+      "label": "Nền nút thao tác nhanh",
+      "desc": "Màu nền của các nút thao tác nhanh (nút nổi trong trình phát nhạc)."
+    },
+    "uiFabIconColor": {
+      "label": "Biểu tượng nút thao tác nhanh",
+      "desc": "Màu biểu tượng của các nút thao tác nhanh trong trình phát nhạc."
+    },
+    "providerTokenPlaceholder": "Dán token nguồn nhạc vào đây",
     "corsProxyDesc": "Dùng để vượt lỗi CORS. Thay URL bằng server proxy của bạn. <code>{url}</code> là link gốc.",
-    "corsProxyDefault": "Spotify sẽ reload sau khi lưu. Để trống để về mặc định: <code>https://cors-proxy.spicetify.app/{url}</code>"
+    "corsProxyDefault": "Spotify sẽ reload sau khi lưu. Để trống để về mặc định: <code>https://cors-proxy.spicetify.app/{url}</code>",
+    "activeColor": {
+      "label": "Màu lời nhạc đang phát",
+      "desc": "Màu sắc của dòng lời nhạc hiện tại đang chạy."
+    },
+    "inactiveColor": {
+      "label": "Màu lời nhạc chờ",
+      "desc": "Màu sắc của các dòng lời nhạc chưa hoặc đã phát qua."
+    },
+    "highlightColor": {
+      "label": "Màu sắc nổi bật (Accent)",
+      "desc": "Màu sắc làm điểm nhấn cho các nút và thành phần UI chính."
+    },
+    "usingThemeColor": "Dùng màu mặc định của Theme"
   },
   "buttons": {
     "clearCache": "Xóa Cache đã lưu",
@@ -183,13 +227,8 @@ window.LANG_VI = {
     "refreshingToken": "Đang làm mới...",
     "tokenRefreshed": "Đã làm mới Token",
     "tooManyAttempts": "Quá nhiều lần thử",
-    "failedRefreshToken": "Làm mới thất bại"
-  },
-  "providers": {
-    "local": { "name": "local" },
-    "musixmatch": { "name": "Musixmatch" },
-    "lrclib": { "name": "LRCLIB" },
-    "spotify": { "name": "Spotify" },
+    "failedRefreshToken": "Làm mới thất bại",
+    "resetToTheme": "Đặt lại về Theme"
   },
   "notifications": {
     "translatedIn": "Dịch xong trong {duration}",
@@ -212,7 +251,28 @@ window.LANG_VI = {
     "noLyricsCache": "Không có lời để lưu (Cache)",
     "cacheDeleted": "Đã xóa cache lời bài hát",
     "cacheSuccess": "Đã lưu cache lời bài hát thành công",
-    "copied": "Đã sao chép: {text}"
+    "copied": "Đã sao chép: {text}",
+    "neteaseNoSynced": "Không có synced lyrics cho bài này.",
+    "neteaseLyricsLoaded": "Đã tải lyrics: {songName}",
+    "lyricsCopied": "Đã sao chép lời bài hát vào clipboard",
+    "lyricsCopyFailed": "Sao chép lời bài hát thất bại",
+    "invalidClipboardUrl": "Clipboard không chứa liên kết hoặc ID YouTube hợp lệ",
+    "failedReadClipboard": "Không thể đọc clipboard. Vui lòng dán thủ công.",
+    "videoSetSaved": "Đã chọn Video: {videoId} (đã lưu)",
+    "translationFailedWithReason": "{mode} thất bại: {reason}",
+    "languageOverrideReset": "Ghi đè Ngôn ngữ được đặt lại thành 'Tắt' cho chế độ AI",
+    "stillConverting": "Vẫn đang chuyển đổi...",
+    "pinyinLibraryUnavailable": "Thư viện Pinyin không khả dụng. Đang hiển thị bản gốc. Cho phép jsDelivr hoặc unpkg.",
+    "conversionSkippedAlreadySimplified": "Bỏ qua chuyển đổi: Đã ở dạng tiếng Trung giản thể",
+    "conversionFailed": "Chuyển đổi thất bại: {error}",
+    "fileTooLarge": "File quá lớn: Dung lượng tối đa là 1MB",
+    "noLyricsInFile": "Không tìm thấy lời bài hát hợp lệ trong file",
+    "loadedLyricsFromFile": "Đã tải lời bài hát {types} từ file",
+    "failedLoadLyricsInvalidFormat": "Tải lời bài hát thất bại: Định dạng file không hợp lệ",
+    "failedReadFileCorrupted": "Đọc file thất bại: File có thể bị hỏng",
+    "installCommandCopied": "Đã sao chép lệnh cài đặt! Dán vào PowerShell",
+    "updateSkipped": "Đã bỏ qua cập nhật",
+    "updateAvailable": "Lyrics Plus v{version} đã có sẵn! Bấm để cập nhật"
   },
   "contextMenu": {
     "provider": "Nguồn dịch",
@@ -282,6 +342,8 @@ window.LANG_VI = {
     "preTransNext": "Bài tiếp theo đã được dịch trước",
     "preTranslateChip": "AI đang dịch sẵn bài tiếp theo (nền)",
     "copy": "Sao chép",
+    "searchYoutube": "Tìm kiếm trên YouTube",
+    "searchNetease": "Tìm Lyrics trên NetEase",
     "viewReasoning": "Xem quá trình suy nghĩ"
   },
   "providers": {
@@ -289,10 +351,10 @@ window.LANG_VI = {
     "musixmatch": { "name": "musixmatch", "desc": "Tương thích đầy đủ với Spotify. Cần token từ ứng dụng Musixmatch chính thức. Nếu lỗi tải lời, hãy bấm <code>Refresh token</code>. Có thể cần CORS proxy." },
     "lrclib": { "name": "lrclib", "desc": "Lời bài hát từ lrclib.net. Hỗ trợ cả synced và unsynced, miễn phí và mã nguồn mở." },
     "spotify": { "name": "spotify", "desc": "Lời bài hát từ Spotify API chính thức." },
-    "netease": { "name": "NetEase", "desc": "Lời bài hát từ NetEase Cloud Music. Phủ sóng tốt cho các nghệ sĩ Indie JP/KR/CN. Yêu cầu Cookie phiên bản web (music.163.com)." }
+    "netease": { "name": "NetEase", "desc": "Lời bài hát từ NetEase Cloud Music. Phủ sóng tốt cho các nghệ sĩ Indie JP/KR/CN. Tùy chọn: Cookie phiên bản web (music.163.com) có thể cải thiện kết quả." }
   },
   "videoModal": {
-    "title": "Cài đặt Video Background",
+    "title": "Video Background",
     "topVideos": "Top Video Phù hợp",
     "inputId": "YouTube Video ID hoặc URL:",
     "placeholder": "Ví dụ: dQw4w9WgXcQ hoặc https://youtube.com/...",
@@ -302,9 +364,19 @@ window.LANG_VI = {
     "manualVideo": "Video Thủ công",
     "score": "Độ khớp",
     "detectedId": "ID tìm thấy",
-    "currentVideo": "Video hiện tại"
+    "currentVideo": "Video hiện tại",
+    "pasteCopied": "Dán liên kết đã sao chép:",
+    "paste": "Dán từ clipboard",
+    "noResults": "Không tìm thấy video phù hợp."
   },
   "modal": {
     "title": "Cài đặt Lyrics Plus"
+  },
+  "neteaseModal": {
+    "title": "Tìm kiếm NetEase",
+    "placeholder": "Tìm theo tên gốc (kanji, hangul, romaji...)",
+    "search": "Tìm",
+    "failed": "Tìm kiếm thất bại",
+    "noResults": "Không tìm thấy kết quả. Thử tìm bằng tên gốc hoặc romaji."
   }
 };

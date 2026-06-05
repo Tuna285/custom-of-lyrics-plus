@@ -135,7 +135,14 @@ const CONFIG = {
         "gemini-api-key": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key") || "",
         "gemini-api-key-romaji": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key-romaji") || "",
         "gemini:endpoint": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:endpoint") || "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-        "gemini:model": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:model") || "gemma-4-26b-a4b-it",
+        "gemini:model": (() => {
+            const val = ConfigUtils.getPersisted("lyrics-plus:visual:gemini:model");
+            if (!val || val === "gemma-4-26b-a4b-it") {
+                ConfigUtils.setPersisted("lyrics-plus:visual:gemini:model", "gemini-3.1-flash-lite");
+                return "gemini-3.1-flash-lite";
+            }
+            return val;
+        })(),
         "gemini:response-mode": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:response-mode") || "json_schema",
         // Reasoning effort: "off" | "low" | "medium" | "high"
         // Migration from legacy boolean `gemini:disable-thinking`:
@@ -188,7 +195,7 @@ const CONFIG = {
         },
         netease: {
             on: ConfigUtils.get("lyrics-plus:provider:netease:on"),
-            desc: "Lyrics sourced from NetEase Cloud Music (网易云音乐). Excellent coverage for indie JP/KR/CN artists. Requires a session Cookie from music.163.com to be pasted below.",
+            desc: "Lyrics sourced from NetEase Cloud Music (网易云音乐). Excellent coverage for indie JP/KR/CN artists. Optional: paste a session Cookie from music.163.com below for better results.",
             token: localStorage.getItem("lyrics-plus:provider:netease:token") || "",
             modes: [SYNCED, UNSYNCED],
         },

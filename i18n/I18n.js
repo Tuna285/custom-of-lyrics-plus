@@ -486,7 +486,7 @@ window.LANG_UI_OVERRIDES_PROVIDER_AND_CORS = {
 		"providers.lrclib.desc": "lrclib.net 가사를 사용합니다. 싱크/비싱크 가사를 모두 지원하며 무료 오픈소스입니다.",
 		"providers.spotify.desc": "Spotify 공식 API에서 가사를 가져옵니다.",
 		"providers.netease.name": "NetEase",
-		"providers.netease.desc": "NetEase Cloud Music의 가사입니다. JP/KR/CN 인디 아티스트 커버리지가 우수합니다. music.163.com의 세션 쿠키가 필요합니다.",
+		"providers.netease.desc": "NetEase Cloud Music의 가사입니다. JP/KR/CN 인디 아티스트 커버리지가 우수합니다. music.163.com의 세션 쿠키는 선택 사항입니다 (입력 시 결과가 향상될 수 있습니다).",
 	},
 	ja: {
 		"settings.corsProxyDesc": "CORS 制限を回避するために使用します。任意のプロキシ URL に置き換えてください。<code>{url}</code> は実際のリクエスト URL に置換されます。",
@@ -496,7 +496,7 @@ window.LANG_UI_OVERRIDES_PROVIDER_AND_CORS = {
 		"providers.lrclib.desc": "lrclib.net の歌詞を使用します。同期/非同期の両方に対応し、無料のオープンソースです。",
 		"providers.spotify.desc": "Spotify 公式 API の歌詞を使用します。",
 		"providers.netease.name": "NetEase",
-		"providers.netease.desc": "NetEase Cloud Music の歌詞を使用します。JP/KR/CN インディーズのカバレッジが優秀です。music.163.com のセッション Cookie が必要です。",
+		"providers.netease.desc": "NetEase Cloud Music の歌詞を使用します。JP/KR/CN インディーズのカバレッジが優秀です。music.163.com のセッション Cookie は任意です（結果が向上する場合があります）。",
 	},
 	zh: {
 		"settings.corsProxyDesc": "用于绕过 CORS 限制。请替换为你自己的代理服务器 URL。<code>{url}</code> 会被替换为真实请求 URL。",
@@ -506,7 +506,7 @@ window.LANG_UI_OVERRIDES_PROVIDER_AND_CORS = {
 		"providers.lrclib.desc": "歌词来源于 lrclib.net，支持同步与非同步歌词，免费且开源。",
 		"providers.spotify.desc": "歌词来源于 Spotify 官方 API。",
 		"providers.netease.name": "网易云音乐",
-		"providers.netease.desc": "歌词来源于网易云音乐。对日韩及中文独立音乐人覆盖极佳。需要提供 music.163.com 的会话 Cookie。",
+		"providers.netease.desc": "歌词来源于网易云音乐。对日韩及中文独立音乐人覆盖极佳。可选提供 music.163.com 的会话 Cookie（可改善结果）。",
 	},
 	vi: {
 		"settings.corsProxyDesc": "Dùng để vượt giới hạn CORS. Hãy thay bằng URL proxy bạn muốn. <code>{url}</code> sẽ được thay bằng URL request thực tế.",
@@ -516,7 +516,7 @@ window.LANG_UI_OVERRIDES_PROVIDER_AND_CORS = {
 		"providers.lrclib.desc": "Lời bài hát từ lrclib.net. Hỗ trợ cả synced và unsynced, miễn phí và mã nguồn mở.",
 		"providers.spotify.desc": "Lời bài hát từ Spotify API chính thức.",
 		"providers.netease.name": "NetEase",
-		"providers.netease.desc": "Lời bài hát từ NetEase Cloud Music. Phủ sóng tốt nhạc Indie JP/KR/CN. Yêu cầu Session Cookie từ music.163.com.",
+		"providers.netease.desc": "Lời bài hát từ NetEase Cloud Music. Phủ sóng tốt nhạc Indie JP/KR/CN. Cookie phiên bản web (music.163.com) là tùy chọn, có thể cải thiện kết quả.",
 	}
 };
 

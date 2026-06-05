@@ -37,11 +37,13 @@ spicetify apply
 ```
 
 Quick-install from remote (end-user):
+
 ```powershell
 iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/install.ps1 | iex
 ```
 
 Uninstall:
+
 ```powershell
 iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/uninstall.ps1 | iex
 ```

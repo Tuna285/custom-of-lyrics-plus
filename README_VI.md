@@ -135,14 +135,6 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 
 ---
 
-## Đề xuất
-
-- Theme: **[Spicetify Lucid](https://github.com/sanoojes/spicetify-lucid)** của sanoojes.
-- TV Mode và Fullscreen Mode: **[Tạo bởi Spicetify Creator](https://github.com/daksh2k/Spicetify-stuff/tree/master/Extensions/full-screen)**.
-*(Cả hai có thể tải ở Spicetify Marketplace)*
-
----
-
 ## Giấy phép
 
 [LGPL-2.1](LICENSE)

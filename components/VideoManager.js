@@ -6,6 +6,8 @@ const VideoManager = {
     _currentVideo: null,
     _userHash: null,
     _retryAbortController: null,
+    _lastSearchUri: null,
+    _lastSearchResults: [],
     
     // Retry configuration
     MAX_RETRIES: 3,
@@ -36,37 +38,270 @@ const VideoManager = {
         console.log("[VideoManager] Initialized (ivLyrics Client-Only Mode with Retry)");
     },
 
+
+
     /**
-     * Sleep helper
+     * Clean track titles to improve search matches (removes Remastered, Radio Edit, etc.)
      */
-    _sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+    _cleanQuery(artist, title) {
+        let cleanTitle = title
+            .replace(/\s*-\s*Remaster(ed)?\s*\d*/gi, "")
+            .replace(/\s*-\s*Radio\s*Edit/gi, "")
+            .replace(/\s*-\s*Single\s*Version/gi, "")
+            .replace(/\s*\(Remastered\)/gi, "");
+        return `${artist} - ${cleanTitle}`;
     },
 
     /**
-     * Single API call to ivLyrics
+     * Search YouTube directly by scraping the search results page.
+     * 100% serverless, CORS-bypassed in Spotify client, bypasses broken public API instances.
      */
-    async _fetchFromIvLyrics(spotifyId, userHash) {
-        const url = `https://lyrics.api.ivl.is/lyrics/youtube?trackId=${spotifyId}&userHash=${userHash}&useCommunity=true`;
+    async _searchDirectYoutube(query) {
+        const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+        console.log(`[VideoManager] Searching YouTube directly: ${url}`);
         
-        const response = await fetch(url, {
-            headers: {
-                "Accept": "application/json"
-            }
-        });
+        try {
+            let html = null;
+            const headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept-Language": "en-US,en;q=0.9"
+            };
 
-        if (!response.ok) {
-            return { success: false, status: response.status };
+            // Try CosmosAsync first to bypass CORS
+            if (window.Spicetify?.CosmosAsync?.get) {
+                try {
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error("CosmosAsync timeout")), 8000)
+                    );
+                    const fetchPromise = window.Spicetify.CosmosAsync.get(url, null, headers);
+                    const data = await Promise.race([fetchPromise, timeoutPromise]);
+                    html = typeof data === "string" ? data : JSON.stringify(data);
+                } catch (cosmosErr) {
+                    console.warn("[VideoManager] CosmosAsync direct search failed, trying fetch fallback...", cosmosErr.message);
+                }
+            }
+
+            // Fallback to fetch (which will likely fail due to CORS in Spotify UI, but kept as absolute fallback)
+            if (!html) {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+                
+                const response = await fetch(url, {
+                    headers,
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    console.warn(`[VideoManager] Direct YouTube search returned status: ${response.status}`);
+                    return null;
+                }
+                
+                html = await response.text();
+            }
+            
+            // Extract ytInitialData JSON object containing search result metadata
+            const jsonRegex = /var\s+ytInitialData\s*=\s*({[\s\S]*?});/;
+            const match = html.match(jsonRegex);
+            
+            if (match) {
+                try {
+                    const jsonStr = match[1];
+                    const data = JSON.parse(jsonStr);
+                    const contents = data.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents;
+                    
+                    if (contents) {
+                        const itemSection = contents.find(c => c.itemSectionRenderer);
+                        const results = itemSection?.itemSectionRenderer?.contents || [];
+                        
+                        // Extract the first video result
+                        for (const result of results) {
+                            if (result.videoRenderer) {
+                                const video = result.videoRenderer;
+                                const videoId = video.videoId;
+                                const title = video.title?.runs?.[0]?.text;
+                                if (videoId) {
+                                    console.log(`[VideoManager] Direct search matched: ${videoId} ("${title}")`);
+                                    return { videoId, title };
+                                }
+                            }
+                        }
+                    }
+                } catch (jsonErr) {
+                    console.warn("[VideoManager] Direct search JSON parse failed, trying HTML regex fallback...", jsonErr);
+                }
+            }
+            
+            // Fallback: search for video URLs directly in the raw HTML string
+            const watchRegex = /\/watch\?v=([a-zA-Z0-9_-]{11})/g;
+            const matches = [...html.matchAll(watchRegex)];
+            if (matches.length > 0) {
+                const videoIds = [...new Set(matches.map(m => m[1]))];
+                if (videoIds.length > 0) {
+                    console.log(`[VideoManager] Regex fallback matched: ${videoIds[0]}`);
+                    return { videoId: videoIds[0], title: query };
+                }
+            }
+        } catch (e) {
+            console.warn("[VideoManager] Direct YouTube search failed:", e.message);
+        }
+        return null;
+    },
+
+    /**
+     * Get active Invidious instances dynamically from api.invidious.io
+     * @returns {Promise<string[]>}
+     */
+    async _getDynamicInvidiousInstances() {
+        try {
+            console.log("[VideoManager] Fetching dynamic Invidious instances...");
+            const response = await fetch("https://api.invidious.io/instances.json");
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const data = await response.json();
+            const entries = Array.isArray(data) ? data : Object.entries(data);
+            const candidates = [];
+            
+            for (const item of entries) {
+                let domain, details;
+                if (Array.isArray(item)) {
+                    domain = item[0];
+                    details = item[1];
+                } else {
+                    domain = item.domain || item.uri;
+                    details = item;
+                }
+                
+                if (details.uri && details.type === "https" && details.monitor?.down === false) {
+                    candidates.push(details.uri);
+                }
+            }
+            
+            console.log(`[VideoManager] Resolved ${candidates.length} healthy Invidious instances.`);
+            return candidates;
+        } catch (e) {
+            console.warn("[VideoManager] Failed to fetch dynamic Invidious instances:", e.message);
+            return [
+                "https://inv.thepixora.com",
+                "https://yt.chocolatemoo53.com",
+                "https://invidious.flokinet.to",
+                "https://yewtu.be"
+            ];
+        }
+    },
+
+    /**
+     * Search YouTube via public Invidious instances (CORS-enabled proxies)
+     */
+    async _searchInvidious(query, trackUri = null) {
+        const instances = await this._getDynamicInvidiousInstances();
+        const toTest = instances.slice(0, 6);
+        
+        for (const instance of toTest) {
+            const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video`;
+            console.log(`[VideoManager] Fallback search via Invidious instance: ${instance}`);
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout per instance
+                
+                const response = await fetch(url, {
+                    headers: { "Accept": "application/json" },
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    console.warn(`[VideoManager] Instance ${instance} returned status: ${response.status}`);
+                    continue;
+                }
+                
+                const data = await response.json();
+                if (Array.isArray(data)) {
+                    const videos = data
+                        .filter(item => item.type === "video" && item.videoId)
+                        .slice(0, 5)
+                        .map(item => ({
+                            videoId: item.videoId,
+                            title: item.title,
+                            author: item.author || "",
+                            lengthSeconds: item.lengthSeconds || 0
+                        }));
+
+                    if (videos.length > 0) {
+                        // Populate cache for settings
+                        if (trackUri) {
+                            this._lastSearchUri = trackUri;
+                            this._lastSearchResults = videos;
+                        }
+                        return { videoId: videos[0].videoId, title: videos[0].title };
+                    }
+                }
+            } catch (e) {
+                console.warn(`[VideoManager] Failed to fetch from Invidious ${instance}:`, e.message);
+            }
+        }
+        return null;
+    },
+
+    /**
+     * Search YouTube via public Invidious instances, returning multiple candidates
+     */
+    async searchMultipleVideos(query, trackUri = null) {
+        if (trackUri && this._lastSearchUri === trackUri && this._lastSearchResults.length > 0) {
+            console.log(`[VideoManager] Returning cached multi-search results for: ${trackUri}`);
+            return this._lastSearchResults;
         }
 
-        const data = await response.json();
-        return data;
+        const instances = await this._getDynamicInvidiousInstances();
+        const toTest = instances.slice(0, 6);
+        
+        for (const instance of toTest) {
+            const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video`;
+            console.log(`[VideoManager] Multi-search via Invidious instance: ${instance}`);
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                
+                const response = await fetch(url, {
+                    headers: { "Accept": "application/json" },
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) continue;
+                
+                const data = await response.json();
+                if (Array.isArray(data)) {
+                    const videos = data
+                        .filter(item => item.type === "video" && item.videoId)
+                        .slice(0, 5)
+                        .map(item => ({
+                            videoId: item.videoId,
+                            title: item.title,
+                            author: item.author || "",
+                            lengthSeconds: item.lengthSeconds || 0
+                        }));
+                    if (videos.length > 0) {
+                        if (trackUri) {
+                            this._lastSearchUri = trackUri;
+                            this._lastSearchResults = videos;
+                        }
+                        return videos;
+                    }
+                }
+            } catch (e) {
+                console.warn(`[VideoManager] Multi-search failed from ${instance}:`, e.message);
+            }
+        }
+        return [];
     },
 
     /**
-     * Fetch video background for a track using ivLyrics API with retry logic
+     * Fetch video background for a track using a dual-layer client-only search workflow
      * @param {Object} trackInfo - { title, artist, duration, uri, image }
-     * @param {Function} onRetry - Optional callback when retrying (for UI feedback)
+     * @param {Function} onRetry - Deprecated/Not used in client-only search
      * @returns {Promise<Object|null>} - Video data or null
      */
     async fetchVideoForTrack(trackInfo, onRetry = null) {
@@ -82,7 +317,7 @@ const VideoManager = {
             return this._currentVideo;
         }
         
-        // Abort any pending retry from previous track
+        // Abort any pending requests from previous track
         if (this._retryAbortController) {
             this._retryAbortController.abort();
         }
@@ -94,16 +329,6 @@ const VideoManager = {
             this._currentVideo = null;
         }
         this._lastFetchUri = trackInfo.uri;
-
-        // Extract Spotify ID from URI (spotify:track:ID)
-        const spotifyId = trackInfo.uri.split(':')[2];
-        if (!spotifyId) {
-            console.warn("[VideoManager] Invalid Spotify URI");
-            return null;
-        }
-
-        const userHash = this._generateUserHash();
-        const startTime = Date.now();
 
         // Check for manual video override FIRST
         const manualVideoId = await this.getManualVideo(trackInfo.uri);
@@ -119,86 +344,76 @@ const VideoManager = {
             console.log(`[VideoManager] Using saved manual video: ${manualVideoId} (offset: ${savedOffset}s)`);
             return this._currentVideo;
         }
-        
-        // Retry loop
-        for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
-            // Check if total timeout exceeded
-            if (Date.now() - startTime >= this.TOTAL_TIMEOUT_MS) {
-                console.log(`[VideoManager] Total timeout (${this.TOTAL_TIMEOUT_MS/1000}s) exceeded for: ${trackInfo.title}`);
-                break;
-            }
-            
-            // Check if aborted (track changed)
-            if (abortSignal.aborted) {
-                console.log(`[VideoManager] Retry aborted for: ${trackInfo.title}`);
-                return null;
-            }
-            
-            console.log(`[VideoManager] Fetching from ivLyrics (attempt ${attempt}/${this.MAX_RETRIES}):`, trackInfo.artist, "-", trackInfo.title);
 
-            try {
-                const data = await this._fetchFromIvLyrics(spotifyId, userHash);
-                
-                // Check if aborted after fetch
-                if (abortSignal.aborted || this._lastFetchUri !== trackInfo.uri) {
-                    console.log(`[VideoManager] Ignored stale response for: ${trackInfo.title}`);
-                    return null;
-                }
-
-                // Success with video data
-                if (data?.success && data?.data?.youtubeVideoId) {
-                    const videoId = data.data.youtubeVideoId;
-                    let syncOffset = (data.data.captionStartTime || 0) / 1000; // Convert ms to seconds
-                    
-                    // Check for user-saved offset override
-                    const savedOffset = await this.getOffset(trackInfo.uri);
-                    if (savedOffset !== null) {
-                        syncOffset = savedOffset;
-                        console.log(`[VideoManager] Using saved offset: ${savedOffset}s`);
-                    }
-                    
-                    this._currentVideo = {
-                        video_id: videoId,
-                        sync_offset: syncOffset,
-                        title: `${trackInfo.artist} - ${trackInfo.title}`,
-                        uri: trackInfo.uri,
-                        source: savedOffset !== null ? "ivLyrics+saved" : "ivLyrics"
-                    };
-                    
-                    console.log(`[VideoManager] ivLyrics found: ${videoId} (offset: ${syncOffset}s)`);
-                    return this._currentVideo;
-                }
-                
-                // No video found or error - retry if not last attempt
-                if (attempt < this.MAX_RETRIES) {
-                    const status = data?.status || (data?.success === false ? "not found" : "error");
-                    console.log(`[VideoManager] ivLyrics returned ${status}, retrying in ${this.RETRY_DELAY_MS/1000}s...`);
-                    
-                    // Notify caller about retry (for loading indicator)
-                    if (onRetry) {
-                        onRetry(attempt, this.MAX_RETRIES, this.RETRY_DELAY_MS);
-                    }
-                    
-                    // Wait before retry
-                    await this._sleep(this.RETRY_DELAY_MS);
-                } else {
-                    console.log("[VideoManager] ivLyrics: No video found after all retries");
-                }
-
-            } catch (e) {
-                console.error(`[VideoManager] ivLyrics request failed (attempt ${attempt}):`, e.message);
-                
-                if (attempt < this.MAX_RETRIES) {
-                    console.log(`[VideoManager] Retrying in ${this.RETRY_DELAY_MS/1000}s...`);
-                    if (onRetry) {
-                        onRetry(attempt, this.MAX_RETRIES, this.RETRY_DELAY_MS);
-                    }
-                    await this._sleep(this.RETRY_DELAY_MS);
-                }
-            }
+        // Check for cached automatic search result SECOND
+        const cachedAuto = await this.getAutoVideo(trackInfo.uri);
+        if (cachedAuto) {
+            const savedOffset = (await this.getOffset(trackInfo.uri)) || 0;
+            this._currentVideo = {
+                video_id: cachedAuto.videoId,
+                sync_offset: savedOffset,
+                title: cachedAuto.title,
+                uri: trackInfo.uri,
+                source: "auto_cache"
+            };
+            console.log(`[VideoManager] Using cached automatic video: ${cachedAuto.videoId} (offset: ${savedOffset}s)`);
+            return this._currentVideo;
         }
 
-        // All retries exhausted
+        const query = this._cleanQuery(trackInfo.artist || "", trackInfo.title || "");
+        console.log(`[VideoManager] Searching video background for: ${query}`);
+        
+        try {
+            // Try Direct YouTube Scrape (highly accurate, fast, domestic IP bypasses bot bans)
+            let result = await this._searchDirectYoutube(query);
+            let source = "youtube_direct";
+            
+            // Check if aborted after fetch
+            if (abortSignal.aborted || this._lastFetchUri !== trackInfo.uri) {
+                console.log(`[VideoManager] Ignored stale response for: ${trackInfo.title}`);
+                return null;
+            }
+
+            // Fallback to Invidious if direct search failed (direct search fails due to CORS in Spotify UI)
+            if (!result || !result.videoId) {
+                console.log("[VideoManager] Direct search failed (CORS or network), attempting Invidious fallback...");
+                result = await this._searchInvidious(query, trackInfo.uri);
+                source = "invidious";
+            }
+
+            if (result && result.videoId) {
+                const videoId = result.videoId;
+                const title = result.title || `${trackInfo.artist} - ${trackInfo.title}`;
+                let syncOffset = 0; // Default offset
+                
+                // Cache this successful automatic search in IndexedDB
+                await this.saveAutoVideo(trackInfo.uri, videoId, title);
+
+                // Check for user-saved offset override
+                const savedOffset = await this.getOffset(trackInfo.uri);
+                if (savedOffset !== null) {
+                    syncOffset = savedOffset;
+                    source += "+saved";
+                    console.log(`[VideoManager] Using saved offset: ${savedOffset}s`);
+                }
+                
+                this._currentVideo = {
+                    video_id: videoId,
+                    sync_offset: syncOffset,
+                    title: title,
+                    uri: trackInfo.uri,
+                    source: source
+                };
+                
+                console.log(`[VideoManager] Found video: ${videoId} (offset: ${syncOffset}s, source: ${source})`);
+                return this._currentVideo;
+            } else {
+                console.log("[VideoManager] No video found on any channels");
+            }
+        } catch (e) {
+            console.error(`[VideoManager] Video search failed:`, e.message);
+        }
+
         this._currentVideo = null;
         return null;
     },
@@ -230,17 +445,81 @@ const VideoManager = {
     },
 
     /**
-     * Reset video state (client cache only, no server)
+     * Reset video state and optionally clear IndexedDB keys for a specific track
+     * @param {string} [trackUri] - Spotify track URI to completely reset
      */
-    reset() {
+    async reset(trackUri = null) {
         // Abort any pending retries
         if (this._retryAbortController) {
             this._retryAbortController.abort();
             this._retryAbortController = null;
         }
-        this._lastFetchUri = null;
-        this._currentVideo = null;
-        console.log("[VideoManager] Cache cleared");
+        
+        if (trackUri) {
+            const manualKey = `video-manual:${trackUri}`;
+            const offsetKey = `video-offset:${trackUri}`;
+            const autoKey = `video-auto:${trackUri}`;
+            try {
+                await IDBCache.delete(manualKey);
+                await IDBCache.delete(offsetKey);
+                await IDBCache.delete(autoKey);
+                console.log(`[VideoManager] Cleared DB cache and manual configs for: ${trackUri.split(':').pop()}`);
+            } catch (e) {
+                console.warn("[VideoManager] Failed to clear DB for track:", e);
+            }
+            if (this._lastFetchUri === trackUri) {
+                this._currentVideo = null;
+                this._lastFetchUri = null;
+            }
+        } else {
+            this._lastFetchUri = null;
+            this._currentVideo = null;
+            console.log("[VideoManager] Memory cache cleared");
+        }
+    },
+
+    /**
+     * Save auto-discovered video details to IndexedDB
+     * @param {string} trackUri - Spotify track URI
+     * @param {string} videoId - YouTube Video ID
+     * @param {string} title - YouTube Video Title
+     * @returns {Promise<boolean>}
+     */
+    async saveAutoVideo(trackUri, videoId, title) {
+        if (!trackUri || !videoId) return false;
+        
+        const key = `video-auto:${trackUri}`;
+        const oneYear = 365 * 24 * 60 * 60 * 1000;
+        
+        try {
+            await IDBCache.set(key, { videoId, title, savedAt: Date.now() }, oneYear);
+            console.log(`[VideoManager] Cached auto video ${videoId} for: ${trackUri.split(':').pop()}`);
+            return true;
+        } catch (e) {
+            console.warn('[VideoManager] Failed to cache auto video:', e);
+            return false;
+        }
+    },
+
+    /**
+     * Get auto-discovered video details from IndexedDB
+     * @param {string} trackUri - Spotify track URI
+     * @returns {Promise<Object|null>} - Video details { videoId, title } or null
+     */
+    async getAutoVideo(trackUri) {
+        if (!trackUri) return null;
+        
+        const key = `video-auto:${trackUri}`;
+        
+        try {
+            const data = await IDBCache.get(key);
+            if (data?.videoId) {
+                return data;
+            }
+        } catch (e) {
+            console.warn('[VideoManager] Failed to get auto video from cache:', e);
+        }
+        return null;
     },
 
     /**

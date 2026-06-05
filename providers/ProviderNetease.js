@@ -89,11 +89,23 @@ const ProviderNetease = (() => {
         const err = (msg) => ({ error: msg, uri: info.uri });
 
         try {
-            let songs = await searchSongs(`${info.title} ${info.artist}`, 6);
+            // Clean title and extract primary artist to optimize NetEase's search engine
+            const cleanTitle = Utils.removeSongFeat(Utils.removeExtraInfo(info.title));
+            const primaryArtist = info.artist.split(",")[0].split("&")[0].trim(); // Extract first artist
 
-            // Fallback: search by artist alone + match by duration
+            DebugLogger.log(`[NetEase] Searching for "${cleanTitle}" by primary artist "${primaryArtist}"`);
+            let songs = await searchSongs(`${cleanTitle} ${primaryArtist}`, 6);
+
+            // Layered Fallback 1: Search by clean title alone (excellent for rare or multi-artist songs)
             if (!songs.length) {
-                songs = await searchSongs(info.artist, 8);
+                DebugLogger.log(`[NetEase] No results for "${cleanTitle} ${primaryArtist}", falling back to title alone: "${cleanTitle}"`);
+                songs = await searchSongs(cleanTitle, 8);
+            }
+
+            // Layered Fallback 2: Search by primary artist alone + match by duration (last resort)
+            if (!songs.length) {
+                DebugLogger.log(`[NetEase] No results for title alone, falling back to artist: "${primaryArtist}"`);
+                songs = await searchSongs(primaryArtist, 10);
             }
             if (!songs.length) return err("NetEase: no results");
 
@@ -144,16 +156,20 @@ const ProviderNetease = (() => {
             const [query,   setQuery]   = react.useState(info ? `${info.title} ${info.artist}` : "");
             const [results, setResults] = react.useState([]);
             const [status,  setStatus]  = react.useState("idle");
+            const [errorMsg, setErrorMsg] = react.useState("");
 
             const doSearch = async () => {
                 if (!query.trim()) return;
                 setStatus("loading");
                 setResults([]);
+                setErrorMsg("");
                 try {
                     const songs = await searchSongs(query.trim(), 8);
                     setResults(songs);
                     setStatus(songs.length ? "done" : "empty");
                 } catch (e) {
+                    console.error("[Lyrics+] NetEase manual search failed:", e);
+                    setErrorMsg(e.message || String(e));
                     setStatus("error");
                 }
             };
@@ -164,7 +180,7 @@ const ProviderNetease = (() => {
                     const d      = await fetchLyricsById(song.id);
                     const synced = parseLRC(d?.lrc?.lyric);
                     if (!synced) {
-                        Spicetify.showNotification("❌ Không có synced lyrics cho bài này.", true);
+                        Spicetify.showNotification("❌ " + getText("notifications.neteaseNoSynced"), true);
                         setStatus("done");
                         return;
                     }
@@ -180,7 +196,7 @@ const ProviderNetease = (() => {
                         _neteaseScore:     1.0,
                     });
                     Spicetify.PopupModal.hide();
-                    Spicetify.showNotification(`✓ Đã tải lyrics: ${song.name}`);
+                    Spicetify.showNotification("✓ " + getText("notifications.neteaseLyricsLoaded", { songName: song.name }));
                 } catch (e) {
                     Spicetify.showNotification("❌ " + e.message, true);
                     setStatus("done");
@@ -217,7 +233,7 @@ const ProviderNetease = (() => {
                     react.createElement("input", {
                         type: "text",
                         value: query,
-                        placeholder: "Tìm theo tên gốc (kanji, hangul, romaji...)",
+                        placeholder: getText("neteaseModal.placeholder") || "Search by original name (kanji, hangul, romaji...)",
                         onChange: e => setQuery(e.target.value),
                         onKeyDown: e => e.key === "Enter" && doSearch(),
                         autoFocus: true,
@@ -236,17 +252,17 @@ const ProviderNetease = (() => {
                             fontWeight: "bold", fontSize: "13px",
                             background: "var(--spice-button)", color: "#fff",
                         },
-                    }, status === "loading" ? "…" : "Tìm")
+                    }, status === "loading" ? "…" : (getText("neteaseModal.search") || "Search"))
                 ),
 
                 // Status messages
                 status === "error" && react.createElement("div", {
                     style: { color: "#ff6b6b", fontSize: "12px", marginBottom: "10px" }
-                }, "Tìm kiếm thất bại. Vui lòng kiểm tra kết nối mạng."),
+                }, errorMsg || (getText("neteaseModal.failed") || "Search failed")),
 
                 status === "empty" && react.createElement("div", {
                     style: { color: "#aaa", fontSize: "12px", textAlign: "center", padding: "20px 0" }
-                }, "Không tìm thấy kết quả. Thử tìm bằng tên gốc hoặc romaji."),
+                }, getText("neteaseModal.noResults") || "No results found. Try searching by original name or romaji."),
 
                 // Results
                 results.length > 0 && react.createElement("div", {
@@ -294,7 +310,7 @@ const ProviderNetease = (() => {
         };
 
         Spicetify.PopupModal.display({
-            title: "Tìm Lyrics trên NetEase",
+            title: getText("neteaseModal.title") || "Search Lyrics on NetEase",
             content: react.createElement(Modal),
         });
     }

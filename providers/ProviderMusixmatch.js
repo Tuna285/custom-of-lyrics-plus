@@ -10,32 +10,73 @@ const ProviderMusixmatch = (() => {
 		Accept: "application/json",
 	};
 
+	async function refreshMusixmatchToken() {
+		try {
+			console.warn("[Lyrics+] Musixmatch token expired or invalid. Refreshing token...");
+			const res = await Spicetify.CosmosAsync.get(
+				"https://apic-appmobile.musixmatch.com/ws/1.1/token.get?app_id=mac-ios-v2.0",
+				null,
+				headers
+			);
+			const newToken = res?.message?.body?.user_token;
+			if (newToken) {
+				CONFIG.providers.musixmatch.token = newToken;
+				localStorage.setItem("lyrics-plus:provider:musixmatch:token", newToken);
+				console.log("[Lyrics+] Musixmatch token auto-refreshed successfully:", newToken);
+				return newToken;
+			}
+		} catch (e) {
+			console.error("[Lyrics+] Failed to auto-refresh Musixmatch token:", e);
+		}
+		return null;
+	}
+
 	async function findLyrics(info) {
 		const baseURL =
 			"https://apic-appmobile.musixmatch.com/ws/1.1/macro.subtitles.get?format=json&namespace=lyrics_richsynched&subtitle_format=mxm&app_id=mac-ios-v2.0&";
 
 		const durr = info.duration / 1000;
 
-		const params = {
-			q_album: info.album,
-			q_artist: info.artist,
-			q_artists: info.artist,
-			q_track: info.title,
-			track_spotify_id: info.uri,
-			q_duration: durr,
-			f_subtitle_length: Math.floor(durr),
-			usertoken: CONFIG.providers.musixmatch.token,
+		const queryMxm = async (tokenVal) => {
+			const params = {
+				q_album: info.album,
+				q_artist: info.artist,
+				q_artists: info.artist,
+				q_track: info.title,
+				track_spotify_id: info.uri,
+				q_duration: durr,
+				f_subtitle_length: Math.floor(durr),
+				usertoken: tokenVal,
+			};
+
+			const finalURL =
+				baseURL +
+				Object.keys(params)
+					.map((key) => `${key}=${encodeURIComponent(params[key])}`)
+					.join("&");
+
+			return await Spicetify.CosmosAsync.get(finalURL, null, headers);
 		};
 
-		const finalURL =
-			baseURL +
-			Object.keys(params)
-				.map((key) => `${key}=${encodeURIComponent(params[key])}`)
-				.join("&");
+		let currentToken = CONFIG.providers.musixmatch.token;
+		let res = await queryMxm(currentToken);
 
-		let body = await Spicetify.CosmosAsync.get(finalURL, null, headers);
+		// If unauthorized (401/402), attempt auto-refresh
+		let statusCode = res?.message?.header?.status_code;
+		if (statusCode === 401 || statusCode === 402) {
+			const refreshedToken = await refreshMusixmatchToken();
+			if (refreshedToken) {
+				res = await queryMxm(refreshedToken);
+			}
+		}
 
-		body = body.message.body.macro_calls;
+		let body = res?.message?.body?.macro_calls;
+		if (!body) {
+			return {
+				error: `Musixmatch request failed with status: ${res?.message?.header?.status_code || "Unknown"}`,
+				uri: info.uri,
+			};
+		}
 
 		if (body["matcher.track.get"].message.header.status_code !== 200) {
 			return {

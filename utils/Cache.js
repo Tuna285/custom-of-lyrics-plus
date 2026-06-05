@@ -5,7 +5,7 @@
 const CacheManager = {
     _l1Cache: new Map(),      // L1: RAM cache (small LRU)
     _l1MaxSize: 20,           // Only keep ~20 recent items in RAM
-    _ttl: 7 * 24 * 60 * 60 * 1000, // 7 days TTL
+    _ttl: 365 * 24 * 60 * 60 * 1000, // 1 year TTL
     _persistKey: 'lyrics-plus:translation-cache',
     _migrated: false,
 

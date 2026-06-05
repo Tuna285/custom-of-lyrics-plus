@@ -137,16 +137,6 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 
 ---
 
-## 推荐
-
-此应用与以下内容完美搭配：
-
-- 主题：sanoojes 的 **[Spicetify Lucid](https://github.com/sanoojes/spicetify-lucid)**。
-- TV 模式和全屏模式：**[由 Spicetify Creator 制作](https://github.com/daksh2k/Spicetify-stuff/tree/master/Extensions/full-screen)**。
-*（两者均可在 Spicetify Marketplace 安装）*
-
----
-
 ## 许可证
 
 [LGPL-2.1](../../LICENSE)

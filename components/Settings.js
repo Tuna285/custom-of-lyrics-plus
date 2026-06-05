@@ -550,14 +550,18 @@ const ConfigHelper = () => {
 		{ value: "https://api.anthropic.com/v1/chat/completions", label: "Anthropic Claude (OpenAI-compat)" },
 	];
 
-	// Popular models matching the endpoints above (verified Apr 2026). Free-form input still allowed.
 	const MODEL_PRESETS = [
-		// Gemma 4 26B A4B (MoE, ~3.88B active) — fastest option with quality on par with 31B
-		// for translation tasks. No thinking mode, so no Pass 3/4 overhead. Free tier: 1500 RPD.
-		{ value: "gemma-4-26b-a4b-it", label: "Recommended — fast, good quality" },
-		// Google Gemini 2.5 — fast tiers (free-tier friendly)
+		// Gemini 3.1 Flash-Lite — recommended default. Extremely fast, high daily limits (500 RPD).
+		{ value: "gemini-3.1-flash-lite", label: "Recommended — fast, 500 RPD free quota" },
+		// Google Gemini 2.5/3.5 — fast tiers (free-tier friendly)
+		"gemini-3.5-flash",
 		"gemini-2.5-flash",
 		"gemini-2.5-flash-lite",
+		// Google Gemini Pro — smart tiers (higher quality, 50 RPD quota)
+		"gemini-2.5-pro",
+		"gemini-1.5-pro",
+		// Gemma 4 26B A4B (MoE, ~3.88B active) — fast option with 1500 RPD limit, no thinking mode.
+		"gemma-4-26b-a4b-it",
 		// Gemma 4 31B (dense) — strongest Gemma 4 with thinking mode
 		"gemma-4-31b-it",
 		// Gemma 3 legacy (still served, useful as fallback)
@@ -580,7 +584,7 @@ const ConfigHelper = () => {
 	// Translation Settings (OpenAI-compatible endpoint + keys; no proxy/official split)
 	const translationSettings = [
 		{ desc: getText("settings.apiEndpoint.label"), key: "gemini:endpoint", type: ConfigComboBox, info: getText("settings.apiEndpoint.desc"), placeholder: "https://…/v1/chat/completions", options: ENDPOINT_PRESETS },
-		{ desc: getText("settings.modelName.label"), key: "gemini:model", type: ConfigComboBox, info: getText("settings.modelName.desc"), placeholder: "gemma-4-26b-a4b-it", options: MODEL_PRESETS },
+		{ desc: getText("settings.modelName.label"), key: "gemini:model", type: ConfigComboBox, info: getText("settings.modelName.desc"), placeholder: "gemini-3.1-flash-lite", options: MODEL_PRESETS },
 		{ desc: getText("settings.apiKey.label"), key: "gemini-api-key", type: ConfigInput, info: getText("settings.apiKey.desc"), inputType: "password", placeholder: "••••••••" },
 		{ desc: getText("settings.apiKey2.label"), key: "gemini-api-key-romaji", type: ConfigInput, info: getText("settings.apiKey2.desc"), inputType: "password", placeholder: "Optional" },
 		{ desc: getText("settings.responseMode.label"), key: "gemini:response-mode", type: ConfigSelection, options: { prompt: getText("settings.responseMode.options.prompt"), json_schema: getText("settings.responseMode.options.json_schema") }, info: getText("settings.responseMode.desc") },

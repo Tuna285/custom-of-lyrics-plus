@@ -487,7 +487,7 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 					if (value === "geminiVi" && CONFIG.visual["translate:detect-language-override"] !== "off") {
 						CONFIG.visual["translate:detect-language-override"] = "off";
 						localStorage.setItem(`${APP_NAME}:visual:translate:detect-language-override`, "off");
-						Spicetify.showNotification("Language Override reset to 'Off' for AI mode", false, 3000);
+						Spicetify.showNotification(getText("notifications.languageOverrideReset"), false, 3000);
 					}
 				}
 			}

@@ -138,16 +138,6 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 
 ---
 
-## おすすめ
-
-このアプリと相性の良いもの:
-
-- テーマ: sanoojsの**[Spicetify Lucid](https://github.com/sanoojes/spicetify-lucid)**。
-- TVモード＆全画面モード: **[Spicetify Creator製](https://github.com/daksh2k/Spicetify-stuff/tree/master/Extensions/full-screen)**。
-*(どちらもSpicetify Marketplaceからインストール可能)*
-
----
-
 ## ライセンス
 
 [LGPL-2.1](../../LICENSE)

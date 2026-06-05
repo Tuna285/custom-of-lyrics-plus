@@ -234,7 +234,7 @@ window.LANG_EN = {
     "musixmatch": { "name": "musixmatch", "desc": "Fully compatible with Spotify. Requires a token from the official Musixmatch app. If lyrics fail to load, refresh the token via the <code>Refresh Token</code> button. A CORS proxy may be required." },
     "lrclib": { "name": "lrclib", "desc": "Lyrics sourced from lrclib.net. Supports both synced and unsynced lyrics. Free and open-source." },
     "spotify": { "name": "spotify", "desc": "Lyrics sourced from the official Spotify API." },
-    "netease": { "name": "NetEase", "desc": "Lyrics sourced from NetEase Cloud Music. Excellent coverage for indie JP/KR/CN artists. Requires a session Cookie from music.163.com." }
+    "netease": { "name": "NetEase", "desc": "Lyrics sourced from NetEase Cloud Music. Excellent coverage for indie JP/KR/CN artists. Optional: session Cookie from music.163.com may improve results." }
   },
   "notifications": {
     "translatedIn": "Translated in {duration}",
@@ -257,7 +257,28 @@ window.LANG_EN = {
     "noLyricsCache": "No lyrics available to cache",
     "cacheDeleted": "Lyrics cache deleted",
     "cacheSuccess": "Lyrics cached successfully",
-    "copied": "Copied: {text}"
+    "copied": "Copied: {text}",
+    "neteaseNoSynced": "No synced lyrics for this track.",
+    "neteaseLyricsLoaded": "Lyrics loaded: {songName}",
+    "lyricsCopied": "Lyrics copied to clipboard",
+    "lyricsCopyFailed": "Failed to copy lyrics to clipboard",
+    "invalidClipboardUrl": "Clipboard does not contain a valid YouTube link/ID",
+    "failedReadClipboard": "Failed to read clipboard. Please paste manually.",
+    "videoSetSaved": "Video set: {videoId} (saved)",
+    "translationFailedWithReason": "{mode} failed: {reason}",
+    "languageOverrideReset": "Language Override reset to 'Off' for AI mode",
+    "stillConverting": "Still converting...",
+    "pinyinLibraryUnavailable": "Pinyin library unavailable. Showing original. Allow jsDelivr or unpkg.",
+    "conversionSkippedAlreadySimplified": "Conversion skipped: Already in Simplified Chinese",
+    "conversionFailed": "Conversion failed: {error}",
+    "fileTooLarge": "File too large: Maximum size is 1MB",
+    "noLyricsInFile": "No valid lyrics found in file",
+    "loadedLyricsFromFile": "Loaded {types} lyrics from file",
+    "failedLoadLyricsInvalidFormat": "Failed to load lyrics: Invalid file format",
+    "failedReadFileCorrupted": "Failed to read file: File may be corrupted",
+    "installCommandCopied": "Install command copied! Paste in PowerShell",
+    "updateSkipped": "Update skipped",
+    "updateAvailable": "Lyrics Plus v{version} available! Click to update"
   },
   "contextMenu": {
     "provider": "Translation Provider",
@@ -327,10 +348,12 @@ window.LANG_EN = {
     "preTransNext": "Next song pre-translated",
     "preTranslateChip": "AI is preparing the next track in the background",
     "copy": "Copy to clipboard",
+    "searchYoutube": "Search on YouTube",
+    "searchNetease": "Search on NetEase",
     "viewReasoning": "View AI reasoning"
   },
   "videoModal": {
-    "title": "Video Background Settings",
+    "title": "Video Background",
     "topVideos": "Top Matching Videos",
     "inputId": "YouTube Video ID or URL:",
     "placeholder": "e.g., dQw4w9WgXcQ or https://youtube.com/watch?v=...",
@@ -340,9 +363,19 @@ window.LANG_EN = {
     "manualVideo": "Manual Video",
     "score": "Score",
     "detectedId": "Detected ID",
-    "currentVideo": "Current video"
+    "currentVideo": "Current video",
+    "pasteCopied": "Paste copied link:",
+    "paste": "Paste from clipboard",
+    "noResults": "No matching videos found."
   },
   "modal": {
     "title": "Lyrics Plus Settings"
+  },
+  "neteaseModal": {
+    "title": "Search NetEase",
+    "placeholder": "Search by original name (kanji, hangul, romaji...)",
+    "search": "Search",
+    "failed": "Search failed",
+    "noResults": "No results found. Try searching by original name or romaji."
   }
 };

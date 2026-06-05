@@ -177,6 +177,12 @@ const GeminiClient = {
             const inner = m[2];
             if (inner) parts.push(inner);
         }
+        // Also support Gemma 4 control tokens: <|channel>thought ... <channel|>
+        const gemmaRe = /<\|channel>thought\n?([\s\S]*?)(?:<channel\|>|$)/gi;
+        while ((m = gemmaRe.exec(s)) !== null) {
+            const inner = m[1];
+            if (inner) parts.push(inner);
+        }
         return parts.join("\n\n").trim();
     },
 
@@ -189,7 +195,8 @@ const GeminiClient = {
         const patterns = [
             /<thought>([\s\S]*?)<\/thought>/gi,
             new RegExp("<" + "think" + ">[\\s\\S]*?<" + "/" + "think" + ">", "gi"),
-            new RegExp("<" + "redacted_thinking" + ">[\\s\\S]*?<" + "/" + "redacted_thinking" + ">", "gi")
+            new RegExp("<" + "redacted_thinking" + ">[\\s\\S]*?<" + "/" + "redacted_thinking" + ">", "gi"),
+            /<\|channel>thought\n?([\s\S]*?)<channel\|>/gi
         ];
         let prev = null;
         while (prev !== s) {
@@ -314,10 +321,38 @@ const GeminiClient = {
             return { vi: stringArr, phonetic: stringArr.join('\n') };
         }
 
+        // Priority 2.5: Regex JSON Recovery (if JSON parsing failed but response contains JSON structures)
+        if (!arr && (raw.includes('[') || raw.includes('{'))) {
+            const stringPattern = /"((?:[^"\\]|\\.)*)"/g;
+            const matches = [...raw.matchAll(stringPattern)];
+            if (matches.length > 0) {
+                const stringArr = [];
+                for (const match of matches) {
+                    const str = match[1];
+                    // Check if this string is followed by a colon (i.e. is a key like "translations":)
+                    const postIndex = match.index + match[0].length;
+                    const postText = raw.slice(postIndex, postIndex + 10);
+                    const isKey = /^\s*:/.test(postText);
+                    if (!isKey) {
+                        try {
+                            stringArr.push(JSON.parse(`"${str}"`));
+                        } catch {
+                            // Manual unescape fallback
+                            stringArr.push(str.replace(/\\"/g, '"').replace(/\\\\/g, '\\'));
+                        }
+                    }
+                }
+                if (stringArr.length > 0) {
+                    console.log(`[Lyrics+] Recovered ${stringArr.length} lines from malformed JSON via regex`);
+                    return { vi: stringArr, phonetic: stringArr.join('\n') };
+                }
+            }
+        }
+
         // Priority 3: Fallback - split by newlines
         DebugLogger.warn("Structured parse failed, using line split fallback...");
         const rawLines = raw.split('\n').filter(l => l.trim());
-        return { vi: rawLines, phonetic: rawLines.join('\n') };
+        return { vi: rawLines, phonetic: rawLines.join('\n'), isFallbackSplit: true };
     },
 
     /**
@@ -332,7 +367,7 @@ const GeminiClient = {
      *   "high"   — full reasoning (~8192 tokens or dynamic)
      *
      * Silently no-op (no warn toast) when the model has no thinking mode in the first place
-     * (e.g. Gemma 4 26B A4B, Gemma 1/2/3, GPT-4o, Claude Haiku, DeepSeek-chat) — the user's
+     * (e.g. Gemma 1/2/3, GPT-4o, Claude Haiku, DeepSeek-chat) — the user's
      * intent is already satisfied by the model's design.
      *
      * Warns only on genuine capability mismatch: user wants "off" on a model whose thinking
@@ -354,12 +389,14 @@ const GeminiClient = {
         // ── Google Gemini (OpenAI-compat or Vertex) ──────────────────────────
         if (url.includes("generativelanguage.googleapis.com") || url.includes("aiplatform.googleapis.com")) {
             // Three classes on Google's endpoint:
-            //   1) Gemini 2.5+ / thinking-exp — supports `thinking_config.thinking_budget` via API
-            //   2) Gemma 4 31B (dense) — thinks natively, but API does NOT accept thinking_config
-            //      (it's a Gemini-only field). Thinking cannot be disabled at runtime.
-            //   3) Gemma 4 26B A4B (MoE), Gemma 1/2/3, older Gemini — no thinking at all.
-            const isGeminiWithBudget = /gemini-(2\.5|3)|flash-thinking|thinking-exp/.test(m);
-            const isGemmaDenseThinking = /gemma-4-31b/.test(m);
+            //   1) Gemini 2.5+ / 3.x / thinking-exp — supports `thinking_config.thinking_budget`
+            //      via extra_body (Gemini-only native field).
+            //   2) Gemma 4 (26B MoE + 31B dense) — both think natively. Since ~May 2026,
+            //      JSON schema mode no longer implicitly suppresses thinking server-side.
+            //      Use top-level `reasoning_effort` (OpenAI compat) to control.
+            //   3) Gemma 1/2/3, older Gemini — no thinking at all.
+            const isGeminiWithBudget = /gemini-(2\.5|[3-9])|flash-thinking|thinking-exp/.test(m);
+            const isGemma4 = /gemma-4/.test(m);
             if (isGeminiWithBudget) {
                 body.extra_body = {
                     ...(body.extra_body || {}),
@@ -371,10 +408,16 @@ const GeminiClient = {
                         },
                     },
                 };
-            } else if (isGemmaDenseThinking && effort === "off") {
-                applied = false; // warn: Gemma 4 31B thinks no matter what
+            } else if (isGemma4) {
+                // Gemma 4 (26B + 31B) thinks natively via <|think|> chat template token.
+                // Google's hosted API does NOT accept reasoning_effort or thinking_config
+                // for Gemma models (HTTP 400: "Thinking budget is not supported").
+                // Thinking is controlled server-side by the chat template — we cannot
+                // disable it from the client. Previously JSON schema mode implicitly
+                // suppressed thinking; this changed ~May 2026.
+                // TODO: Monitor Google API updates for Gemma thinking control support.
             }
-            // else: non-thinking Gemma (26B A4B, 1/2/3) — silent no-op
+            // else: Gemma 1/2/3 — no thinking, silent no-op
         }
         // ── OpenRouter (routes to many providers — always honors reasoning field) ────
         else if (url.includes("openrouter.ai")) {
@@ -461,22 +504,23 @@ const GeminiClient = {
         const m = (model || "").toLowerCase();
         const isGoogle = ep.includes("generativelanguage.googleapis.com");
         if (!isGoogle) return true;
-        // Google API: only Gemma 1/2/3 are limited. Gemini and Gemma 4+ work.
-        if (/^gemma-[123](?:[^\d]|$)/.test(m)) return false;
+        // Google API: Gemma 1/2/3 reject JSON schema + system role natively.
+        // Gemma 4 natively supports them, BUT its native <|think|> tokens clash with
+        // Google's JSON schema constraints. When thinking is disabled, the model
+        // generates an empty thought block <|channel>thought\n<channel|> before the output,
+        // which violates JSON schema and causes the generation to hang for 40s+ before timing out.
+        // Forcing Prompt Engineering mode bypasses the JSON constraint and restores fast speeds.
+        if (/^gemma-[1234](?:[^\d]|$)/.test(m)) return false;
         return true;
     },
 
-    /** One-shot toast when JSON schema mode is auto-demoted to prompt mode. */
+    /** Silent marker when JSON schema mode is auto-demoted to prompt mode. */
     warnJsonSchemaUnsupported(endpoint, model) {
         if (!this._jsonFallbackWarnedKeys) this._jsonFallbackWarnedKeys = new Set();
         const key = `${endpoint}::${model}`;
         if (this._jsonFallbackWarnedKeys.has(key)) return;
         this._jsonFallbackWarnedKeys.add(key);
-        try {
-            const msg = (typeof getText === "function" && getText("settings.responseMode.unsupportedToast"))
-                || `${model} doesn't support JSON Schema — using Prompt Engineering instead.`;
-            Spicetify?.showNotification?.(msg, false, 4000);
-        } catch (_) { /* notification optional */ }
+        // Toast removed: this fallback is now intentional for Gemma 4.
     },
 
     /**
@@ -782,7 +826,7 @@ const GeminiClient = {
         DebugLogger.group(`${wantSmartPhonetic ? 'Phonetic' : 'Translation'} Request`);
 
         const endpoint = CONFIG?.visual?.["gemini:endpoint"] || "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-        const model = CONFIG?.visual?.["gemini:model"] || "gemma-4-26b-a4b-it";
+        const model = CONFIG?.visual?.["gemini:model"] || "gemini-3.1-flash-lite";
         let responseMode = CONFIG?.visual?.["gemini:response-mode"] || "prompt";
 
         // Auto-demote JSON Schema → Prompt Engineering for models that don't support it
@@ -806,6 +850,25 @@ const GeminiClient = {
         // (strict anti-redraft on low, unleashed on high).
         const reasoningEffort = CONFIG?.visual?.["gemini:reasoning-effort"] || "low";
 
+        const ep = (endpoint || "").toLowerCase();
+        const m = (model || "").toLowerCase();
+        const isGoogle = ep.includes("generativelanguage.googleapis.com");
+        const supportsSystemRole = !(isGoogle && /^gemma-[123](?:[^\d]|$)/.test(m));
+        const isGemma4Google = isGoogle && /^gemma-4(?:[^\d]|$)/.test(m);
+        const isGeminiWithBudget = /gemini-(2\.5|[3-9])|flash-thinking|thinking-exp/.test(m);
+
+        // A model is thinking if it's Gemma 4 (forced thinking on Google API) OR
+        // if it's Gemini with thinking budget and reasoning effort is not "off".
+        const isThinkingActive = isGemma4Google || (isGeminiWithBudget && reasoningEffort !== "off");
+
+        // Calculate max_tokens budget. If the model is actively thinking, the reasoning block
+        // will consume thousands of tokens. We must drastically increase the output budget (6144+)
+        // so the final translation output itself doesn't get truncated (resulting in no output).
+        let tokens = this.estimateMaxTokens(lineCount, wantSmartPhonetic);
+        if (isThinkingActive) {
+            tokens = Math.max(tokens, 6144);
+        }
+
         if (responseMode === "json_schema") {
             // JSON Schema mode: system/user split + response_format
             let prompt;
@@ -815,7 +878,7 @@ const GeminiClient = {
                     user: Prompts.buildMinimalFallbackPrompt({ artist, title, text })
                 };
             } else if (wantSmartPhonetic) {
-                prompt = Prompts.buildJsonSchemaPhoneticPrompt({ artist, title, text });
+                prompt = Prompts.buildJsonSchemaPhoneticPrompt({ artist, title, text, reasoningEffort });
             } else {
                 prompt = Prompts.buildJsonSchemaTranslationPrompt({ artist, title, text, styleKey, pronounKey, reasoningEffort });
             }
@@ -827,29 +890,42 @@ const GeminiClient = {
                     { role: "user", content: prompt.user }
                 ],
                 temperature: wantSmartPhonetic ? 0.35 : 1,
-                max_tokens: this.estimateMaxTokens(lineCount, wantSmartPhonetic),
+                max_tokens: tokens,
                 response_format: { type: "json_object" }
             };
         } else {
-            // Prompt Engineering mode: single user message (some models like Gemma 3 don't support system messages)
+            // Prompt Engineering mode
             let prompt;
             if (_isRetry) {
                 prompt = {
                     system: "You are a translator. Output compact tags <1>...</1> only.",
-                    user: Prompts.buildMinimalFallbackPrompt({ artist, title, text })
+                    user: Prompts.buildMinimalFallbackTagsPrompt({ artist, title, text })
                 };
             } else {
                 prompt = Prompts.buildPromptEngPrompt({ artist, title, text, styleKey, pronounKey, wantSmartPhonetic, reasoningEffort });
             }
 
-            // Combine system + user into single user message for universal compatibility
-            const combinedContent = `${prompt.system}\n\n---\n\n${prompt.user}`;
+            let msgs = [];
+            if (supportsSystemRole) {
+                msgs.push({ role: "system", content: prompt.system });
+            }
+
+            if (supportsSystemRole) {
+                msgs.push({ role: "user", content: prompt.user });
+            } else {
+                msgs.push({ role: "user", content: `${prompt.system}\n\n---\n\n${prompt.user}` });
+            }
+
+            // Force greedy decoding (temperature: 0) for Gemma 4 to stop it from 
+            // hallucinating and redrafting endlessly in its forced thinking block.
+            let temp = wantSmartPhonetic ? 0.35 : 0.7;
+            if (isGemma4Google) temp = 0.0;
 
             body = {
                 model,
-                messages: [{ role: "user", content: combinedContent }],
-                temperature: wantSmartPhonetic ? 0.35 : 0.7,
-                max_tokens: this.estimateMaxTokens(lineCount, wantSmartPhonetic)
+                messages: msgs,
+                temperature: temp,
+                max_tokens: tokens
             };
         }
 
@@ -903,7 +979,7 @@ const GeminiClient = {
 
                 // Adapt streamed result to the shape processResponse expects
                 const data = { choices: [{ message: streamed.message }], usage: streamed.usage };
-                return this.processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime);
+                return this.processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime, _isRetry);
             };
 
             if (disableQueue) {
@@ -926,7 +1002,8 @@ const GeminiClient = {
             console.groupEnd();
 
             // Retry with fallback prompt if first attempt failed
-            if (error.name !== 'AbortError' && !_isRetry && error.status) {
+            const isClientError = error.status === 401 || error.status === 403 || error.status === 404;
+            if (error.name !== 'AbortError' && !_isRetry && !isClientError) {
                 console.log('[Lyrics+] Retrying with fallback minimal prompt...');
                 return this.callGemini({
                     apiKey, artist, title, text,
@@ -1008,7 +1085,7 @@ const GeminiClient = {
         return "";
     },
 
-    processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime) {
+    processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime, isRetry = false) {
         // OpenAI-compatible format: always data.choices[0].message.content
         if (!data?.choices?.length) throw new Error("No response from API");
         const message = data.choices[0]?.message;
@@ -1049,8 +1126,17 @@ const GeminiClient = {
 
         const duration = Date.now() - startTime;
 
-        // Validate line count
+        // Validate line count and structure integrity
         if (result.vi && result.vi.length !== lineCount) {
+            if (!isRetry) {
+                if (result.isFallbackSplit) {
+                    throw new Error(`Format validation failed: expected ${lineCount} structured lines, but parser fell back to raw line splitting and got ${result.vi.length} lines.`);
+                }
+                if (responseMode === "json_schema") {
+                    throw new Error(`JSON format validation failed: expected ${lineCount} lines, got ${result.vi.length} lines.`);
+                }
+            }
+
             DebugLogger.warn(`Line count mismatch! Expected: ${lineCount}, Got: ${result.vi.length}`);
             // Pad or trim to match expected count
             if (result.vi.length < lineCount) {

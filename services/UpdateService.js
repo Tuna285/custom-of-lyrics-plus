@@ -4,7 +4,7 @@ const UpdateService = {
     VERSION_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/version.json",
     RAW_BASE_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main",
     INSTALL_COMMAND: "iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/install.ps1 | iex",
-    CURRENT_VERSION: "1.6.0",
+    CURRENT_VERSION: "1.7.0",
     CHECK_INTERVAL: 0,
 
     UPDATE_FILES: [
@@ -75,7 +75,7 @@ const UpdateService = {
     async copyInstallCommand() {
         try {
             await navigator.clipboard.writeText(this.INSTALL_COMMAND);
-            Spicetify.showNotification("Install command copied! Paste in PowerShell", false, 3000);
+            Spicetify.showNotification(getText("notifications.installCommandCopied"), false, 3000);
             return true;
         } catch (e) {
             // Fallback for older browsers
@@ -85,7 +85,7 @@ const UpdateService = {
             textarea.select();
             document.execCommand('copy');
             document.body.removeChild(textarea);
-            Spicetify.showNotification("Install command copied! Paste in PowerShell", false, 3000);
+            Spicetify.showNotification(getText("notifications.installCommandCopied"), false, 3000);
             return true;
         }
     },
@@ -243,7 +243,7 @@ const UpdateService = {
                                     localStorage.setItem("lyrics-plus:skipped-versions", JSON.stringify(skippedVersions));
                                 }
                                 Spicetify.PopupModal.hide();
-                                Spicetify.showNotification("Update skipped", false, 1500);
+                                Spicetify.showNotification(getText("notifications.updateSkipped"), false, 1500);
                             },
                             style: {
                                 flex: 1,
@@ -294,7 +294,7 @@ const UpdateService = {
         // Show notification toast first
         try {
             Spicetify.showNotification(
-                `Lyrics Plus v${newVersion} available! Click to update`,
+                getText("notifications.updateAvailable", { version: newVersion }),
                 false,
                 5000
             );

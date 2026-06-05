@@ -163,11 +163,35 @@ openVideoSettingsModal() {
 	const ModalContent = () => {
 		const [offset, setOffset] = react.useState(currentOffset);
 		const [videoId, setVideoId] = react.useState(currentVideo);
-		const [manualInput, setManualInput] = react.useState("");
+		const [manualInput, setManualInput] = react.useState(currentVideo);
+		const [searchResults, setSearchResults] = react.useState([]);
+		const [searchLoading, setSearchLoading] = react.useState(false);
+		const ytRegex = /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([a-zA-Z0-9_-]{11})/;
+
+		react.useEffect(() => {
+			let isMounted = true;
+			const fetchResults = async () => {
+				setSearchLoading(true);
+				try {
+					const query = `${info.artist} - ${info.title}`;
+					const results = await VideoManager.searchMultipleVideos(query, info.uri);
+					if (isMounted) {
+						setSearchResults(results);
+					}
+				} catch (e) {
+					console.error("[Lyrics+] Failed to fetch top videos:", e);
+				} finally {
+					if (isMounted) setSearchLoading(false);
+				}
+			};
+			fetchResults();
+			return () => { isMounted = false; };
+		}, []);
 
 		return react.createElement("div", { 
 			style: { 
 				padding: "10px", 
+				width: "380px",
 				maxWidth: "450px",
 				color: "#fff"
 			} 
@@ -193,16 +217,16 @@ openVideoSettingsModal() {
 						objectFit: "cover"
 					}
 				}),
-				react.createElement("div", { style: { flex: 1 } },
+				react.createElement("div", { style: { flex: 1, minWidth: 0 } },
 					react.createElement("div", { 
-						style: { fontWeight: "bold", fontSize: "14px", marginBottom: "4px" } 
+						style: { fontWeight: "bold", fontSize: "14px", marginBottom: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } 
 					}, info.title),
 					react.createElement("div", { 
-						style: { fontSize: "12px", color: "#aaa" } 
+						style: { fontSize: "12px", color: "#aaa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } 
 					}, info.artist)
 				),
-				// Copy Button
-				react.createElement(Spicetify.ReactComponent.TooltipWrapper, { label: getText("tooltips.copy") || "Copy to search" },
+				// YouTube Search Button
+				react.createElement(Spicetify.ReactComponent.TooltipWrapper, { label: getText("tooltips.searchYoutube") || "Search on YouTube" },
 					react.createElement("button", {
 						className: "lyrics-config-button",
 						style: {
@@ -214,15 +238,74 @@ openVideoSettingsModal() {
 							marginLeft: "5px"
 						},
 						onClick: () => {
-							const textToCopy = `${info.artist} - ${info.title}`;
-							Spicetify.Platform.ClipboardAPI.copy(textToCopy);
-							const msg = getText("notifications.copied").replace("{text}", textToCopy);
-							Spicetify.showNotification(msg);
+							const query = `${info.artist} - ${info.title}`;
+							const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+							window.open(searchUrl, "_blank");
 						}
 					}, react.createElement("svg", {
 						width: 16, height: 16, viewBox: "0 0 16 16", fill: "currentColor",
-						dangerouslySetInnerHTML: { __html: '<path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>' }
+						dangerouslySetInnerHTML: { __html: '<path d="M8.051 1.999h.089c.822.003 4.987.033 6.11.335a2.01 2.01 0 0 1 1.415 1.42c.101.38.172.883.22 1.402l.01.104.022.26.008.104c.065.914.073 1.77.074 1.957v.075c-.001.194-.01 1.108-.104 2.481l-.008.104-.022.26-.01.104c-.048.52-.119 1.023-.22 1.402a2.007 2.007 0 0 1-1.415 1.42c-1.16.312-5.569.334-6.18.335h-.142c-.309 0-1.587-.006-2.927-.052l-.17-.006-.287-.012-.17-.008c-1.372-.064-2.285-.102-2.484-.105a2.01 2.01 0 0 1-1.415-1.42c-.101-.38-.172-.882-.22-1.401l-.01-.104-.022-.26-.008-.104C.065 9.01.057 8.154.056 7.967v-.075c.001-.194.01-1.108.104-2.48l.008-.105.022-.26.01-.104c.048-.52.119-1.023.22-1.402a2.007 2.007 0 0 1 1.415-1.42C3.125 2.006 7.625 1.999 8.051 2zm-.965 3.19v4.62l4.002-2.31-4.002-2.31z"/>' }
 					}))
+				)
+			),
+
+			// Top Matching Videos Section
+			react.createElement("div", { style: { marginBottom: "12px" } },
+				react.createElement("label", {
+					style: {
+						fontSize: "12px",
+						fontWeight: "bold",
+						color: "var(--spice-button)",
+						display: "block",
+						marginBottom: "6px"
+					}
+				}, getText("videoModal.topVideos")),
+				searchLoading ? react.createElement("div", { style: { fontSize: "12px", color: "#aaa", textAlign: "center", padding: "10px 0" } }, "...") :
+				searchResults.length === 0 ? react.createElement("div", { style: { fontSize: "12px", color: "#888", textAlign: "center", padding: "10px 0" } }, getText("videoModal.noResults")) :
+				react.createElement("div", {
+					style: {
+						display: "flex",
+						flexDirection: "column",
+						gap: "6px",
+						maxHeight: "120px",
+						overflowY: "auto",
+						paddingRight: "4px"
+					}
+				},
+					searchResults.map((video) => {
+						const isSelected = videoId === video.videoId;
+						const formatDuration = (sec) => {
+							if (!sec) return "";
+							return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+						};
+						return react.createElement("button", {
+							key: video.videoId,
+							onClick: () => {
+								setManualInput(video.videoId);
+								setVideoId(video.videoId);
+							},
+							style: {
+								display: "flex",
+								alignItems: "center",
+								gap: "10px",
+								padding: "6px 10px",
+								borderRadius: "6px",
+								background: isSelected ? "rgba(29,185,84,0.15)" : "rgba(255,255,255,0.04)",
+								border: isSelected ? "1px solid rgba(29,185,84,0.4)" : "1px solid transparent",
+								cursor: "pointer",
+								color: "var(--spice-text)",
+								textAlign: "left",
+								fontSize: "12px",
+								width: "100%"
+							}
+						},
+							react.createElement("div", { style: { flex: 1, minWidth: 0 } },
+								react.createElement("div", { style: { fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, video.title),
+								react.createElement("div", { style: { fontSize: "10px", color: "#888", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, video.author)
+							),
+							react.createElement("div", { style: { fontSize: "10px", color: "#666", marginLeft: "6px", whiteSpace: "nowrap" } }, formatDuration(video.lengthSeconds))
+						);
+					})
 				)
 			),
 
@@ -230,28 +313,69 @@ openVideoSettingsModal() {
 			react.createElement("div", {
 				style: { marginBottom: "10px" }
 			},
-				react.createElement("label", { 
-					style: { 
-						display: "block", 
-						marginBottom: "5px", 
-						fontSize: "12px",
-						fontWeight: "bold",
-						color: "var(--spice-button)"
-					} 
-				}, getText("videoModal.inputId")),
+				react.createElement("div", {
+					style: {
+						display: "flex",
+						justifyContent: "space-between",
+						alignItems: "center",
+						marginBottom: "5px"
+					}
+				},
+					react.createElement("label", { 
+						style: { 
+							fontSize: "12px",
+							fontWeight: "bold",
+							color: "var(--spice-button)"
+						} 
+					}, getText("videoModal.inputId")),
+					react.createElement("button", {
+						style: {
+							background: "transparent",
+							border: "none",
+							color: "var(--spice-button, #1db954)",
+							cursor: "pointer",
+							fontSize: "11px",
+							fontWeight: "bold",
+							padding: "2px 6px"
+						},
+						onClick: async () => {
+							try {
+								const text = await navigator.clipboard.readText();
+								if (text) {
+									const trimmed = text.trim();
+									const match = trimmed.match(ytRegex);
+									if (match) {
+										setManualInput(trimmed);
+										setVideoId(match[1]);
+										Spicetify.showNotification(`✓ ${getText("notifications.videoSynced").replace("{videoId}", match[1]).replace("{offset}", offset)}`);
+									} else if (trimmed.length === 11 && /^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+										setManualInput(trimmed);
+										setVideoId(trimmed);
+										Spicetify.showNotification("✓ " + getText("notifications.videoSet", { videoId: trimmed }));
+									} else {
+										Spicetify.showNotification(getText("notifications.invalidClipboardUrl"), true, 2000);
+									}
+								}
+							} catch (err) {
+								Spicetify.showNotification(getText("notifications.failedReadClipboard"), true, 2000);
+							}
+						}
+					}, getText("videoModal.paste") || "Paste")
+				),
 				react.createElement("input", {
 					type: "text",
 					placeholder: getText("videoModal.placeholder"),
-					value: manualInput || videoId,
+					value: manualInput,
 					onChange: (e) => {
 						const val = e.target.value.trim();
 						setManualInput(val);
-						// Auto-extract video ID from URL or direct ID
-						const urlMatch = val.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+						const urlMatch = val.match(ytRegex);
 						if (urlMatch) {
 							setVideoId(urlMatch[1]);
 						} else if (val.length === 11 && /^[a-zA-Z0-9_-]{11}$/.test(val)) {
 							setVideoId(val);
+						} else {
+							setVideoId("");
 						}
 					},
 					style: { 
@@ -365,7 +489,7 @@ openVideoSettingsModal() {
 							// Save offset AND manual video ID to IndexedDB for persistence
 							VideoManager.saveOffset(info.uri, offset);
 							VideoManager.saveManualVideo(info.uri, videoId);
-							Spicetify.showNotification(`✓ Video set: ${videoId} (saved)`, false, 2000);
+							Spicetify.showNotification("✓ " + getText("notifications.videoSetSaved", { videoId }), false, 2000);
 						}
 						Spicetify.PopupModal.hide();
 					},
@@ -384,7 +508,7 @@ openVideoSettingsModal() {
 				react.createElement("button", {
 					onClick: () => {
 						// Simple client-only reset
-						VideoManager.reset();
+						VideoManager.reset(info.uri);
 						self.setState({ videoBackground: null });
 						Spicetify.PopupModal.hide();
 						Spicetify.showNotification(getText("notifications.videoReset"), false, 2000);
@@ -814,7 +938,7 @@ infoFromTrack(track) {
 					this.setState({ translationStatus: null });
 				}
 				const modeDisplayName = mode === "gemini_romaji" ? "Romaji, Romaja, Pinyin translation" : "Vietnamese translation";
-				Spicetify.showNotification(`${modeDisplayName} failed: ${error.message || "Unknown error"}`, true, 4000);
+				Spicetify.showNotification(getText("notifications.translationFailedWithReason", { mode: modeDisplayName, reason: error.message || "Unknown error" }), true, 4000);
 				return null; // Return null on failure
 			}
 		};
@@ -1022,8 +1146,10 @@ infoFromTrack(track) {
 		});
 
 		const updateCombinedLyrics = (force = false) => {
-			// Guard clause to prevent race conditions from previous songs or requests
-			if (this.state.uri !== uri || this.activeRequestTimestamp !== requestTimestamp) {
+			// Guard clause: only skip if song has changed. Do NOT check activeRequestTimestamp
+			// here — slow Gemini responses (40s+) are still valid results for THIS song, even if
+			// lyricsSource was re-entered (e.g. by reasoning state changes triggering re-renders).
+			if (this.state.uri !== uri) {
 				return;
 			}
 
@@ -1095,7 +1221,7 @@ infoFromTrack(track) {
 
 		// Start first request immediately (non-blocking)
 		const promise1 = processMode(firstMode, lyrics).then(result => {
-			if (this.state.uri !== uri || this.activeRequestTimestamp !== requestTimestamp) return;
+			if (this.state.uri !== uri) return;
 			if (this._dmResults?.[currentUri]) this._dmResults[currentUri][firstModeKey] = result;
 			updateCombinedLyrics(true);
 		}).catch(error => {
@@ -1107,7 +1233,7 @@ infoFromTrack(track) {
 		// Delay 500ms then start second request (staggered to avoid API contention)
 		const promise2 = new Promise(resolve => setTimeout(resolve, 500)).then(() => {
 			return processMode(secondMode, lyrics).then(result => {
-				if (this.state.uri !== uri || this.activeRequestTimestamp !== requestTimestamp) return;
+				if (this.state.uri !== uri) return;
 				if (this._dmResults?.[currentUri]) this._dmResults[currentUri][secondModeKey] = result;
 				updateCombinedLyrics(true);
 			}).catch(error => {
@@ -1529,7 +1655,7 @@ infoFromTrack(track) {
 				// Show pending notification if conversion takes longer than 3s
 				pendingTimer = setTimeout(() => {
 					try {
-						Spicetify.showNotification("Still converting...", false, 2000);
+						Spicetify.showNotification(getText("notifications.stillConverting"), false, 2000);
 					} catch (e) {
 						if (window.lyricsPlusDebug) console.warn("[Lyrics+] Could not show notification:", e);
 					}
@@ -1667,7 +1793,7 @@ infoFromTrack(track) {
 					// Warn if pinyin conversion produced no visible changes (likely CDN blocked -> fallback)
 					const anyChanged = lyrics.some((lyric, i) => (result?.[i] ?? "") !== (lyric?.text || ""));
 					if (!anyChanged) {
-						Spicetify.showNotification("Pinyin library unavailable. Showing original. Allow jsDelivr or unpkg.", true, 4000);
+						Spicetify.showNotification(getText("notifications.pinyinLibraryUnavailable"), true, 4000);
 					}
 				} else {
 					const map = {
@@ -1678,7 +1804,7 @@ infoFromTrack(track) {
 
 					// Prevent self-conversion
 					if (targetConvert === "cn") {
-						Spicetify.showNotification("Conversion skipped: Already in Simplified Chinese", false, 2000);
+						Spicetify.showNotification(getText("notifications.conversionSkippedAlreadySimplified"), false, 2000);
 						return lyrics;
 					}
 
@@ -1695,7 +1821,7 @@ infoFromTrack(track) {
 					// Warn if pinyin conversion produced no visible changes (likely CDN blocked -> fallback)
 					const anyChanged = lyrics.some((lyric, i) => (result?.[i] ?? "") !== (lyric?.text || ""));
 					if (!anyChanged) {
-						Spicetify.showNotification("Pinyin library unavailable. Showing original. Allow jsDelivr or unpkg.", true, 4000);
+						Spicetify.showNotification(getText("notifications.pinyinLibraryUnavailable"), true, 4000);
 					}
 				} else {
 					const map = {
@@ -1716,7 +1842,7 @@ infoFromTrack(track) {
 			const res = Utils.processTranslatedLyrics(result, lyrics);
 			return res;
 		} catch (error) {
-			Spicetify.showNotification(`Conversion failed: ${error.message || "Unknown error"}`, true, 3000);
+			Spicetify.showNotification(getText("notifications.conversionFailed", { error: error.message || "Unknown error" }), true, 3000);
 			console.error("Translation error:", error);
 		}
 	}
@@ -1999,7 +2125,7 @@ infoFromTrack(track) {
 		const reader = new FileReader();
 
 		if (file[0].size > 1024 * 1024) {
-			Spicetify.showNotification("File too large: Maximum size is 1MB", true, 3000);
+			Spicetify.showNotification(getText("notifications.fileTooLarge"), true, 3000);
 			return;
 		}
 
@@ -2011,7 +2137,7 @@ infoFromTrack(track) {
 					.map((key) => key[0].toUpperCase() + key.slice(1));
 
 				if (!parsedKeys.length) {
-					Spicetify.showNotification("No valid lyrics found in file", true, 3000);
+					Spicetify.showNotification(getText("notifications.noLyricsInFile"), true, 3000);
 					return;
 				}
 
@@ -2037,16 +2163,16 @@ infoFromTrack(track) {
 				CacheManager.set(this.currentTrackUri, newState);
 				this.saveLocalLyrics(this.currentTrackUri, newState);
 
-				Spicetify.showNotification(`✓ Loaded ${parsedKeys.join(", ")} lyrics from file`, false, 3000);
+				Spicetify.showNotification("✓ " + getText("notifications.loadedLyricsFromFile", { types: parsedKeys.join(", ") }), false, 3000);
 			} catch (e) {
 				console.error(e);
-				Spicetify.showNotification("Failed to load lyrics: Invalid file format", true, 3000);
+				Spicetify.showNotification(getText("notifications.failedLoadLyricsInvalidFormat"), true, 3000);
 			}
 		};
 
 		reader.onerror = (e) => {
 			console.error(e);
-			Spicetify.showNotification("Failed to read file: File may be corrupted", true, 3000);
+			Spicetify.showNotification(getText("notifications.failedReadFileCorrupted"), true, 3000);
 		};
 
 		reader.readAsText(file[0]);
@@ -2693,7 +2819,7 @@ infoFromTrack(track) {
 				// NetEase Manual Search Button
 				react.createElement(
 					Spicetify.ReactComponent.TooltipWrapper,
-					{ label: "Tìm Lyrics trên NetEase" },
+					{ label: getText("tooltips.searchNetease") || "Search on NetEase" },
 					react.createElement("button", {
 						className: "lyrics-config-button",
 						onClick: () => {
