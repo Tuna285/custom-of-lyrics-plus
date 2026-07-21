@@ -654,35 +654,14 @@ const ConfigHelper = () => {
 	];
 
 	const MODEL_PRESETS = [
-		// Gemini 3.6 Flash & 3.5 Flash-Lite — recommended optimal split
-		{ value: "gemini-3.6-flash", label: "Gemini 3.6 Flash — Highest quality for translation" },
+		// Google Gemini 3.x series
+		{ value: "gemini-3.6-flash", label: "Gemini 3.6 Flash — Highest quality model" },
 		{ value: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite — Ultra fast, 500 RPD free quota" },
 		"gemini-3.5-flash",
 		"gemini-3.1-flash-lite",
-		"gemini-2.5-flash",
-		"gemini-2.5-flash-lite",
-		// Google Gemini Pro — smart tiers (higher quality, 50 RPD quota)
-		"gemini-2.5-pro",
-		"gemini-1.5-pro",
-		// Gemma 4 26B A4B (MoE, ~3.88B active) — fast option with 1500 RPD limit, no thinking mode.
+		// Google Gemma 4 series
 		"gemma-4-26b-a4b-it",
-		// Gemma 4 31B (dense) — strongest Gemma 4 with thinking mode
 		"gemma-4-31b-it",
-		// Gemma 3 legacy (still served, useful as fallback)
-		"gemma-3-27b-it",
-		// OpenRouter (gateway namespace prefix) — current routes
-		"openai/gpt-5.4-mini",
-		"anthropic/claude-sonnet-4.6",
-		// DeepSeek — aliases auto-route to V3.2 (chat = non-thinking, reasoner = thinking)
-		"deepseek-chat",
-		"deepseek-reasoner",
-		// OpenAI GPT-5.4 family (Mar 2026)
-		"gpt-5.4",
-		"gpt-5.4-mini",
-		// Anthropic Claude 4.x (Feb–Apr 2026)
-		"claude-opus-4-7",
-		"claude-sonnet-4-6",
-		"claude-haiku-4-5",
 	];
 
 	// Translation Settings (OpenAI-compatible endpoint + keys; no proxy/official split)
