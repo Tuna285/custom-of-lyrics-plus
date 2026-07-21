@@ -241,6 +241,18 @@ class LyricsContainer extends react.Component {
 		});
 	}
 
+	toggleReasoning = () => {
+		this.setState((prevState) => ({
+			isReasoningVisible: !prevState.isReasoningVisible,
+		}));
+	};
+
+	openVideoSettingsModal() {
+		if (typeof window.LyricsPlus?.openVideoSettingsModal === "function") {
+			window.LyricsPlus.openVideoSettingsModal(this);
+		}
+	}
+
 	async refreshMusixmatchTranslation() {
 		const selectedLanguage = CONFIG.visual["musixmatch-translation-language"] || "none";
 		const availableTranslations = this.state.musixmatchAvailableTranslations || [];
@@ -1098,6 +1110,31 @@ class LyricsContainer extends react.Component {
 						musixmatchSelectedLanguage: this.state.musixmatchTranslationLanguage || CONFIG.visual["musixmatch-translation-language"],
 					}),
 				react.createElement(AdjustmentsMenu, { mode, hasPerformer }),
+				// Video Background Settings Button
+				CONFIG.visual["video-background"] &&
+					react.createElement(
+						Spicetify.ReactComponent.TooltipWrapper,
+						{ label: getText("tooltips.videoSettings", {}, "Video Settings") },
+						react.createElement(
+							"button",
+							{
+								className: "lyrics-config-button",
+								onClick: () => {
+									this.openVideoSettingsModal();
+								},
+								style: { color: "var(--lp-fab-icon, var(--spice-button))" },
+							},
+							react.createElement("svg", {
+								width: 16,
+								height: 16,
+								viewBox: "0 0 16 16",
+								fill: "currentColor",
+								dangerouslySetInnerHTML: {
+									__html: '<path d="M14.5 13.5h-13A.5.5 0 011 13V3a.5.5 0 01.5-.5h13a.5.5 0 01.5.5v10a.5.5 0 01-.5.5zM2 12h12V4H2v8z"/><path d="M6 6l4 2-4 2V6z"/>',
+								},
+							})
+						)
+					),
 				react.createElement(
 					Spicetify.ReactComponent.TooltipWrapper,
 					{
@@ -1166,37 +1203,124 @@ class LyricsContainer extends react.Component {
 							},
 						})
 					)
-				)
+				),
+				// Reset translation cache button
+				(this.state.synced || this.state.unsynced || this.state.genius) &&
+					react.createElement(
+						Spicetify.ReactComponent.TooltipWrapper,
+						{
+							label: getText("tooltips.resetCache", {}, "Reset Translation Cache"),
+						},
+						react.createElement(
+							"button",
+							{
+								className: "lyrics-config-button",
+								style: { color: "var(--lp-fab-icon, var(--spice-button))" },
+								onClick: () => {
+									const modeKey = this.modeKey || "gemini";
+									const mode1 = CONFIG.visual[`translation-mode:${modeKey}`];
+									const mode2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
+									const modesToClear = [mode1, mode2].filter((m) => m && m !== "none");
+									this.resetTranslationCache(this.currentTrackUri, modesToClear.length > 0 ? modesToClear : null);
+								},
+							},
+							react.createElement("svg", {
+								width: 16,
+								height: 16,
+								viewBox: "0 0 16 16",
+								fill: "currentColor",
+								dangerouslySetInnerHTML: {
+									__html:
+										Spicetify.SVGIcons["x"] ||
+										Spicetify.SVGIcons["close"] ||
+										Spicetify.SVGIcons["cross"] ||
+										'<path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>',
+								},
+							})
+						)
+					),
+				// AI Reasoning window toggle button
+				react.createElement(
+					Spicetify.ReactComponent.TooltipWrapper,
+					{
+						label: getText("tooltips.viewReasoning", {}, "AI Reasoning Window"),
+					},
+					react.createElement(
+						"button",
+						{
+							className: "lyrics-config-button",
+							onClick: this.toggleReasoning,
+							style: { color: this.state.isReasoningVisible ? "var(--spice-button)" : "var(--lp-fab-icon, var(--spice-button))" },
+						},
+						"N"
+					)
+				),
+				// Open Settings modal button
+				react.createElement(
+					Spicetify.ReactComponent.TooltipWrapper,
+					{
+						label: getText("tooltips.openSettings", {}, "Open Settings"),
+					},
+					react.createElement(
+						"button",
+						{
+							className: "lyrics-config-button",
+							style: { color: "var(--lp-fab-icon, var(--spice-button))" },
+							onClick: () => {
+								openConfig();
+							},
+						},
+						react.createElement("svg", {
+							width: 16,
+							height: 16,
+							viewBox: "0 0 16 16",
+							fill: "currentColor",
+							dangerouslySetInnerHTML: {
+								__html:
+									Spicetify.SVGIcons["settings"] ||
+									Spicetify.SVGIcons["preferences"] ||
+									'<path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/>',
+								},
+							})
+						)
+					)
 			),
 			activeItem,
-			!!document.querySelector(".main-topBar-topbarContentWrapper") &&
-				react.createElement(TopBarContent, {
-					links: this.availableModes,
-					activeLink: CONFIG.modes[mode],
-					lockLink: CONFIG.modes[this.state.lockMode],
-					switchCallback: (label) => {
-						const mode = CONFIG.modes.findIndex((a) => a === label);
-						if (mode !== this.state.mode) {
-							// If explicitMode is not set, moving the topBar will apply the default mode value for the selected song.
-							const info = this.infoFromTrack(Spicetify.Player.data.item);
-							if (info?.uri && CACHE[info?.uri]) {
-								CACHE[info.uri].mode = mode;
-							}
+			react.createElement(TopBarContent, {
+				links: this.availableModes,
+				activeLink: CONFIG.modes[mode],
+				lockLink: CONFIG.modes[this.state.lockMode],
+				switchCallback: (label) => {
+					const mode = CONFIG.modes.findIndex((a) => a === label);
+					if (mode !== this.state.mode) {
+						const info = this.infoFromTrack(Spicetify.Player.data.item);
+						if (info?.uri && CACHE[info?.uri]) {
+							CACHE[info.uri].mode = mode;
+						}
 
-							this.setState({ explicitMode: mode });
-							this.state.provider !== "local" && this.fetchLyrics(Spicetify.Player.data.item, mode);
-						}
-					},
-					lockCallback: (label) => {
-						let mode = CONFIG.modes.findIndex((a) => a === label);
-						if (mode === this.state.lockMode) {
-							mode = -1;
-						}
-						this.setState({ explicitMode: mode, lockMode: mode });
-						this.fetchLyrics(Spicetify.Player.data.item, mode);
-						CONFIG.locked = mode;
-						localStorage.setItem("lyrics-plus:lock-mode", mode);
-					},
+						this.setState({ explicitMode: mode });
+						this.state.provider !== "local" && this.fetchLyrics(Spicetify.Player.data.item, mode);
+					}
+				},
+				lockCallback: (label) => {
+					let mode = CONFIG.modes.findIndex((a) => a === label);
+					if (mode === this.state.lockMode) {
+						mode = -1;
+					}
+					this.setState({ explicitMode: mode, lockMode: mode });
+					this.fetchLyrics(Spicetify.Player.data.item, mode);
+					CONFIG.locked = mode;
+					localStorage.setItem("lyrics-plus:lock-mode", mode);
+				},
+			}),
+			typeof window.ReasoningWindow === "function" &&
+				react.createElement(window.ReasoningWindow, {
+					open: !!this.state.isReasoningVisible,
+					streams: this.state.reasoningStreams || {},
+					activeTab: this.state.reasoningActiveTab,
+					onTabChange: (tab) => this.setState({ reasoningActiveTab: tab }),
+					isStreaming: !!this.state.isTranslating,
+					onClose: this.toggleReasoning,
 				})
 		);
 
