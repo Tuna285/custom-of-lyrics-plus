@@ -203,20 +203,10 @@ const VideoManager = {
             }
         }
 
-        const subtitleNegatives = [
-            "lyric video", "lyrics video", "vietsub", "subviet", "kanji/romaji", 
-            "subbed", "subtitulado", "engsub", "subtitle", "subtitles"
-        ];
-        for (const kw of subtitleNegatives) {
-            if (videoTitle.includes(kw) && !cleanTitle.includes(kw)) {
-                score -= 180; // Strongly penalize videos with burned-in subtitles
-            }
-        }
-
-        const mildNegatives = ["parody", "live", "concert", "performance"];
+        const mildNegatives = ["parody", "live", "concert", "performance", "vietsub", "sub"];
         for (const kw of mildNegatives) {
             if (videoTitle.includes(kw) && !cleanTitle.includes(kw)) {
-                score -= 80; // Standard penalty for live versions
+                score -= 80; // Standard penalty for live versions or fansubs
             }
         }
 
