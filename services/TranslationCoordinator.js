@@ -183,8 +183,8 @@ window.LyricsPlus.TranslationCoordinator = {
 
 		// Get current results - always read from _dmResults to avoid stale closure
 		const getResults = () => ({
-			mode1: self._dmResults?.[currentUri]?.mode1 || null,
-			mode2: self._dmResults?.[currentUri]?.mode2 || null
+			mode1: (displayMode1 && displayMode1 !== "none") ? (self._dmResults?.[currentUri]?.mode1 || null) : null,
+			mode2: (displayMode2 && displayMode2 !== "none") ? (self._dmResults?.[currentUri]?.mode2 || null) : null
 		});
 
 		const updateCombinedLyrics = (force = false) => {
