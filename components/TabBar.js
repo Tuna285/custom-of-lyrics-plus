@@ -92,6 +92,8 @@ const TopBarContent = ({ links, activeLink, lockLink, switchCallback, lockCallba
 	);
 };
 
+const getReactDOM = () => Spicetify.ReactDOM;
+
 const TabBarContext = ({ children }) => {
 	const reactDOMRef = getReactDOM();
 	const target = document.querySelector(".main-topBar-topbarContentWrapper");
