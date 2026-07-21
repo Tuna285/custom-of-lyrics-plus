@@ -105,7 +105,19 @@ const estimateLineDuration = (line, stats) => {
     return Math.max(MIN_LINE_DUR, len * (stats?.msPerChar || DEFAULT_MS_PER_CHAR));
 };
 
-const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara, trackUri }) => {
+const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara, trackUri, ...props }) => {
+    const isReallySynced = lyrics.length > 0 && lyrics.some(l => l.startTime !== undefined);
+    if (!isReallySynced && lyrics.length > 0) {
+        return react.createElement(SyncedExpandedLyricsPage, {
+            lyrics,
+            provider,
+            copyright,
+            isKara,
+            trackUri,
+            ...props
+        });
+    }
+
     const [position, setPosition] = useState(0);
     const activeLineEle = useRef();
     const lyricContainerEle = useRef();
