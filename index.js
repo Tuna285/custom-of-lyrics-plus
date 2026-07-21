@@ -869,7 +869,7 @@ class LyricsContainer extends react.Component {
 		window.addEventListener("fad-request", lyricContainerUpdate);
 
 		this.pretranslateInterval = setInterval(() => {
-			if (Spicetify.Player.data.is_paused || !CONFIG.visual["pre-translation"]) return;
+			if (Spicetify.Player?.data?.is_paused || !CONFIG.visual["pre-translation"]) return;
 			const duration = Spicetify.Player.getDuration();
 			const progress = Spicetify.Player.getProgress();
 			const preTransTime = (Number(CONFIG.visual["pre-translation-time"]) || 30) * 1000;

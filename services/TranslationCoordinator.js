@@ -110,7 +110,7 @@ window.LyricsPlus.TranslationCoordinator = {
 
 		// If no display modes are active, just optimize the original lyrics (e.g., to handle note lines)
 		if ((!displayMode1 || displayMode1 === "none") && (!displayMode2 || displayMode2 === "none")) {
-			const optimizedLyrics = self.optimizeTranslations(lyrics, null, null);
+			const optimizedLyrics = TranslationUtils.optimizeTranslations(lyrics, null, null);
 			self._setCurrentLyrics(Array.isArray(optimizedLyrics) ? optimizedLyrics : []);
 			return;
 		}
