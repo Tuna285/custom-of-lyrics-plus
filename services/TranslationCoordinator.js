@@ -220,28 +220,51 @@ window.LyricsPlus.TranslationCoordinator = {
 				currentUri
 			});
 		}
+		// Helper to check if a mode translation is already in-flight (either in active fetches or Map)
+		const isModeInflight = (mode) => {
+			if (!mode || mode === "none") return false;
+			if (self._activeFetches?.[currentUri]?.has(mode)) {
+				return true;
+			}
+			if (String(mode).startsWith("gemini")) {
+				const styleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
+				const pronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
+				const cacheKey2 = `${currentUri}:${mode}:${styleKey}:${pronounKey}`;
+				return !!(self._inflightGemini && self._inflightGemini.has(cacheKey2));
+			} else {
+				const cacheKey = `${currentUri}:${mode}`;
+				return !!(self._inflightTrad && self._inflightTrad.has(cacheKey));
+			}
+		};
 
 		// If we have cached results, show them immediately
 		// IMPORTANT: Only return early if ALL active modes are cached
 		// Otherwise proceed to fetch the missing ones
 		const activeMode1 = displayMode1 && displayMode1 !== "none";
 		const activeMode2 = displayMode2 && displayMode2 !== "none";
-		const missingMode1 = activeMode1 && !cachedMode1;
-		const missingMode2 = activeMode2 && !cachedMode2;
+		const missingMode1 = activeMode1 && !cachedMode1 && !isModeInflight(displayMode1);
+		const missingMode2 = activeMode2 && !cachedMode2 && !isModeInflight(displayMode2);
 
 		if ((cachedMode1 || cachedMode2)) {
 			updateCombinedLyrics(true);
 		}
 
 		if (!missingMode1 && !missingMode2) {
-			// All active modes are cached, no need to fetch
+			// All active modes are cached or in-flight, no need to fetch
 			return;
 		}
 
+		// Register the new fetches synchronously to prevent duplicate triggers
+		self._activeFetches = self._activeFetches || {};
+		self._activeFetches[currentUri] = self._activeFetches[currentUri] || new Set();
+		if (missingMode1 && activeMode1) self._activeFetches[currentUri].add(displayMode1);
+		if (missingMode2 && activeMode2) self._activeFetches[currentUri].add(displayMode2);
 
 		// No cache yet - show original lyrics immediately so UI isn't blank while waiting
-		const optimizedOriginal = TranslationUtils.optimizeTranslations(lyrics, null, null);
-		self._setCurrentLyrics(Array.isArray(optimizedOriginal) ? optimizedOriginal : []);
+		if (!cachedMode1 && !cachedMode2) {
+			const optimizedOriginal = TranslationUtils.optimizeTranslations(lyrics, null, null);
+			self._setCurrentLyrics(Array.isArray(optimizedOriginal) ? optimizedOriginal : []);
+		}
 
 		// Staggered parallel execution: Phonetic starts first, Translation starts 500ms later
 		// This avoids API contention while keeping total time close to parallel
@@ -262,6 +285,12 @@ window.LyricsPlus.TranslationCoordinator = {
 			firstModeKey = 'mode1'; secondModeKey = 'mode2';
 		}
 
+		const cleanActiveFetch = (mode) => {
+			if (self._activeFetches?.[uri]) {
+				self._activeFetches[uri].delete(mode);
+			}
+		};
+
 		// Start first request immediately (non-blocking)
 		const promise1 = processMode(firstMode, lyrics).then(result => {
 			if (self.state.uri !== uri) return;
@@ -271,6 +300,8 @@ window.LyricsPlus.TranslationCoordinator = {
 			if (self.state.uri !== uri) return;
 			console.warn(`Display ${firstMode} failed:`, error.message);
 			updateCombinedLyrics(true);
+		}).finally(() => {
+			cleanActiveFetch(firstMode);
 		});
 
 		// Delay 500ms then start second request (staggered to avoid API contention)
@@ -283,6 +314,8 @@ window.LyricsPlus.TranslationCoordinator = {
 				if (self.state.uri !== uri) return;
 				console.warn(`Display ${secondMode} failed:`, error.message);
 				updateCombinedLyrics(true);
+			}).finally(() => {
+				cleanActiveFetch(secondMode);
 			});
 		});
 
