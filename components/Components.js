@@ -703,14 +703,29 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
     // Auto-fetch song insights via Google Search when modal opens
     useEffect(() => {
         if (!open) return;
-        if (!streams.insights) {
-            const currentTrack = Spicetify.Player?.data?.track;
-            const artist = currentTrack?.metadata?.artist_name || "";
-            const title = currentTrack?.metadata?.title || "";
+        if (!streams.insights || streams.insights.startsWith("⚠️")) {
+            const trackItem = Spicetify.Player?.data?.item || Spicetify.Player?.data?.track;
+            const artist = trackItem?.metadata?.artist_name
+                        || trackItem?.artists?.[0]?.name
+                        || (typeof Spicetify.Player?.getArtist === "function" ? Spicetify.Player.getArtist() : "")
+                        || "";
+            const title = trackItem?.metadata?.title
+                       || trackItem?.name
+                       || (typeof Spicetify.Player?.getName === "function" ? Spicetify.Player.getName() : "")
+                       || "";
+
             let apiKey = "";
             try {
-                const keys = JSON.parse(CONFIG?.visual?.["gemini-api-keys"] || "[]");
-                apiKey = keys[0] || CONFIG?.visual?.["gemini-api-key"] || "";
+                const rawKeys = (typeof ConfigUtils !== "undefined" && ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-keys"))
+                             || (CONFIG?.visual?.["gemini-api-keys"]);
+                const keys = JSON.parse(rawKeys || "[]");
+                if (Array.isArray(keys) && keys.length > 0) {
+                    apiKey = keys[Math.floor(Math.random() * keys.length)];
+                } else {
+                    apiKey = (typeof ConfigUtils !== "undefined" && ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key"))
+                          || (CONFIG?.visual?.["gemini-api-key"])
+                          || "";
+                }
             } catch (e) {}
 
             if (artist && title && apiKey && window.GeminiClient?.fetchSongInsights) {
@@ -724,6 +739,8 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
                     });
             } else if (!apiKey) {
                 setStreams((prev) => ({ ...prev, insights: "⚠️ Vui lòng nhập Gemini API Key trong Cài đặt để sử dụng tính năng tra cứu Google Search này." }));
+            } else if (!artist || !title) {
+                setStreams((prev) => ({ ...prev, insights: "⚠️ Không lấy được tên bài hát/ca sĩ từ Spotify." }));
             }
         }
     }, [open, streams.insights]);

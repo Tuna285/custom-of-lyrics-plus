@@ -129,6 +129,7 @@ window.LANG_UI_OVERRIDES = {
 		"ui.translating": "번역 중...",
 		"ui.providedBy": "{provider} 제공 가사",
 		"ui.reasoningTitle": "AI 추론 과정",
+		"ui.reasoningTabInsights": "💡 Ý nghĩa & Search",
 		"ui.reasoningTabTranslation": "번역",
 		"ui.reasoningTabPhonetic": "발음",
 		"ui.preTranslateChip": "다음: {title}",

@@ -11,6 +11,7 @@ window.LANG_EN = {
     "reasoningTitle": "AI Reasoning Process",
     "reasoningPending": "Still waiting for the model response. If your endpoint returns reasoning only after the full reply, text will appear here when ready.",
     "reasoningEmpty": "No separate reasoning text for this response. Many models hide thinking, or your prompt asks for output only.",
+    "reasoningTabInsights": "💡 Insights & Search",
     "reasoningTabTranslation": "Translation",
     "reasoningTabPhonetic": "Phonetic",
     "preTranslateChip": "Next: {title}"
