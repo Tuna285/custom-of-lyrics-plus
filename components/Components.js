@@ -935,12 +935,14 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
 
     const currentText = effectiveTab ? (streams[effectiveTab] || "") : "";
 
-    // Auto-scroll to latest token while sticky (re-runs on content + tab change)
+    // Auto-scroll to top for insights, or to bottom for live streaming tokens
     useEffect(() => {
         if (!open) return;
         const el = bodyRef.current;
         if (!el) return;
-        if (stickToBottomRef.current) {
+        if (effectiveTab === "insights") {
+            el.scrollTop = 0;
+        } else if (stickToBottomRef.current) {
             el.scrollTop = el.scrollHeight;
         }
     }, [currentText, open, effectiveTab]);
