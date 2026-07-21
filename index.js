@@ -1048,7 +1048,7 @@ class LyricsContainer extends react.Component {
 		} else if (CONFIG.visual.colorful) {
 			this.styleVariables = {
 				"--lyrics-color-active": "white",
-				"--lyrics-color-inactive": this.state.colors.inactive,
+				"--lyrics-color-inactive": "rgba(255, 255, 255, 0.35)",
 				"--lyrics-color-background": this.state.colors.background || "transparent",
 				"--lyrics-highlight-background": this.state.colors.inactive,
 				"--lyrics-background-noise": CONFIG.visual.noise ? "var(--background-noise)" : "unset",
