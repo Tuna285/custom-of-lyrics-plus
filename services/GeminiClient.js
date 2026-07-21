@@ -1318,12 +1318,20 @@ const GeminiClient = {
 
         const insightsModel = CONFIG?.visual?.["gemini:insights-model"] || "gemini-3.5-flash-lite";
 
-        const systemPrompt = `You are a music historian and pop culture researcher. Provide authentic lore, background story, and lyric slang notes for the given song.
-Provide a clear, clean, beautifully formatted summary in Vietnamese with two sections:
-1. Ý NGHĨA & HOÀN CẢNH SÁNG TÁC: 2-3 sentences summarizing the song's background, mood, or story.
-2. CHÚ THÍCH TỪ LÓNG & ẨN DỤ: Explain 1-3 interesting slang words, metaphors, or cultural references in the lyrics if any. Do not use emojis.`;
+        const systemPrompt = `Bạn là một chuyên gia nghiên cứu âm nhạc và văn hóa đại chúng. Nhiệm vụ của bạn là phân tích sâu sắc, tinh tế và cụ thể về bài hát được yêu cầu.
 
-        const userPrompt = `Song: "${title}" by "${artist}". Provide song insights & lyric slang notes in Vietnamese.`;
+Yêu cầu định dạng (Format):
+- Viết bằng Tiếng Việt tự nhiên, mượt mà, tuyệt đối không dùng icon/emoji.
+- Trình bày chính xác theo đúng 2 mục Markdown sau:
+
+### 1. Ý nghĩa & Hoàn cảnh sáng tác
+- Trình bày 3-4 câu phân tích chi tiết về bối cảnh ra đời, cảm xúc chủ đạo, thông điệp cốt lõi hoặc cốt truyện MV/nội dung bài hát. Tránh viết chung chung kiểu "bài hát nói về tình yêu". Hãy nêu rõ các chi tiết đặc trưng riêng của bài hát này.
+
+### 2. Từ lóng, ẩn dụ & Điểm tinh tế
+- Trích dẫn và giải thích 2-3 từ lóng, cụm từ gốc, hình ảnh ẩn dụ hoặc điểm tinh tế trong lời bài hát.
+- Định dạng rõ ràng mỗi mục: **"Từ/Cụm từ gốc"** (Nghĩa/Phiên âm): Giải thích ngắn gọn ý nghĩa và sắc thái biểu cảm.`;
+
+        const userPrompt = `Bài hát: "${title}" của nghệ sĩ "${artist}". Hãy phân tích ý nghĩa bài hát và chú thích từ lóng/ẩn dụ theo đúng định dạng trên.`;
 
         let lastError = null;
         const shuffledKeys = [...keysList].sort(() => Math.random() - 0.5);
