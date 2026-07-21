@@ -1316,7 +1316,7 @@ div.lyrics-tabBar-headerItemLink {
   height: var(--lyrics-font-size);
   width: var(--lyrics-font-size);
 
-  opacity: 1;
+  opacity: 0.3;
   transform: scale(0.4);
   transform-origin: center;
 
@@ -1330,8 +1330,7 @@ div.lyrics-tabBar-headerItemLink {
 .lyrics-idling-indicator__circle.active {
   opacity: 1;
   transform: scale(0.7);
-  /* Extended duration: original timing + fade phase */
-  animation: idlingPulse calc(var(--indicator-delay) * 1.6) ease-out forwards;
+  animation: idlingPulse var(--indicator-delay) linear forwards;
 }
 
 @keyframes idlingPulse {
