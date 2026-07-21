@@ -1105,6 +1105,19 @@ class LyricsContainer extends react.Component {
 
 		this.state.mode = mode;
 
+		const trackUriNow = this.state.uri;
+		const translationStatusForTrack =
+			this.state.translationStatus &&
+			(!this.state.translationStatus.trackUri || this.state.translationStatus.trackUri === trackUriNow)
+				? this.state.translationStatus
+				: null;
+		const translationIndicatorVisible =
+			!!(this.state.isTranslating && this.state.translationIndicatorUri === trackUriNow);
+		const hasReasoningText = !!(
+			(this.state.reasoningStreams?.translation && this.state.reasoningStreams.translation.length > 0) ||
+			(this.state.reasoningStreams?.phonetic && this.state.reasoningStreams.phonetic.length > 0)
+		);
+
 		const out = react.createElement(
 			"div",
 			{
@@ -1119,6 +1132,16 @@ class LyricsContainer extends react.Component {
 			},
 			react.createElement("div", {
 				className: "lyrics-lyricsContainer-LyricsBackground",
+			}),
+			react.createElement(window.TranslationStatusOverlay, {
+				isVisible: translationIndicatorVisible,
+				status: translationStatusForTrack,
+				hasReasoningText,
+				onReasoningClick: this.toggleReasoning,
+				isReasoningOpen: !!this.state.isReasoningVisible,
+				preTranslateChip: this.state.preTranslateChip,
+				currentUri: trackUriNow,
+				preTranslateEnabled: !!CONFIG.visual["pre-translation"],
 			}),
 			react.createElement(
 				"div",
