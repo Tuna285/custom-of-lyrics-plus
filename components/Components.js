@@ -991,13 +991,23 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
             let trimmed = line.trim();
             if (!trimmed) return react.createElement("div", { key: idx, style: { height: "6px" } });
 
-            // Handle headers (### or ##)
+            // Handle headers (### or ## or #)
             if (trimmed.startsWith("#")) {
                 const cleanHeader = trimmed.replace(/^#+\s*/, "").replace(/\*\*/g, "");
                 return react.createElement("h4", {
                     key: idx,
-                    style: { margin: "10px 0 6px 0", fontSize: "14px", fontWeight: "600", color: "#fff" }
+                    style: { margin: "12px 0 6px 0", fontSize: "14px", fontWeight: "600", color: "#fff" }
                 }, cleanHeader);
+            }
+
+            // Strip leading bullet markers like "- ", "* ", ":*", ":* ", "• "
+            let isBullet = false;
+            if (/^([-*•]|:\*?)\s*/.test(trimmed)) {
+                const match = trimmed.match(/^([-*•]|:\*?)\s*/);
+                if (match && match[0]) {
+                    trimmed = trimmed.slice(match[0].length);
+                    isBullet = true;
+                }
             }
 
             // Parse **bold** syntax inside lines
@@ -1009,7 +1019,14 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
                 return part;
             });
 
-            return react.createElement("p", { key: idx, style: { margin: "0 0 6px 0", lineHeight: "1.5" } }, ...children);
+            return react.createElement("p", {
+                key: idx,
+                style: {
+                    margin: "0 0 6px 0",
+                    lineHeight: "1.5",
+                    paddingLeft: isBullet ? "12px" : "0"
+                }
+            }, isBullet ? "• " : "", ...children);
         });
     };
 
