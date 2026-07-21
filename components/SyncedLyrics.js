@@ -294,7 +294,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara,
                     pointerEvents: "none",
                 }
             },
-            `Paused: ${Spicetify.Player?.data?.is_paused} | Progress: ${Spicetify.Player.getProgress()} | Position: ${position} | Lines: ${lyrics.length} | Synced: ${lyrics[0]?.startTime !== undefined}`
+            `Paused: ${Spicetify.Player?.data?.is_paused} | Progress: ${Spicetify.Player.getProgress()} | Position: ${position} | Lines: ${lyrics.length} | Synced: ${lyrics[0]?.startTime !== undefined} | Sample: ${JSON.stringify(lyrics.slice(0, 3))}`
         ),
         react.createElement(
             "div",
@@ -601,7 +601,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
                     pointerEvents: "none",
                 }
             },
-            `Paused: ${Spicetify.Player?.data?.is_paused} | Progress: ${Spicetify.Player.getProgress()} | Position: ${position} | Lines: ${lyrics.length} | Synced: ${lyrics[0]?.startTime !== undefined}`
+            `Paused: ${Spicetify.Player?.data?.is_paused} | Progress: ${Spicetify.Player.getProgress()} | Position: ${position} | Lines: ${lyrics.length} | Synced: ${lyrics[0]?.startTime !== undefined} | Sample: ${JSON.stringify(lyrics.slice(0, 3))}`
         ),
         react.createElement("p", {
             className: "lyrics-lyricsContainer-LyricsUnsyncedPadding",
