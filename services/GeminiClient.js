@@ -1304,7 +1304,14 @@ const GeminiClient = {
         return { ...result, duration, reasoningContent };
     },
 
+    _insightsCache: {},
+
     async fetchSongInsights({ artist, title, apiKeys }) {
+        const trackKey = `${(artist || "").trim().toLowerCase()} - ${(title || "").trim().toLowerCase()}`;
+        if (trackKey && this._insightsCache[trackKey]) {
+            return { text: this._insightsCache[trackKey] };
+        }
+
         let keysList = Array.isArray(apiKeys) && apiKeys.length > 0 ? apiKeys : [];
         if (typeof apiKeys === "string" && apiKeys.trim()) keysList = [apiKeys.trim()];
         if (keysList.length === 0) throw new Error("Missing API key");
@@ -1319,6 +1326,7 @@ Provide a clear, clean, beautifully formatted summary in Vietnamese with two sec
         const userPrompt = `Song: "${title}" by "${artist}". Search Google and provide song insights & lyric slang notes in Vietnamese.`;
 
         let lastError = null;
+        let consecutive429Count = 0;
 
         const shuffledKeys = [...keysList].sort(() => Math.random() - 0.5);
         for (const key of shuffledKeys) {
@@ -1353,10 +1361,16 @@ Provide a clear, clean, beautifully formatted summary in Vietnamese with two sec
                 });
 
                 if (response.status === 429) {
-                    console.warn(`[Lyrics+] Key hit 429 rate limit on ${insightsModel}. Trying next key...`);
+                    consecutive429Count++;
+                    console.warn(`[Lyrics+] Key hit 429 rate limit on ${insightsModel}. (${consecutive429Count} key(s) limited)`);
+                    if (consecutive429Count >= 2) {
+                        throw new Error("Tất cả API Key hiện tại đều đang bị giới hạn tần suất (429 Too Many Requests). Vui lòng đợi 1 phút rồi thử lại.");
+                    }
                     await new Promise(r => setTimeout(r, 200));
                     continue;
                 }
+
+                consecutive429Count = 0;
 
                 if (!response.ok) {
                     const errJson = await response.json().catch(() => ({}));
@@ -1368,9 +1382,14 @@ Provide a clear, clean, beautifully formatted summary in Vietnamese with two sec
                 const data = await response.json();
                 const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Không tìm thấy thông tin bổ sung cho bài hát này.";
                 console.log(`[Lyrics+] Successfully received song insights using ${insightsModel}.`);
+                
+                if (trackKey) {
+                    this._insightsCache[trackKey] = text;
+                }
                 return { text };
             } catch (err) {
                 lastError = err;
+                if (err.message.includes("429")) break;
             }
         }
 

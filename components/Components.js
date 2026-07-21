@@ -718,14 +718,16 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
                    || (typeof Spicetify.Player?.getName === "function" ? Spicetify.Player.getName() : "")
                    || "";
 
+        const trackIdentifier = trackUri || (artist && title ? `${artist}-${title}` : "");
+
         // Reset fetch ref if user changed tracks
-        if (trackUri && fetchedTrackUriRef.current && fetchedTrackUriRef.current !== trackUri) {
+        if (trackIdentifier && fetchedTrackUriRef.current && fetchedTrackUriRef.current !== trackIdentifier) {
             fetchedTrackUriRef.current = null;
             isFetchingRef.current = false;
         }
 
         // Fetch ONCE per track
-        if (trackUri && fetchedTrackUriRef.current !== trackUri && !isFetchingRef.current) {
+        if (trackIdentifier && fetchedTrackUriRef.current !== trackIdentifier && !isFetchingRef.current) {
             isFetchingRef.current = true;
 
             let apiKeys = [];
@@ -744,7 +746,7 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
                 setStreams((prev) => ({ ...prev, insights: getText("ui.insightsLoading") || "Đang dùng Google Search tra cứu ý nghĩa bài hát & từ lóng…" }));
                 window.GeminiClient.fetchSongInsights({ artist, title, apiKeys })
                     .then((res) => {
-                        fetchedTrackUriRef.current = trackUri;
+                        fetchedTrackUriRef.current = trackIdentifier;
                         setStreams((prev) => ({ ...prev, insights: res.text }));
                     })
                     .catch((err) => {
