@@ -1389,8 +1389,8 @@ Hãy phân tích ý nghĩa bài hát và trích dẫn/chú thích từ lóng, �
                         throw new Error(`HTTP ${response.status}: ${errMsg}`);
                     }
 
-                    const data = await response.json();
-                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Không tìm thấy thông tin bổ sung cho bài hát này.";
+                    const partsArr = data.candidates?.[0]?.content?.parts || [];
+                    const text = partsArr.map((p) => p.text || "").join("").trim() || "Không tìm thấy thông tin bổ sung cho bài hát này.";
                     console.log(`[Lyrics+] Successfully received song insights (search: ${useSearch}).`);
                     
                     if (trackKey) {
