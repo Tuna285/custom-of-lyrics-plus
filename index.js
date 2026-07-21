@@ -1110,7 +1110,33 @@ class LyricsContainer extends react.Component {
 						musixmatchSelectedLanguage: this.state.musixmatchTranslationLanguage || CONFIG.visual["musixmatch-translation-language"],
 					}),
 				react.createElement(AdjustmentsMenu, { mode, hasPerformer }),
-				// Video Background Settings Button
+				// 3. NetEase Search button (N)
+				react.createElement(
+					Spicetify.ReactComponent.TooltipWrapper,
+					{
+						label: getText("tooltips.searchNetease", {}, "Search NetEase"),
+					},
+					react.createElement(
+						"button",
+						{
+							className: "lyrics-config-button",
+							onClick: () => {
+								const info = this.infoFromTrack(Spicetify.Player.data.item);
+								if (info && typeof ProviderNetease?.openSearchModal === "function") {
+									ProviderNetease.openSearchModal(info.title, info.artist, (selectedLyrics) => {
+										if (selectedLyrics) {
+											const mode = CONFIG.modes[this.state.mode];
+											this.setState({ [mode]: selectedLyrics });
+										}
+									});
+								}
+							},
+							style: { color: "var(--lp-fab-icon, var(--spice-button))" },
+						},
+						"N"
+					)
+				),
+				// 4. Video Background Settings Button (▶)
 				CONFIG.visual["video-background"] &&
 					react.createElement(
 						Spicetify.ReactComponent.TooltipWrapper,
@@ -1135,6 +1161,7 @@ class LyricsContainer extends react.Component {
 							})
 						)
 					),
+				// 5. Cache lyrics button (↓)
 				react.createElement(
 					Spicetify.ReactComponent.TooltipWrapper,
 					{
@@ -1171,6 +1198,7 @@ class LyricsContainer extends react.Component {
 						})
 					)
 				),
+				// 6. Load lyrics from file button (+)
 				react.createElement(
 					Spicetify.ReactComponent.TooltipWrapper,
 					{
@@ -1204,7 +1232,7 @@ class LyricsContainer extends react.Component {
 						})
 					)
 				),
-				// Reset translation cache button
+				// 7. Reset translation cache button (✕)
 				(this.state.synced || this.state.unsynced || this.state.genius) &&
 					react.createElement(
 						Spicetify.ReactComponent.TooltipWrapper,
@@ -1239,33 +1267,7 @@ class LyricsContainer extends react.Component {
 							})
 						)
 					),
-				// NetEase Search button (N)
-				react.createElement(
-					Spicetify.ReactComponent.TooltipWrapper,
-					{
-						label: getText("tooltips.searchNetease", {}, "Search NetEase"),
-					},
-					react.createElement(
-						"button",
-						{
-							className: "lyrics-config-button",
-							onClick: () => {
-								const info = this.infoFromTrack(Spicetify.Player.data.item);
-								if (info && typeof ProviderNetease?.openSearchModal === "function") {
-									ProviderNetease.openSearchModal(info.title, info.artist, (selectedLyrics) => {
-										if (selectedLyrics) {
-											const mode = CONFIG.modes[this.state.mode];
-											this.setState({ [mode]: selectedLyrics });
-										}
-									});
-								}
-							},
-							style: { color: "var(--lp-fab-icon, var(--spice-button))" },
-						},
-						"N"
-					)
-				),
-				// Open Settings modal button
+				// 8. Open Settings modal button (⚙)tton
 				react.createElement(
 					Spicetify.ReactComponent.TooltipWrapper,
 					{
