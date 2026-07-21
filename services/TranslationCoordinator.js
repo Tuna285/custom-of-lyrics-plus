@@ -1180,52 +1180,45 @@ window.LyricsPlus.TranslationCoordinator = {
 		}
 
 		// 2. Luồng dịch thuật/phiên âm Gemini ở nền
-		const provider = CONFIG.visual["translate:translated-lyrics-source"];
-		if (provider === "geminiVi") {
-			const lyricsToTranslate = lyricsData.synced || lyricsData.unsynced || lyricsData.genius;
-			if (lyricsToTranslate && (Array.isArray(lyricsToTranslate) ? lyricsToTranslate.length > 0 : typeof lyricsToTranslate === 'string')) {
-				const lyricsStateForTranslation = {
-					...lyricsData,
-					uri: nextInfo.uri,
-					artist: nextInfo.artist,
-					title: nextInfo.title
-				};
+		const lyricsToTranslate = lyricsData.synced || lyricsData.unsynced || lyricsData.genius;
+		if (lyricsToTranslate && (Array.isArray(lyricsToTranslate) ? lyricsToTranslate.length > 0 : typeof lyricsToTranslate === 'string')) {
+			const lyricsStateForTranslation = {
+				...lyricsData,
+				uri: nextInfo.uri,
+				artist: nextInfo.artist,
+				title: nextInfo.title
+			};
 
-				const originalLanguage = this.provideLanguageCode(self, lyricsToTranslate);
-				let friendlyLanguage = null;
-				if (originalLanguage) {
-					try {
-						friendlyLanguage = new Intl.DisplayNames(["en"], { type: "language" }).of(originalLanguage.split("-")[0])?.toLowerCase();
-					} catch (e) { /* ignore */ }
-				}
+			const originalLanguage = this.provideLanguageCode(self, lyricsToTranslate);
+			let friendlyLanguage = null;
+			if (originalLanguage) {
+				try {
+					friendlyLanguage = new Intl.DisplayNames(["en"], { type: "language" }).of(originalLanguage.split("-")[0])?.toLowerCase();
+				} catch (e) { /* ignore */ }
+			}
 
-				const modeKey = !friendlyLanguage ? "gemini" : friendlyLanguage;
-				const displayMode1 = CONFIG.visual[`translation-mode:${modeKey}`];
-				const displayMode2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
+			const modeKey = !friendlyLanguage ? "gemini" : friendlyLanguage;
+			const displayMode1 = CONFIG.visual[`translation-mode:${modeKey}`];
+			const displayMode2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
 
-				const triggerTranslation = async (mode) => {
-					if (!mode || mode === "none") return;
-					if (String(mode).startsWith("gemini")) {
-						console.log(`[Lyrics+] Smart Pre-load: triggering ${mode} translation (${Array.isArray(lyricsToTranslate) ? lyricsToTranslate.length : 1} lines)`);
-						await this.getGeminiTranslation(self, lyricsStateForTranslation, lyricsToTranslate, mode, true).catch((e) => {
-							console.warn(`[Lyrics+] Smart Pre-load: ${mode} translation failed:`, e);
-							self.pretranslatedUri = null;
-							queueMicrotask(() => this._maybeClearPretranslateChip(self, nextInfo.uri));
-						});
-					}
-				};
-
-				const startedGemini = [displayMode1, displayMode2].some(
-					(m) => m && m !== "none" && String(m).startsWith("gemini")
-				);
-				triggerTranslation(displayMode1);
-				triggerTranslation(displayMode2);
-				if (startedGemini) {
-					self.setState({
-						preTranslateChip: { uri: nextInfo.uri, title: nextInfo.title || "" },
+			const triggerTranslation = async (mode) => {
+				if (!mode || mode === "none") return;
+				if (String(mode).startsWith("gemini")) {
+					console.log(`[Lyrics+] Smart Pre-load: triggering ${mode} translation (${Array.isArray(lyricsToTranslate) ? lyricsToTranslate.length : 1} lines)`);
+					await this.getGeminiTranslation(self, lyricsStateForTranslation, lyricsToTranslate, mode, true).catch((e) => {
+						console.warn(`[Lyrics+] Smart Pre-load: ${mode} translation failed:`, e);
+						self.pretranslatedUri = null;
+						queueMicrotask(() => this._maybeClearPretranslateChip(self, nextInfo.uri));
 					});
 				}
-			}
+			};
+
+			// Show chip as soon as pre-load starts (regardless of mode)
+			self.setState({
+				preTranslateChip: { uri: nextInfo.uri, title: nextInfo.title || "" },
+			});
+			triggerTranslation(displayMode1);
+			triggerTranslation(displayMode2);
 		}
 	},
 
