@@ -1309,10 +1309,9 @@ const GeminiClient = {
         if (typeof apiKeys === "string" && apiKeys.trim()) keysList = [apiKeys.trim()];
         if (keysList.length === 0) throw new Error("Missing API key");
 
-        // Shuffle keys to distribute load evenly
-        const shuffledKeys = [...keysList].sort(() => Math.random() - 0.5);
-
-        const insightsModel = CONFIG?.visual?.["gemini:insights-model"] || "gemini-3.5-flash-lite";
+        const primaryModel = CONFIG?.visual?.["gemini:insights-model"] || "gemini-3.5-flash-lite";
+        const fallbackModel = primaryModel === "gemini-3.5-flash-lite" ? "gemini-3.6-flash" : "gemini-3.5-flash-lite";
+        const candidateModels = [primaryModel, fallbackModel];
 
         const systemPrompt = `You are a professional music historian and pop culture researcher. Use Google Search to find authentic lore, MV plot, background story, and lyric slang notes for the given song.
 Provide a clear, clean, beautifully formatted summary in Vietnamese with two sections:
@@ -1322,59 +1321,64 @@ Provide a clear, clean, beautifully formatted summary in Vietnamese with two sec
         const userPrompt = `Song: "${title}" by "${artist}". Search Google and provide song insights & lyric slang notes in Vietnamese.`;
 
         let lastError = null;
-        for (const key of shuffledKeys) {
-            if (!key || !key.trim()) continue;
-            try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${insightsModel}:generateContent?key=${key.trim()}`;
 
-                const postData = JSON.stringify({
-                    systemInstruction: {
-                        parts: [{ text: systemPrompt }]
-                    },
-                    contents: [
-                        {
-                            role: "user",
-                            parts: [{ text: userPrompt }]
+        for (const model of candidateModels) {
+            const shuffledKeys = [...keysList].sort(() => Math.random() - 0.5);
+            for (const key of shuffledKeys) {
+                if (!key || !key.trim()) continue;
+                try {
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key.trim()}`;
+
+                    const postData = JSON.stringify({
+                        systemInstruction: {
+                            parts: [{ text: systemPrompt }]
+                        },
+                        contents: [
+                            {
+                                role: "user",
+                                parts: [{ text: userPrompt }]
+                            }
+                        ],
+                        tools: [
+                            { googleSearch: {} }
+                        ],
+                        generationConfig: {
+                            temperature: 0.7,
+                            maxOutputTokens: 1000
                         }
-                    ],
-                    tools: [
-                        { googleSearch: {} }
-                    ],
-                    generationConfig: {
-                        temperature: 0.7,
-                        maxOutputTokens: 1000
+                    });
+
+                    console.log(`[Lyrics+] Fetching song insights via ${model} for ${artist} - ${title}...`);
+                    const response = await fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: postData
+                    });
+
+                    if (response.status === 429) {
+                        console.warn(`[Lyrics+] Key hit 429 rate limit on ${model}. Trying next key...`);
+                        await new Promise(r => setTimeout(r, 200));
+                        continue;
                     }
-                });
 
-                console.log(`[Lyrics+] Fetching song insights via ${insightsModel} for ${artist} - ${title}...`);
-                const response = await fetch(url, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: postData
-                });
+                    if (!response.ok) {
+                        const errJson = await response.json().catch(() => ({}));
+                        const errMsg = errJson.error?.message || response.statusText;
+                        console.error(`[Lyrics+] Insights API HTTP ${response.status}:`, errMsg);
+                        throw new Error(`HTTP ${response.status}: ${errMsg}`);
+                    }
 
-                if (response.status === 429) {
-                    console.warn(`[Lyrics+] Key hit 429 rate limit. Trying next key in list...`);
-                    continue;
+                    const data = await response.json();
+                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Không tìm thấy thông tin bổ sung cho bài hát này.";
+                    console.log(`[Lyrics+] Successfully received song insights using ${model}.`);
+                    return { text };
+                } catch (err) {
+                    lastError = err;
                 }
-
-                if (!response.ok) {
-                    const errJson = await response.json().catch(() => ({}));
-                    const errMsg = errJson.error?.message || response.statusText;
-                    console.error(`[Lyrics+] Insights API HTTP ${response.status}:`, errMsg);
-                    throw new Error(`HTTP ${response.status}: ${errMsg}`);
-                }
-
-                const data = await response.json();
-                const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Không tìm thấy thông tin bổ sung cho bài hát này.";
-                console.log(`[Lyrics+] Successfully received song insights.`);
-                return { text };
-            } catch (err) {
-                lastError = err;
             }
         }
 
-        throw lastError || new Error("All API keys failed or rate-limited (429).");
+        throw lastError || new Error("Hệ thống API đang tạm quá tải (429). Vui lòng thử lại sau 1 phút.");
     }
 };
 
