@@ -174,10 +174,10 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
 
                     const lineEnd = currentLine.startTime + Math.min(
                         Math.max(estDur, interval * ratio),
-                        nextLine.startTime - 6000
+                        nextLine.startTime - 5500
                     );
                     const insertTime = Math.max(lineEnd + IDLE_GRACE_MS, currentLine.startTime + estDur + 1000);
-                    if (nextLine.startTime - insertTime >= IDLE_MIN_VISIBLE_MS) {
+                    if (nextLine.startTime - insertTime >= 4000) {
                         processed.push({
                             text: "♪",
                             startTime: insertTime,
@@ -330,22 +330,24 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                     }
 
                     const rawDuration = nextStartTime - startTime;
-                    const duration = Math.max(rawDuration, 5000);
-                    const elapsed = position - startTime;
-                    const progress = Math.min(Math.max(elapsed / duration, 0), 1);
+                    if (rawDuration >= 4000) {
+                        const duration = Math.max(rawDuration, 5000);
+                        const elapsed = position - startTime;
+                        const progress = Math.min(Math.max(elapsed / duration, 0), 1);
 
-                    return react.createElement(IdlingIndicator, {
-                        isActive: isActive,
-                        progress: progress,
-                        delay: duration / 3,
-                        positionIndex: animationIndex,
-                        animationIndex: (animationIndex < 0 ? 0 : animationIndex) + 1,
-                        blurIndex: Math.abs(animationIndex),
-                        isPadding: paddingLine,
-                        isExiting: position >= nextStartTime,
-                        key: lineNumber,
-                        ref: ref
-                    });
+                        return react.createElement(IdlingIndicator, {
+                            isActive: isActive,
+                            progress: progress,
+                            delay: duration / 3,
+                            positionIndex: animationIndex,
+                            animationIndex: (animationIndex < 0 ? 0 : animationIndex) + 1,
+                            blurIndex: Math.abs(animationIndex),
+                            isPadding: paddingLine,
+                            isExiting: position >= nextStartTime,
+                            key: lineNumber,
+                            ref: ref
+                        });
+                    }
                 }
 
                 return react.createElement(
@@ -610,22 +612,24 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
                 }
 
                 const rawDuration = nextStartTime - startTime;
-                const duration = Math.max(rawDuration, 5000);
-                const elapsed = position - startTime;
-                const progress = Math.min(Math.max(elapsed / duration, 0), 1);
+                if (rawDuration >= 4000) {
+                    const duration = Math.max(rawDuration, 5000);
+                    const elapsed = position - startTime;
+                    const progress = Math.min(Math.max(elapsed / duration, 0), 1);
 
-                return react.createElement(IdlingIndicator, {
-                    isActive: isActive,
-                    progress: progress,
-                    delay: duration / 3,
-                    positionIndex: animationIndex,
-                    animationIndex: (animationIndex < 0 ? 0 : animationIndex) + 1,
-                    blurIndex: Math.abs(animationIndex),
-                    isPadding: paddingLine,
-                    isExiting: nextStartTime - position < 500,
-                    key: i,
-                    ref: ref
-                });
+                    return react.createElement(IdlingIndicator, {
+                        isActive: isActive,
+                        progress: progress,
+                        delay: duration / 3,
+                        positionIndex: animationIndex,
+                        animationIndex: (animationIndex < 0 ? 0 : animationIndex) + 1,
+                        blurIndex: Math.abs(animationIndex),
+                        isPadding: paddingLine,
+                        isExiting: nextStartTime - position < 500,
+                        key: i,
+                        ref: ref
+                    });
+                }
             }
 
             return react.createElement(
