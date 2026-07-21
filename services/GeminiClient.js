@@ -1306,7 +1306,7 @@ const GeminiClient = {
 
     _insightsCache: {},
 
-    async fetchSongInsights({ artist, title, apiKeys }) {
+    async fetchSongInsights({ artist, title, lyricsText, apiKeys }) {
         const trackKey = `${(artist || "").trim().toLowerCase()} - ${(title || "").trim().toLowerCase()}`;
         if (trackKey && this._insightsCache[trackKey]) {
             return { text: this._insightsCache[trackKey] };
@@ -1318,20 +1318,22 @@ const GeminiClient = {
 
         const insightsModel = CONFIG?.visual?.["gemini:insights-model"] || "gemini-3.5-flash-lite";
 
-        const systemPrompt = `Bạn là một chuyên gia nghiên cứu âm nhạc và văn hóa đại chúng. Nhiệm vụ của bạn là phân tích sâu sắc, tinh tế và cụ thể về bài hát được yêu cầu.
+        const systemPrompt = `Bạn là một chuyên gia nghiên cứu âm nhạc và văn hóa đại chúng. Nhiệm vụ của bạn là phân tích sâu sắc, tinh tế và cụ thể về bài hát dựa trên thông tin nghệ sĩ và lời bài hát được cung cấp.
 
 Yêu cầu định dạng (Format):
 - Viết bằng Tiếng Việt tự nhiên, mượt mà, tuyệt đối không dùng icon/emoji.
 - Trình bày chính xác theo đúng 2 mục Markdown sau:
 
 ### 1. Ý nghĩa & Hoàn cảnh sáng tác
-- Trình bày 3-4 câu phân tích chi tiết về bối cảnh ra đời, cảm xúc chủ đạo, thông điệp cốt lõi hoặc cốt truyện MV/nội dung bài hát. Tránh viết chung chung kiểu "bài hát nói về tình yêu". Hãy nêu rõ các chi tiết đặc trưng riêng của bài hát này.
+- Trình bày 3-4 câu phân tích chi tiết về bối cảnh ra đời, cảm xúc chủ đạo, thông điệp cốt lõi hoặc cốt truyện bài hát. Tránh viết chung chung. Hãy nêu rõ các chi tiết đặc trưng riêng của bài hát này.
 
 ### 2. Từ lóng, ẩn dụ & Điểm tinh tế
-- Trích dẫn và giải thích 2-3 từ lóng, cụm từ gốc, hình ảnh ẩn dụ hoặc điểm tinh tế trong lời bài hát.
-- Định dạng rõ ràng mỗi mục: **"Từ/Cụm từ gốc"** (Nghĩa/Phiên âm): Giải thích ngắn gọn ý nghĩa và sắc thái biểu cảm.`;
+- Trích dẫn trực tiếp và giải thích 2-3 từ lóng, cụm từ gốc, hình ảnh ẩn dụ hoặc câu hát đắt giá trong lời bài hát.
+- Định dạng rõ ràng mỗi mục: **"Từ/Cụm từ gốc trong lời"** (Nghĩa/Phiên âm): Giải thích ngắn gọn ý nghĩa và sắc thái biểu cảm.`;
 
-        const userPrompt = `Bài hát: "${title}" của nghệ sĩ "${artist}". Hãy phân tích ý nghĩa bài hát và chú thích từ lóng/ẩn dụ theo đúng định dạng trên.`;
+        const userPrompt = `Bài hát: "${title}" của nghệ sĩ "${artist}".
+${lyricsText ? `\nLời bài hát:\n"""\n${lyricsText}\n"""\n` : ""}
+Hãy phân tích ý nghĩa bài hát và trích dẫn/chú thích từ lóng, ẩn dụ đặc sắc từ lời bài hát trên theo đúng định dạng.`;
 
         let lastError = null;
         const shuffledKeys = [...keysList].sort(() => Math.random() - 0.5);

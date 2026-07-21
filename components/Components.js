@@ -743,8 +743,14 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
             } catch (e) {}
 
             if (artist && title && apiKeys.length > 0 && window.GeminiClient?.fetchSongInsights) {
+                const lyricsState = window.lyricContainer?.state;
+                const currentLyrics = lyricsState?.currentLyrics || lyricsState?.synced || lyricsState?.unsynced || [];
+                const lyricsText = Array.isArray(currentLyrics)
+                    ? currentLyrics.map((l) => l.originalText || l.text || "").filter(Boolean).slice(0, 35).join("\n")
+                    : "";
+
                 setStreams((prev) => ({ ...prev, insights: getText("ui.insightsLoading") || "Đang dùng Google Search tra cứu ý nghĩa bài hát & từ lóng…" }));
-                window.GeminiClient.fetchSongInsights({ artist, title, apiKeys })
+                window.GeminiClient.fetchSongInsights({ artist, title, lyricsText, apiKeys })
                     .then((res) => {
                         fetchedTrackUriRef.current = trackIdentifier;
                         setStreams((prev) => ({ ...prev, insights: res.text }));
