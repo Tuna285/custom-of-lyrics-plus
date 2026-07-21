@@ -654,10 +654,11 @@ const ConfigHelper = () => {
 	];
 
 	const MODEL_PRESETS = [
-		// Gemini 3.1 Flash-Lite — recommended default. Extremely fast, high daily limits (500 RPD).
-		{ value: "gemini-3.1-flash-lite", label: "Recommended — fast, 500 RPD free quota" },
-		// Google Gemini 2.5/3.5 — fast tiers (free-tier friendly)
+		// Gemini 3.6 Flash & 3.5 Flash-Lite — recommended optimal split
+		{ value: "gemini-3.6-flash", label: "Gemini 3.6 Flash — Highest quality for translation" },
+		{ value: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite — Ultra fast, 500 RPD free quota" },
 		"gemini-3.5-flash",
+		"gemini-3.1-flash-lite",
 		"gemini-2.5-flash",
 		"gemini-2.5-flash-lite",
 		// Google Gemini Pro — smart tiers (higher quality, 50 RPD quota)
