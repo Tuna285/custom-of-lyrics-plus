@@ -337,7 +337,7 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                         return react.createElement(IdlingIndicator, {
                             isActive: isActive,
                             progress: progress,
-                            delay: duration / 3,
+                            delay: duration / 4,
                             positionIndex: animationIndex,
                             animationIndex: (animationIndex < 0 ? 0 : animationIndex) + 1,
                             blurIndex: Math.abs(animationIndex),
@@ -621,7 +621,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
                     return react.createElement(IdlingIndicator, {
                         isActive: isActive,
                         progress: progress,
-                        delay: duration / 3,
+                        delay: duration / 4,
                         positionIndex: animationIndex,
                         animationIndex: (animationIndex < 0 ? 0 : animationIndex) + 1,
                         blurIndex: Math.abs(animationIndex),
