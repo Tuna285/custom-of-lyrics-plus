@@ -214,6 +214,7 @@ const ProviderNetease = (() => {
             const [status,  setStatus]  = react.useState("idle");
             const [errorMsg, setErrorMsg] = react.useState("");
             const [localSuggestions, setLocalSuggestions] = react.useState(null);
+            const [selectedId, setSelectedId] = react.useState(null);
 
             const isMountedRef = react.useRef(true);
             react.useEffect(() => {
@@ -413,6 +414,7 @@ const ProviderNetease = (() => {
                         _neteaseId:        song.id,
                         _neteaseScore:     1.0,
                     });
+                    setSelectedId(song.id);
                     Spicetify.PopupModal.hide();
                     Spicetify.showNotification("✓ " + getText("notifications.neteaseLyricsLoaded", { songName: song.name }));
                 } catch (e) {
@@ -557,8 +559,8 @@ const ProviderNetease = (() => {
                             style: {
                                 display: "flex", alignItems: "center", gap: "12px",
                                 width: "100%", padding: "8px 12px",
-                                background: i === 0 ? "rgba(29,185,84,0.12)" : "rgba(255,255,255,0.04)",
-                                border: i === 0 ? "1px solid rgba(29,185,84,0.35)" : "1px solid transparent",
+                                background: song.id === selectedId ? "rgba(29,185,84,0.12)" : "rgba(255,255,255,0.04)",
+                                border: song.id === selectedId ? "1px solid rgba(29,185,84,0.35)" : "1px solid transparent",
                                 borderRadius: "8px", cursor: "pointer",
                                 textAlign: "left", color: "var(--spice-text)",
                             }
