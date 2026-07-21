@@ -161,6 +161,7 @@ class LyricsContainer extends react.Component {
 			isFADMode: false,
 			isCached: false,
 			language: null,
+			error: null,
 		};
 		this.currentTrackUri = "";
 		this.nextTrackUri = "";
@@ -937,6 +938,10 @@ class LyricsContainer extends react.Component {
 		refreshMusixmatchTranslation = null;
 	}
 
+	componentDidCatch(error, info) {
+		this.setState({ error: `${error.message}\n${error.stack}` });
+	}
+
 	updateVisualOnConfigChange() {
 		this.availableModes = CONFIG.modes.filter((_, id) => {
 			return Object.values(CONFIG.providers).some((p) => p.on && p.modes.includes(id));
@@ -964,6 +969,50 @@ class LyricsContainer extends react.Component {
 	}
 
 	render() {
+		if (this.state.error) {
+			return react.createElement(
+				"div",
+				{
+					style: {
+						display: "flex",
+						flexDirection: "column",
+						justifyContent: "center",
+						alignItems: "center",
+						height: "100%",
+						width: "100%",
+						backgroundColor: "#2b1010",
+						color: "#ff6b6b",
+						padding: "30px",
+						fontFamily: "monospace",
+						whiteSpace: "pre-wrap",
+						fontSize: "12px",
+						overflowY: "auto",
+						zIndex: 9999,
+						position: "absolute",
+						top: 0,
+						left: 0,
+					},
+				},
+				react.createElement("h2", { style: { marginBottom: "15px", color: "#ff8b8b" } }, "Lyrics Plus Error Caught:"),
+				react.createElement("p", null, this.state.error),
+				react.createElement(
+					"button",
+					{
+						style: {
+							marginTop: "20px",
+							padding: "10px 20px",
+							backgroundColor: "#ff6b6b",
+							color: "white",
+							border: "none",
+							borderRadius: "5px",
+							cursor: "pointer",
+						},
+						onClick: () => this.setState({ error: null }),
+					},
+					"Dismiss"
+				)
+			);
+		}
 		const fadLyricsContainer = document.getElementById("fad-lyrics-plus-container");
 		this.state.isFADMode = !!fadLyricsContainer;
 
