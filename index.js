@@ -33,79 +33,10 @@ if (typeof window !== "undefined") {
 	window[MUSIXMATCH_TRANSLATION_PREFIX_GLOBAL_KEY] = MUSIXMATCH_TRANSLATION_PREFIX;
 }
 
-const KARAOKE = 0;
-const SYNCED = 1;
-const UNSYNCED = 2;
-const GENIUS = 3;
-
-const CONFIG = {
-	visual: {
-		"playbar-button": getConfig("lyrics-plus:visual:playbar-button", false),
-		colorful: getConfig("lyrics-plus:visual:colorful"),
-		noise: getConfig("lyrics-plus:visual:noise"),
-		"background-color": localStorage.getItem("lyrics-plus:visual:background-color") || "var(--spice-main)",
-		"active-color": localStorage.getItem("lyrics-plus:visual:active-color") || "var(--spice-text)",
-		"inactive-color": localStorage.getItem("lyrics-plus:visual:inactive-color") || "rgba(var(--spice-rgb-subtext),0.5)",
-		"highlight-color": localStorage.getItem("lyrics-plus:visual:highlight-color") || "var(--spice-button)",
-		alignment: localStorage.getItem("lyrics-plus:visual:alignment") || "center",
-		"lines-before": localStorage.getItem("lyrics-plus:visual:lines-before") || "0",
-		"lines-after": localStorage.getItem("lyrics-plus:visual:lines-after") || "2",
-		"font-size": localStorage.getItem("lyrics-plus:visual:font-size") || "32",
-		"translate:translated-lyrics-source": localStorage.getItem("lyrics-plus:visual:translate:translated-lyrics-source") || "none",
-		"translate:display-mode": localStorage.getItem("lyrics-plus:visual:translate:display-mode") || "replace",
-		"translate:detect-language-override": localStorage.getItem("lyrics-plus:visual:translate:detect-language-override") || "off",
-		"translation-mode:japanese": localStorage.getItem("lyrics-plus:visual:translation-mode:japanese") || "furigana",
-		"translation-mode:korean": localStorage.getItem("lyrics-plus:visual:translation-mode:korean") || "romaja",
-		"translation-mode:chinese": localStorage.getItem("lyrics-plus:visual:translation-mode:chinese") || "cn",
-		translate: getConfig("lyrics-plus:visual:translate", false),
-		"ja-detect-threshold": localStorage.getItem("lyrics-plus:visual:ja-detect-threshold") || "40",
-		"hans-detect-threshold": localStorage.getItem("lyrics-plus:visual:hans-detect-threshold") || "40",
-		"musixmatch-translation-language": localStorage.getItem("lyrics-plus:visual:musixmatch-translation-language") || "none",
-		"fade-blur": getConfig("lyrics-plus:visual:fade-blur"),
-		"fullscreen-key": localStorage.getItem("lyrics-plus:visual:fullscreen-key") || "f12",
-		"show-performers": getConfig("lyrics-plus:visual:show-performers", true),
-		"synced-compact": getConfig("lyrics-plus:visual:synced-compact"),
-		"dual-genius": getConfig("lyrics-plus:visual:dual-genius"),
-		"global-delay": Number(localStorage.getItem("lyrics-plus:visual:global-delay")) || 0,
-		delay: 0,
-	},
-	providers: {
-		lrclib: {
-			on: getConfig("lyrics-plus:provider:lrclib:on"),
-			desc: "Lyrics sourced from lrclib.net. Supports both synced and unsynced lyrics. LRCLIB is a free and open-source lyrics provider.",
-			modes: [SYNCED, UNSYNCED],
-		},
-		musixmatch: {
-			on: getConfig("lyrics-plus:provider:musixmatch:on"),
-			desc: "Fully compatible with Spotify. Requires a token that can be retrieved from the official Musixmatch app. If you have problems with retrieving lyrics, try refreshing the token by clicking <code>Refresh Token</code> button. You may need to be forced to use your own CORS Proxy to use this provider.",
-			token: localStorage.getItem("lyrics-plus:provider:musixmatch:token") || "21051986b9886beabe1ce01c3ce94c96319411f8f2c122676365e3",
-			modes: [KARAOKE, SYNCED, UNSYNCED],
-		},
-		spotify: {
-			on: getConfig("lyrics-plus:provider:spotify:on"),
-			desc: "Lyrics sourced from official Spotify API.",
-			modes: [SYNCED, UNSYNCED],
-		},
-		netease: {
-			on: getConfig("lyrics-plus:provider:netease:on", false),
-			desc: "Crowdsourced lyrics provider ran by Chinese developers and users.",
-			modes: [KARAOKE, SYNCED, UNSYNCED],
-		},
-		genius: {
-			on: spotifyVersion >= "1.2.31" ? false : getConfig("lyrics-plus:provider:genius:on"),
-			desc: "Provide unsynced lyrics with insights from artists themselves. Genius is disabled and cannot be used as a provider on <code>1.2.31</code> and higher.",
-			modes: [GENIUS],
-		},
-		local: {
-			on: getConfig("lyrics-plus:provider:local:on"),
-			desc: "Provide lyrics from cache/local files loaded from previous Spotify sessions.",
-			modes: [KARAOKE, SYNCED, UNSYNCED],
-		},
-	},
-	providersOrder: localStorage.getItem("lyrics-plus:services-order"),
-	modes: ["karaoke", "synced", "unsynced", "genius"],
-	locked: localStorage.getItem("lyrics-plus:lock-mode") || "-1",
-};
+// Global constants (KARAOKE, SYNCED, UNSYNCED, GENIUS, CONFIG) are defined in utils/Config.js
+if (typeof CONFIG !== "undefined" && typeof CONFIG.providersOrder !== "undefined") {
+	CONFIG.providersOrder = localStorage.getItem("lyrics-plus:services-order") || CONFIG.providersOrder;
+}
 
 try {
 	CONFIG.providersOrder = JSON.parse(CONFIG.providersOrder);
