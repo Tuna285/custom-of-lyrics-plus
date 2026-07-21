@@ -1298,33 +1298,34 @@ class LyricsContainer extends react.Component {
 					)
 			),
 			activeItem,
-			react.createElement(TopBarContent, {
-				links: this.availableModes,
-				activeLink: CONFIG.modes[mode],
-				lockLink: CONFIG.modes[this.state.lockMode],
-				switchCallback: (label) => {
-					const mode = CONFIG.modes.findIndex((a) => a === label);
-					if (mode !== this.state.mode) {
-						const info = this.infoFromTrack(Spicetify.Player.data.item);
-						if (info?.uri && CACHE[info?.uri]) {
-							CACHE[info.uri].mode = mode;
-						}
+			!!document.querySelector(".main-topBar-topbarContentWrapper") &&
+				react.createElement(TopBarContent, {
+					links: this.availableModes,
+					activeLink: CONFIG.modes[mode],
+					lockLink: CONFIG.modes[this.state.lockMode],
+					switchCallback: (label) => {
+						const mode = CONFIG.modes.findIndex((a) => a === label);
+						if (mode !== this.state.mode) {
+							const info = this.infoFromTrack(Spicetify.Player.data.item);
+							if (info?.uri && CACHE[info?.uri]) {
+								CACHE[info.uri].mode = mode;
+							}
 
-						this.setState({ explicitMode: mode });
-						this.state.provider !== "local" && this.fetchLyrics(Spicetify.Player.data.item, mode);
-					}
-				},
-				lockCallback: (label) => {
-					let mode = CONFIG.modes.findIndex((a) => a === label);
-					if (mode === this.state.lockMode) {
-						mode = -1;
-					}
-					this.setState({ explicitMode: mode, lockMode: mode });
-					this.fetchLyrics(Spicetify.Player.data.item, mode);
-					CONFIG.locked = mode;
-					localStorage.setItem("lyrics-plus:lock-mode", mode);
-				},
-			}),
+							this.setState({ explicitMode: mode });
+							this.state.provider !== "local" && this.fetchLyrics(Spicetify.Player.data.item, mode);
+						}
+					},
+					lockCallback: (label) => {
+						let mode = CONFIG.modes.findIndex((a) => a === label);
+						if (mode === this.state.lockMode) {
+							mode = -1;
+						}
+						this.setState({ explicitMode: mode, lockMode: mode });
+						this.fetchLyrics(Spicetify.Player.data.item, mode);
+						CONFIG.locked = mode;
+						localStorage.setItem("lyrics-plus:lock-mode", mode);
+					},
+				}),
 			typeof window.ReasoningWindow === "function" &&
 				react.createElement(window.ReasoningWindow, {
 					open: !!this.state.isReasoningVisible,
