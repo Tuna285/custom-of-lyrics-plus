@@ -11,6 +11,7 @@ const spotifyVersion = Spicetify.Platform.version;
 // Define a function called "render" to specify app entry point
 // This function will be used to mount app to main view.
 function render() {
+	syncConfigWithLocalStorage();
 	return react.createElement(LyricsContainer, null);
 }
 
@@ -33,54 +34,57 @@ if (typeof window !== "undefined") {
 	window[MUSIXMATCH_TRANSLATION_PREFIX_GLOBAL_KEY] = MUSIXMATCH_TRANSLATION_PREFIX;
 }
 
-// Global constants (KARAOKE, SYNCED, UNSYNCED, GENIUS, CONFIG) are defined in utils/Config.js
-if (typeof CONFIG !== "undefined" && typeof CONFIG.providersOrder !== "undefined") {
-	CONFIG.providersOrder = localStorage.getItem("lyrics-plus:services-order") || CONFIG.providersOrder;
-}
+function syncConfigWithLocalStorage() {
+	if (typeof CONFIG === "undefined") return;
 
-try {
-	CONFIG.providersOrder = JSON.parse(CONFIG.providersOrder);
-	if (!Array.isArray(CONFIG.providersOrder) || Object.keys(CONFIG.providers).length !== CONFIG.providersOrder.length) {
-		throw "";
+	if (typeof CONFIG.providersOrder !== "undefined") {
+		CONFIG.providersOrder = localStorage.getItem("lyrics-plus:services-order") || CONFIG.providersOrder;
 	}
-} catch {
-	CONFIG.providersOrder = Object.keys(CONFIG.providers);
-	localStorage.setItem("lyrics-plus:services-order", JSON.stringify(CONFIG.providersOrder));
-}
 
-CONFIG.locked = Number.parseInt(CONFIG.locked);
-CONFIG.visual["lines-before"] = Number.parseInt(CONFIG.visual["lines-before"]);
-CONFIG.visual["lines-after"] = Number.parseInt(CONFIG.visual["lines-after"]);
-CONFIG.visual["font-size"] = Number.parseInt(CONFIG.visual["font-size"]);
-CONFIG.visual["ja-detect-threshold"] = Number.parseInt(CONFIG.visual["ja-detect-threshold"]);
-CONFIG.visual["hans-detect-threshold"] = Number.parseInt(CONFIG.visual["hans-detect-threshold"]);
+	try {
+		CONFIG.providersOrder = JSON.parse(CONFIG.providersOrder);
+		if (!Array.isArray(CONFIG.providersOrder) || Object.keys(CONFIG.providers).length !== CONFIG.providersOrder.length) {
+			throw "";
+		}
+	} catch {
+		CONFIG.providersOrder = Object.keys(CONFIG.providers);
+		localStorage.setItem("lyrics-plus:services-order", JSON.stringify(CONFIG.providersOrder));
+	}
 
-if (CONFIG.visual["translate:translated-lyrics-source"] === "musixmatchTranslation") {
-	const language = CONFIG.visual["musixmatch-translation-language"];
-	const normalizedLanguage = language && language !== "none" ? language : "none";
-	const upgradedValue = normalizedLanguage !== "none" ? `${MUSIXMATCH_TRANSLATION_PREFIX}${normalizedLanguage}` : "none";
-	CONFIG.visual["translate:translated-lyrics-source"] = upgradedValue;
-	localStorage.setItem(`${APP_NAME}:visual:translate:translated-lyrics-source`, upgradedValue);
-}
+	CONFIG.locked = Number.parseInt(CONFIG.locked);
+	CONFIG.visual["lines-before"] = Number.parseInt(CONFIG.visual["lines-before"]);
+	CONFIG.visual["lines-after"] = Number.parseInt(CONFIG.visual["lines-after"]);
+	CONFIG.visual["font-size"] = Number.parseInt(CONFIG.visual["font-size"]);
+	CONFIG.visual["ja-detect-threshold"] = Number.parseInt(CONFIG.visual["ja-detect-threshold"]);
+	CONFIG.visual["hans-detect-threshold"] = Number.parseInt(CONFIG.visual["hans-detect-threshold"]);
 
-if (typeof CONFIG.visual["translate:translated-lyrics-source"] === "string") {
-	const sourceValue = CONFIG.visual["translate:translated-lyrics-source"];
-	if (sourceValue.startsWith(MUSIXMATCH_TRANSLATION_PREFIX)) {
-		const language = sourceValue.slice(MUSIXMATCH_TRANSLATION_PREFIX.length) || "none";
-		if (CONFIG.visual["musixmatch-translation-language"] !== language) {
-			CONFIG.visual["musixmatch-translation-language"] = language;
-			localStorage.setItem(`${APP_NAME}:visual:musixmatch-translation-language`, language);
+	if (CONFIG.visual["translate:translated-lyrics-source"] === "musixmatchTranslation") {
+		const language = CONFIG.visual["musixmatch-translation-language"];
+		const normalizedLanguage = language && language !== "none" ? language : "none";
+		const upgradedValue = normalizedLanguage !== "none" ? `${MUSIXMATCH_TRANSLATION_PREFIX}${normalizedLanguage}` : "none";
+		CONFIG.visual["translate:translated-lyrics-source"] = upgradedValue;
+		localStorage.setItem(`${APP_NAME}:visual:translate:translated-lyrics-source`, upgradedValue);
+	}
+
+	if (typeof CONFIG.visual["translate:translated-lyrics-source"] === "string") {
+		const sourceValue = CONFIG.visual["translate:translated-lyrics-source"];
+		if (sourceValue.startsWith(MUSIXMATCH_TRANSLATION_PREFIX)) {
+			const language = sourceValue.slice(MUSIXMATCH_TRANSLATION_PREFIX.length) || "none";
+			if (CONFIG.visual["musixmatch-translation-language"] !== language) {
+				CONFIG.visual["musixmatch-translation-language"] = language;
+				localStorage.setItem(`${APP_NAME}:visual:musixmatch-translation-language`, language);
+			}
 		}
 	}
-}
 
-if (
-	CONFIG.visual.translate &&
-	typeof CONFIG.visual["translate:translated-lyrics-source"] === "string" &&
-	CONFIG.visual["translate:translated-lyrics-source"] !== "none"
-) {
-	CONFIG.visual.translate = false;
-	localStorage.setItem(`${APP_NAME}:visual:translate`, "false");
+	if (
+		CONFIG.visual.translate &&
+		typeof CONFIG.visual["translate:translated-lyrics-source"] === "string" &&
+		CONFIG.visual["translate:translated-lyrics-source"] !== "none"
+	) {
+		CONFIG.visual.translate = false;
+		localStorage.setItem(`${APP_NAME}:visual:translate`, "false");
+	}
 }
 
 // CACHE and emptyState are declared in utils/Config.js
