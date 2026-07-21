@@ -1324,7 +1324,7 @@ div.lyrics-tabBar-headerItemLink {
   opacity: 1;
   animation:
     idlingPulse var(--indicator-delay) linear forwards,
-    idlingIdleWave var(--indicator-delay) ease-in-out calc(var(--indicator-delay)) infinite;
+    idlingIdleWave calc(var(--indicator-delay) * 0.3) ease-in-out calc(var(--indicator-delay)) infinite;
 }
 
 @keyframes idlingPulse {
