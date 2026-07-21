@@ -610,6 +610,7 @@ class LyricsContainer extends react.Component {
 			for (let i = 0; i < newLyrics.length; i++) {
 				if (
 					this.state.currentLyrics[i].text !== newLyrics[i].text ||
+					this.state.currentLyrics[i].text2 !== newLyrics[i].text2 ||
 					this.state.currentLyrics[i].startTime !== newLyrics[i].startTime ||
 					this.state.currentLyrics[i].endTime !== newLyrics[i].endTime
 				) {
