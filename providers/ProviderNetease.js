@@ -289,10 +289,10 @@ const ProviderNetease = (() => {
                             
                             let isSynced = false;
                             let hasLyrics = false;
-                            
                             if (rawLrc.trim()) {
                                 hasLyrics = true;
-                                isSynced = /\[\d{1,2}:\d{2}/.test(rawLrc);
+                                const parsed = parseLyrics(rawLrc);
+                                isSynced = !!(parsed?.synced);
                             }
                             
                             return {
