@@ -917,10 +917,11 @@ class LyricsContainer extends react.Component {
 		window.addEventListener("fad-request", lyricContainerUpdate);
 
 		this.pretranslateInterval = setInterval(() => {
-			if (Spicetify.Player?.data?.is_paused || !CONFIG.visual["pre-translation"]) return;
+			const isEnabled = CONFIG.visual["smart-pre-load"] ?? CONFIG.visual["pre-translation"] ?? true;
+			if (Spicetify.Player?.data?.is_paused || !isEnabled) return;
 			const duration = Spicetify.Player.getDuration();
 			const progress = Spicetify.Player.getProgress();
-			const preTransTime = (Number(CONFIG.visual["pre-translation-time"]) || 30) * 1000;
+			const preTransTime = (Number(CONFIG.visual["smart-pre-load-time"] || CONFIG.visual["pre-translation-time"]) || 30) * 1000;
 			if (duration > 0 && duration - progress < preTransTime) {
 				if (window.LyricsPlus?.TranslationCoordinator) {
 					window.LyricsPlus.TranslationCoordinator.tryPretranslateNext(this);
@@ -1194,7 +1195,7 @@ class LyricsContainer extends react.Component {
 				isReasoningOpen: !!this.state.isReasoningVisible,
 				preTranslateChip: this.state.preTranslateChip,
 				currentUri: trackUriNow,
-				preTranslateEnabled: !!CONFIG.visual["pre-translation"],
+				preTranslateEnabled: !!(CONFIG.visual["smart-pre-load"] ?? CONFIG.visual["pre-translation"] ?? true),
 			}),
 			react.createElement(
 				"div",

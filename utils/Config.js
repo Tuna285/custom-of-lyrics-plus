@@ -163,6 +163,8 @@ const CONFIG = {
         "dual-genius": ConfigUtils.getPersisted("lyrics-plus:visual:dual-genius") === "true",
         "smart-pre-load": ConfigUtils.getPersisted("lyrics-plus:visual:smart-pre-load") !== "false",
         "smart-pre-load-time": ConfigUtils.getPersisted("lyrics-plus:visual:smart-pre-load-time") || "30",
+        "pre-translation": ConfigUtils.getPersisted("lyrics-plus:visual:smart-pre-load") !== "false",
+        "pre-translation-time": ConfigUtils.getPersisted("lyrics-plus:visual:smart-pre-load-time") || "30",
         "global-delay": Number(ConfigUtils.getPersisted("lyrics-plus:visual:global-delay")) || 0,
         delay: 0,
         "video-background": ConfigUtils.get("lyrics-plus:visual:video-background", false),
