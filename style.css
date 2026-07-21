@@ -1476,7 +1476,9 @@ div.lyrics-tabBar-headerItemLink {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
+  height: 34px;
+  padding: 0 16px;
+  box-sizing: border-box;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(10px);
   border-radius: 20px;
@@ -1485,6 +1487,7 @@ div.lyrics-tabBar-headerItemLink {
 
 .lyrics-translating-spinner {
   display: flex;
+  align-items: center;
   gap: 4px;
 }
 
@@ -1513,6 +1516,9 @@ div.lyrics-tabBar-headerItemLink {
   font-weight: 500;
   color: var(--spice-text);
   opacity: 0.9;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
 }
 
 @keyframes pulse {
