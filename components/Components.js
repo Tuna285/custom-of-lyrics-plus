@@ -442,8 +442,8 @@ const TranslatingIndicatorRow = react.memo(
         isReasoningOpen = false,
     }) => {
         const showPill = isVisible || !!status;
-        // Brain only shows alongside the active pill. Once translation finishes the pill (and brain) disappear; the modal — if user opened it — stays open independently.
-        const showBrain = showPill;
+        // Keep brain button persistent so user can view Song Insights & Reasoning anytime!
+        const showBrain = true;
         if (!showPill) return null;
 
         return react.createElement(
@@ -639,6 +639,7 @@ window.TranslationStatusOverlay = TranslationStatusOverlay;
  *  - Initial position: anchored just under the brain icon (top-right of lyrics area)
  */
 const REASONING_TAB_LABELS = {
+    insights: () => getText("ui.reasoningTabInsights") || "💡 Ý nghĩa & Search",
     translation: () => getText("ui.reasoningTabTranslation") || "Translation",
     phonetic: () => getText("ui.reasoningTabPhonetic") || "Phonetic",
 };

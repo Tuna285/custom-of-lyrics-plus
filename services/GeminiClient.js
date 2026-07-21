@@ -1302,6 +1302,55 @@ const GeminiClient = {
         DebugLogger.log(`Completed in ${duration}ms.`);
         DebugLogger.groupEnd();
         return { ...result, duration, reasoningContent };
+    },
+
+    async fetchSongInsights({ artist, title, apiKey }) {
+        if (!apiKey?.trim()) throw new Error("Missing API key");
+
+        const insightsModel = CONFIG?.visual?.["gemini:insights-model"] || "gemini-3.5-flash-lite";
+
+        const systemPrompt = `You are a professional music historian and pop culture researcher. Use Google Search to find authentic lore, MV plot, background story, and lyric slang notes for the given song.
+Provide a clear, beautifully formatted summary in Vietnamese with two sections:
+1. 💡 **Ý NGHĨA & HOÀN CẢNH SÁNG TÁC**: 2-3 sentences summarizing the song's background, mood, or story.
+2. 📖 **CHÚ THÍCH TỪ LÓNG & ẨN DỤ**: Explain 1-3 interesting slang words, metaphors, or cultural references in the lyrics if any.`;
+
+        const userPrompt = `Song: "${title}" by "${artist}". Search Google and provide song insights & lyric slang notes in Vietnamese.`;
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${insightsModel}:generateContent?key=${apiKey}`;
+
+        const postData = JSON.stringify({
+            systemInstruction: {
+                parts: [{ text: systemPrompt }]
+            },
+            contents: [
+                {
+                    role: "user",
+                    parts: [{ text: userPrompt }]
+                }
+            ],
+            tools: [
+                { googleSearch: {} }
+            ],
+            generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 1000
+            }
+        });
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: postData
+        });
+
+        if (!response.ok) {
+            const errJson = await response.json().catch(() => ({}));
+            throw new Error(`Insights API error ${response.status}: ${errJson.error?.message || response.statusText}`);
+        }
+
+        const data = await response.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Không tìm thấy thông tin bổ sung cho bài hát này.";
+        return { text };
     }
 };
 

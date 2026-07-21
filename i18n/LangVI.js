@@ -91,7 +91,11 @@ window.LANG_VI = {
     },
     "phoneticModelName": {
       "label": "Model Phiên Âm",
-      "desc": "Model LLM dùng để tạo Romaji/Furigana. Nên chọn model nhẹ, nhanh (như gemini-2.5-flash-lite) để tiết kiệm quota của model dịch chính."
+      "desc": "Model LLM dùng để tạo Romaji/Furigana. Nên chọn model nhẹ, nhanh (như gemini-3.5-flash-lite) để tiết kiệm quota của model dịch chính."
+    },
+    "insightsModelName": {
+      "label": "Model Tra Cứu Bài Hát & Search",
+      "desc": "Model LLM dùng để tra cứu ý nghĩa, cốt truyện bài hát và từ lóng bằng Google Search (Mặc định: gemini-3.5-flash-lite)."
     },
     "apiKeys": {
       "label": "Danh sách Gemini API Keys",
