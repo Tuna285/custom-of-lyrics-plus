@@ -935,7 +935,7 @@ div.lyrics-tabBar-headerItemLink {
 
 #lyrics-plus-config-container button.switch:not(.disabled) {
   background-color: var(--lp-ui-switch-on, var(--spice-button)) !important;
-  color: var(--lp-ui-btn-text, #111);
+  color: #ffffff !important;
   box-shadow: 0 2px 10px color-mix(in srgb, var(--lp-ui-accent, var(--spice-button)) 42%, transparent);
 }
 

@@ -121,12 +121,12 @@ function openOptionsModal(title, items, onChange, eventType = null) {
 		{
 			id: `${APP_NAME}-config-container`,
 			style: {
-				"--lp-ui-switch-on": CONFIG.visual["ui-switch-on-color"] || "#1ed760",
+				"--lp-ui-switch-on": CONFIG.visual["ui-switch-on-color"] || "var(--spice-button)",
 				"--lp-ui-switch-off": CONFIG.visual["ui-switch-off-color"] || "rgba(255,255,255,0.16)",
 				"--lp-ui-btn-bg": CONFIG.visual["ui-button-bg-color"] || "rgba(255,255,255,0.08)",
 				"--lp-ui-btn-text": CONFIG.visual["ui-button-text-color"] || "#ffffff",
 				"--lp-fab-bg": CONFIG.visual["ui-fab-bg-color"] || "rgba(20,20,20,0.72)",
-				"--lp-fab-icon": CONFIG.visual["ui-fab-icon-color"] || "#1ed760",
+				"--lp-fab-icon": CONFIG.visual["ui-fab-icon-color"] || "var(--spice-button)",
 			}
 		},
 		react.createElement("style", {
