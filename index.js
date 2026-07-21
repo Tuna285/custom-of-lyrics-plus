@@ -484,20 +484,30 @@ class LyricsContainer extends react.Component {
 		} else {
 			this.setState({ ...emptyState, isLoading: true, isCached: false });
 
-			const resp = await this.tryServices(info, mode);
-			if (resp.provider) {
+			let resp;
+			try {
+				resp = await this.tryServices(info, mode);
+			} catch (err) {
+				console.error("[Lyrics+] tryServices error:", err);
+				this.setState({ isLoading: false });
+				return;
+			}
+
+			if (resp?.provider) {
 				// Cache lyrics
 				CACHE[resp.uri] = resp;
 			}
 
 			// This True when the user presses the Cache Lyrics button and saves it to localStorage.
-			isCached = this.lyricsSaved(resp.uri);
+			isCached = this.lyricsSaved(resp?.uri || info.uri);
 
 			// In case user skips tracks too fast and multiple callbacks
 			// set wrong lyrics to current track.
-			if (resp.uri === this.currentTrackUri) {
+			const isMatch = !resp?.uri || resp.uri === this.currentTrackUri || info.uri === this.currentTrackUri;
+			if (isMatch) {
 				tempState = { ...emptyState, ...resp, isLoading: false, isCached };
 			} else {
+				this.setState({ isLoading: false });
 				return;
 			}
 		}

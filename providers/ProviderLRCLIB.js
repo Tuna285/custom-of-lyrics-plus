@@ -13,11 +13,7 @@ const ProviderLRCLIB = (() => {
 			.map((key) => `${key}=${encodeURIComponent(params[key])}`)
 			.join("&")}`;
 
-		const body = await fetch(finalURL, {
-			headers: {
-				"x-user-agent": `spicetify v${Spicetify.Config.version} (https://github.com/spicetify/cli)`,
-			},
-		});
+		const body = await fetch(finalURL);
 
 		if (body.status !== 200) {
 			return {
