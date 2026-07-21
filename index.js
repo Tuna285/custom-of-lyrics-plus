@@ -814,8 +814,34 @@ class LyricsContainer extends react.Component {
 					return;
 				}
 
-				this.setState({ ...localLyrics, provider: "local" });
-				CACHE[this.currentTrackUri] = { ...localLyrics, provider: "local", uri: this.currentTrackUri };
+				if (CACHE[this.currentTrackUri]) {
+					const resetKeys = ["romaji", "furigana", "hiragana", "katakana", "hangul", "romaja", "cn", "hk", "tw", "musixmatchTranslation", "musixmatchTranslationLanguage"];
+					for (const k of resetKeys) {
+						delete CACHE[this.currentTrackUri][k];
+					}
+				}
+				CACHE[this.currentTrackUri] = {
+					...CACHE[this.currentTrackUri],
+					...localLyrics,
+					provider: "local",
+					uri: this.currentTrackUri
+				};
+				this.setState({
+					...emptyState,
+					...localLyrics,
+					romaji: null,
+					furigana: null,
+					hiragana: null,
+					katakana: null,
+					hangul: null,
+					romaja: null,
+					cn: null,
+					hk: null,
+					tw: null,
+					musixmatchTranslation: null,
+					musixmatchTranslationLanguage: null,
+					provider: "local"
+				});
 				this.saveLocalLyrics(this.currentTrackUri, localLyrics);
 
 				Spicetify.showNotification(`Loaded ${parsedKeys.join(", ")} lyrics from file`);
@@ -1173,7 +1199,16 @@ class LyricsContainer extends react.Component {
 								if (typeof ProviderNetease?.openManualSearchModal === "function") {
 									ProviderNetease.openManualSearchModal((selectedLyrics) => {
 										if (selectedLyrics) {
-											CACHE[selectedLyrics.uri] = selectedLyrics;
+											if (CACHE[selectedLyrics.uri]) {
+												const resetKeys = ["romaji", "furigana", "hiragana", "katakana", "hangul", "romaja", "cn", "hk", "tw", "musixmatchTranslation", "musixmatchTranslationLanguage"];
+												for (const k of resetKeys) {
+													delete CACHE[selectedLyrics.uri][k];
+												}
+											}
+											CACHE[selectedLyrics.uri] = {
+												...CACHE[selectedLyrics.uri],
+												...selectedLyrics
+											};
 											let finalMode = -1;
 											if (selectedLyrics.karaoke) {
 												finalMode = KARAOKE;
@@ -1188,6 +1223,17 @@ class LyricsContainer extends react.Component {
 											this.setState({
 												...emptyState,
 												...selectedLyrics,
+												romaji: null,
+												furigana: null,
+												hiragana: null,
+												katakana: null,
+												hangul: null,
+												romaja: null,
+												cn: null,
+												hk: null,
+												tw: null,
+												musixmatchTranslation: null,
+												musixmatchTranslationLanguage: null,
 												mode: finalMode,
 												isLoading: false,
 												isCached: this.lyricsSaved(selectedLyrics.uri),

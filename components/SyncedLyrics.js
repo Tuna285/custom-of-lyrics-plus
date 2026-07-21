@@ -578,8 +578,10 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
         return 0;
     }, [padded, position]);
 
+    const isReallySynced = useMemo(() => lyrics.length > 0 && lyrics.some(l => l.startTime !== undefined), [lyrics]);
+
     useEffect(() => {
-        if (activeLineRef.current && (!intialScroll[0] || isInViewport(activeLineRef.current))) {
+        if (isReallySynced && activeLineRef.current && (!intialScroll[0] || isInViewport(activeLineRef.current))) {
             activeLineRef.current.scrollIntoView({
                 behavior: "smooth",
                 block: "center",
@@ -587,7 +589,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
             });
             intialScroll[0] = true;
         }
-    }, [activeLineRef.current]);
+    }, [activeLineRef.current, isReallySynced]);
 
     return react.createElement(
         "div",
@@ -619,11 +621,11 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
             className: "lyrics-lyricsContainer-LyricsUnsyncedPadding",
         }),
         padded.map(({ text, startTime, originalText, text2 }, i) => {
-            const isActive = i === activeLineIndex;
+            const isActive = !isReallySynced || i === activeLineIndex;
             const { mainText, subText, subText2 } = Utils.getDisplayTexts(text, originalText, text2);
 
             let ref;
-            if (isActive) {
+            if (isReallySynced && isActive) {
                 ref = activeLineRef;
             }
 
