@@ -28,10 +28,11 @@ CORE PRINCIPLE: Prioritize Emotional Impact, Poetic Flow, and Singability over d
         style: `STRATEGY: "TRANSCREATION & MELODIC ALIGNMENT"
 1) Melodic Flow & Syllable Control (CRITICAL):
    - Pay attention to line length and pacing. Do not translate a short, punchy original line into a long, wordy Vietnamese sentence.
-   - Keep word counts balanced so the translation matches the original song tempo.
+   - Match syllable count and word rhythm closely to the original song tempo so the translation is naturally singable.
    - Avoid awkward consonant clusters or harsh tones that disrupt the vocal melody.
 
-2) Natural Syntax & Pronoun Dropping:
+2) Natural Vocabulary & Pronoun Dropping:
+   - Prefer natural, emotionally resonant modern Vietnamese vocabulary. Avoid heavy, stiff, or archaic Sino-Vietnamese (Hán-Việt) terms (e.g., avoid turning everyday feelings into heavy "tương tư", "u hoài", "ái tình") unless explicitly requested.
    - In Vietnamese lyrics, constantly repeating "Anh/Em/Tôi" makes the song sound robotic.
    - Once the subject-object relationship is established, omit explicit pronouns where natural to let the actions and emotions flow.
    - Use poetic word order/inversion (e.g., "Nơi này lạnh giá" -> "Lạnh lẽo nơi đây") to enhance lyricism.
