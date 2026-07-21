@@ -596,11 +596,32 @@ class LyricsContainer extends react.Component {
 
 	_setCurrentLyrics(arr) {
 		if (!Array.isArray(arr)) {
-			this.setState({ currentLyrics: arr });
+			if (this.state.currentLyrics !== arr) {
+				this.setState({ currentLyrics: arr });
+			}
 			return;
 		}
 		const source = this.state.synced || this.state.unsynced;
-		this.setState({ currentLyrics: this._reattachTiming(arr, source) });
+		const newLyrics = this._reattachTiming(arr, source);
+		
+		// Prevent infinite render loop by checking if new lyrics are identical to current state
+		let isSame = Array.isArray(this.state.currentLyrics) && this.state.currentLyrics.length === newLyrics.length;
+		if (isSame) {
+			for (let i = 0; i < newLyrics.length; i++) {
+				if (
+					this.state.currentLyrics[i].text !== newLyrics[i].text ||
+					this.state.currentLyrics[i].startTime !== newLyrics[i].startTime ||
+					this.state.currentLyrics[i].endTime !== newLyrics[i].endTime
+				) {
+					isSame = false;
+					break;
+				}
+			}
+		}
+		
+		if (!isSame) {
+			this.setState({ currentLyrics: newLyrics });
+		}
 	}
 
 	_reattachTiming(target, source) {
