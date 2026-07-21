@@ -1265,30 +1265,6 @@ class LyricsContainer extends react.Component {
 						"N"
 					)
 				),
-				// AI Reasoning window toggle button (Reasoning)
-				react.createElement(
-					Spicetify.ReactComponent.TooltipWrapper,
-					{
-						label: getText("tooltips.viewReasoning", {}, "AI Reasoning Window"),
-					},
-					react.createElement(
-						"button",
-						{
-							className: "lyrics-config-button",
-							onClick: this.toggleReasoning,
-							style: { color: this.state.isReasoningVisible ? "var(--spice-button)" : "var(--lp-fab-icon, var(--spice-button))" },
-						},
-						react.createElement("svg", {
-							width: 16,
-							height: 16,
-							viewBox: "0 0 16 16",
-							fill: "currentColor",
-							dangerouslySetInnerHTML: {
-								__html: '<path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM2.5 8a5.5 5.5 0 1111 0 5.5 5.5 0 01-11 0z"/><path d="M8 4a1 1 0 00-1 1v3a1 1 0 002 0V5a1 1 0 00-1-1zM8 10a1 1 0 100 2 1 1 0 000-2z"/>',
-							},
-						})
-					)
-				),
 				// Open Settings modal button
 				react.createElement(
 					Spicetify.ReactComponent.TooltipWrapper,
