@@ -83,19 +83,17 @@ if (
 	localStorage.setItem(`${APP_NAME}:visual:translate`, "false");
 }
 
-let CACHE = {};
-
-const emptyState = {
-	karaoke: null,
-	synced: null,
-	unsynced: null,
-	genius: null,
-	genius2: null,
-	currentLyrics: null,
-	musixmatchAvailableTranslations: null,
-	musixmatchTrackId: null,
-	musixmatchTranslationLanguage: null,
-};
+// CACHE and emptyState are declared in utils/Config.js
+if (typeof window.CACHE !== "undefined") {
+	CACHE = window.CACHE;
+}
+if (typeof window.emptyState !== "undefined") {
+	Object.assign(emptyState, {
+		musixmatchAvailableTranslations: null,
+		musixmatchTrackId: null,
+		musixmatchTranslationLanguage: null,
+	});
+}
 
 let lyricContainerUpdate;
 let reloadLyrics;
