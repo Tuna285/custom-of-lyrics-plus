@@ -35,6 +35,7 @@ window.LyricsPlus.TranslationCoordinator = {
 			});
 			//Reset per-track progressive results
 			self._dmResults = {};
+			self._saveInProgress = null;
 
 			//Clean up inflight requests for OLD tracks only, keep current track
 			if (self._inflightGemini) {
@@ -237,12 +238,6 @@ window.LyricsPlus.TranslationCoordinator = {
 			return;
 		}
 
-		// Deduplicate active fetch requests to prevent infinite cascading loops
-		self._inflightRequests = self._inflightRequests || {};
-		if (self._inflightRequests[currentUri]) {
-			return;
-		}
-		self._inflightRequests[currentUri] = true;
 
 		// No cache yet - show original lyrics immediately so UI isn't blank while waiting
 		const optimizedOriginal = TranslationUtils.optimizeTranslations(lyrics, null, null);
@@ -293,15 +288,17 @@ window.LyricsPlus.TranslationCoordinator = {
 
 		// Auto-save cache after all translations complete
 		Promise.allSettled([promise1, promise2]).then(() => {
-			if (self._inflightRequests) {
-				self._inflightRequests[uri] = false;
-			}
-
 			// Only save if still on the same track
 			if (self.state.uri !== uri) {
 				console.log(`[Lyrics+] Skip cache - track changed`);
 				return;
 			}
+
+			// If already cached or save is in-progress, no need to save again
+			if (self.state.isCached || self._saveInProgress === uri) {
+				return;
+			}
+			self._saveInProgress = uri;
 
 			const currentLyrics = self.state.currentLyrics;
 			if (!currentLyrics || currentLyrics.length === 0) {
@@ -885,7 +882,9 @@ window.LyricsPlus.TranslationCoordinator = {
 				localStorage.setItem(`${APP_NAME}:cached-uris`, JSON.stringify(cachedUris));
 			}
 
-			self.setState({ isCached: true });
+			if (!self.state.isCached) {
+				self.setState({ isCached: true });
+			}
 		} catch (e) {
 			console.error("[Lyrics+] Failed to save to IndexedDB:", e);
 		}

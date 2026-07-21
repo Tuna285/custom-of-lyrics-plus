@@ -105,7 +105,8 @@ const estimateLineDuration = (line, stats) => {
     return Math.max(MIN_LINE_DUR, len * (stats?.msPerChar || DEFAULT_MS_PER_CHAR));
 };
 
-const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara, trackUri, ...props }) => {
+const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, isKara, trackUri, ...props }) => {
+    const lyrics = rawLyrics || [];
     const isReallySynced = lyrics.length > 0 && lyrics.some(l => l.startTime !== undefined);
     if (!isReallySynced && lyrics.length > 0) {
         return react.createElement(SyncedExpandedLyricsPage, {
@@ -445,7 +446,8 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara,
     );
 });
 
-const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKara, trackUri }) => {
+const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, isKara, trackUri }) => {
+    const lyrics = rawLyrics || [];
     const [position, setPosition] = useState(0);
     const activeLineRef = useRef(null);
     const pageRef = useRef(null);
