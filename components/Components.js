@@ -728,20 +728,13 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
         }
     }, [open, streams.insights]);
 
-    // Build the list of available tabs from streams that have content
-    const availableTabs = useMemo(() => {
-        const tabs = ["insights"];
-        for (const key of ["translation", "phonetic"]) {
-            const v = streams[key];
-            if (v && String(v).trim()) tabs.push(key);
-        }
-        return tabs;
-    }, [streams.translation, streams.phonetic, streams.insights]);
+    // Always show all 3 tabs: insights (default), translation, phonetic
+    const availableTabs = useMemo(() => ["insights", "translation", "phonetic"], []);
 
-    // Effective active tab — fall back to first available
+    // Effective active tab — fall back to insights
     const effectiveTab = useMemo(() => {
         if (activeTab && availableTabs.includes(activeTab)) return activeTab;
-        return availableTabs[0] || activeTab || null;
+        return "insights";
     }, [activeTab, availableTabs]);
 
     // Auto-focus the first tab that gets content if no tab is active
@@ -917,8 +910,8 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
         ? (isStreaming ? getText("ui.reasoningPending") : getText("ui.reasoningEmpty"))
         : "";
 
-    // Tab bar appears whenever there is more than one stream OR streaming is active (so user can preview the in-flight task)
-    const showTabs = availableTabs.length > 1 || (isStreaming && availableTabs.length >= 1);
+    // Always display tab bar with all 3 tabs
+    const showTabs = true;
 
     const tabBar = showTabs && react.createElement(
         "div",
