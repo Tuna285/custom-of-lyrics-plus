@@ -1121,12 +1121,28 @@ class LyricsContainer extends react.Component {
 						{
 							className: "lyrics-config-button",
 							onClick: () => {
-								const info = this.infoFromTrack(Spicetify.Player.data.item);
-								if (info && typeof ProviderNetease?.openSearchModal === "function") {
-									ProviderNetease.openSearchModal(info.title, info.artist, (selectedLyrics) => {
+								if (typeof ProviderNetease?.openManualSearchModal === "function") {
+									ProviderNetease.openManualSearchModal((selectedLyrics) => {
 										if (selectedLyrics) {
-											const mode = CONFIG.modes[this.state.mode];
-											this.setState({ [mode]: selectedLyrics });
+											CACHE[selectedLyrics.uri] = selectedLyrics;
+											let finalMode = -1;
+											if (selectedLyrics.karaoke) {
+												finalMode = KARAOKE;
+											} else if (selectedLyrics.synced) {
+												finalMode = SYNCED;
+											} else if (selectedLyrics.unsynced) {
+												finalMode = UNSYNCED;
+											} else if (selectedLyrics.genius) {
+												finalMode = GENIUS;
+											}
+											this.state.explicitMode = finalMode;
+											this.setState({
+												...emptyState,
+												...selectedLyrics,
+												mode: finalMode,
+												isLoading: false,
+												isCached: this.lyricsSaved(selectedLyrics.uri),
+											});
 										}
 									});
 								}
