@@ -168,7 +168,18 @@ const VideoBackground = (() => {
                                 if (uiFlashTimeoutRef.current) clearTimeout(uiFlashTimeoutRef.current);
                                 uiFlashTimeoutRef.current = setTimeout(() => setIsUIFlashing(false), 400);
                                 setHasStartedPlaying(true);
-                                
+
+                                try {
+                                    if (typeof player.setOption === "function") {
+                                        player.setOption("captions", "track", {});
+                                        player.setOption("cc", "track", {});
+                                    }
+                                    if (typeof player.unloadModule === "function") {
+                                        player.unloadModule("captions");
+                                        player.unloadModule("cc");
+                                    }
+                                } catch (_) {}
+
                                 // Wait for 1.2s of stable playback to hide YouTube play overlay & vignette
                                 setTimeout(() => {
                                     if (isMountedRef.current) {

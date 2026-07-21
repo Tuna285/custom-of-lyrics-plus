@@ -428,13 +428,13 @@
   text-shadow: none;
 }
 
-/* Video BG: Active line keeps its glow but with soft dark outline */
+/* Video BG: Active line keeps crisp text with dark contrast outline only (no white halo glow) */
 .video-bg-active
   .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active {
   text-shadow:
-    0 0 20px rgba(255, 255, 255, 0.4),
-    0 0 8px rgba(0, 0, 0, 0.6),
-    0 2px 6px rgba(0, 0, 0, 0.5);
+    0 0 8px rgba(0, 0, 0, 0.95),
+    0 0 16px rgba(0, 0, 0, 0.7),
+    0 2px 6px rgba(0, 0, 0, 1);
 }
 
 .lyrics-lyricsContainer-LyricsLine,
