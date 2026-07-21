@@ -444,7 +444,6 @@ const TranslatingIndicatorRow = react.memo(
         const showPill = isVisible || !!status;
         // Keep brain button persistent so user can view Song Insights & Reasoning anytime!
         const showBrain = true;
-        if (!showPill) return null;
 
         return react.createElement(
             "div",
@@ -676,7 +675,7 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
         };
 
         const handleClear = () => {
-            setStreams({ translation: "", phonetic: "" });
+            setStreams({ insights: "", translation: "", phonetic: "" });
             setIsStreaming(false);
             setActiveTab(null);
         };
@@ -687,7 +686,10 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
 
         // Synchronize state with current global values on open
         if (window.LyricsPlus) {
-            setStreams({ ...(window.LyricsPlus.currentReasoning || { translation: "", phonetic: "" }) });
+            setStreams((prev) => ({
+                insights: prev.insights || "",
+                ...(window.LyricsPlus.currentReasoning || { translation: "", phonetic: "" })
+            }));
             setIsStreaming(!!window.LyricsPlus.isReasoningStreaming);
         }
 
@@ -698,15 +700,43 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
         };
     }, [open]);
 
+    // Auto-fetch song insights via Google Search when modal opens
+    useEffect(() => {
+        if (!open) return;
+        if (!streams.insights) {
+            const currentTrack = Spicetify.Player?.data?.track;
+            const artist = currentTrack?.metadata?.artist_name || "";
+            const title = currentTrack?.metadata?.title || "";
+            let apiKey = "";
+            try {
+                const keys = JSON.parse(CONFIG?.visual?.["gemini-api-keys"] || "[]");
+                apiKey = keys[0] || CONFIG?.visual?.["gemini-api-key"] || "";
+            } catch (e) {}
+
+            if (artist && title && apiKey && window.GeminiClient?.fetchSongInsights) {
+                setStreams((prev) => ({ ...prev, insights: "🔍 Đang dùng Google Search tra cứu ý nghĩa bài hát & từ lóng..." }));
+                window.GeminiClient.fetchSongInsights({ artist, title, apiKey })
+                    .then((res) => {
+                        setStreams((prev) => ({ ...prev, insights: res.text }));
+                    })
+                    .catch((err) => {
+                        setStreams((prev) => ({ ...prev, insights: `⚠️ Lỗi tra cứu: ${err.message}` }));
+                    });
+            } else if (!apiKey) {
+                setStreams((prev) => ({ ...prev, insights: "⚠️ Vui lòng nhập Gemini API Key trong Cài đặt để sử dụng tính năng tra cứu Google Search này." }));
+            }
+        }
+    }, [open, streams.insights]);
+
     // Build the list of available tabs from streams that have content
     const availableTabs = useMemo(() => {
-        const tabs = [];
+        const tabs = ["insights"];
         for (const key of ["translation", "phonetic"]) {
             const v = streams[key];
             if (v && String(v).trim()) tabs.push(key);
         }
         return tabs;
-    }, [streams.translation, streams.phonetic]);
+    }, [streams.translation, streams.phonetic, streams.insights]);
 
     // Effective active tab — fall back to first available
     const effectiveTab = useMemo(() => {
