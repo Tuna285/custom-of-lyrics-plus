@@ -237,6 +237,13 @@ window.LyricsPlus.TranslationCoordinator = {
 			return;
 		}
 
+		// Deduplicate active fetch requests to prevent infinite cascading loops
+		self._inflightRequests = self._inflightRequests || {};
+		if (self._inflightRequests[currentUri]) {
+			return;
+		}
+		self._inflightRequests[currentUri] = true;
+
 		// No cache yet - show original lyrics immediately so UI isn't blank while waiting
 		const optimizedOriginal = TranslationUtils.optimizeTranslations(lyrics, null, null);
 		self._setCurrentLyrics(Array.isArray(optimizedOriginal) ? optimizedOriginal : []);
@@ -286,6 +293,10 @@ window.LyricsPlus.TranslationCoordinator = {
 
 		// Auto-save cache after all translations complete
 		Promise.allSettled([promise1, promise2]).then(() => {
+			if (self._inflightRequests) {
+				self._inflightRequests[uri] = false;
+			}
+
 			// Only save if still on the same track
 			if (self.state.uri !== uri) {
 				console.log(`[Lyrics+] Skip cache - track changed`);
