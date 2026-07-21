@@ -700,50 +700,68 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
         };
     }, [open]);
 
-    // Auto-fetch song insights via Google Search when modal opens
+    const fetchedTrackUriRef = useRef(null);
+    const isFetchingRef = useRef(false);
+
+    // Auto-fetch song insights via Google Search when modal opens (ONCE per track)
     useEffect(() => {
         if (!open) return;
-        if (!streams.insights || streams.insights.startsWith("Lỗi")) {
-            const trackItem = Spicetify.Player?.data?.item || Spicetify.Player?.data?.track;
-            const artist = trackItem?.metadata?.artist_name
-                        || trackItem?.artists?.[0]?.name
-                        || (typeof Spicetify.Player?.getArtist === "function" ? Spicetify.Player.getArtist() : "")
-                        || "";
-            const title = trackItem?.metadata?.title
-                       || trackItem?.name
-                       || (typeof Spicetify.Player?.getName === "function" ? Spicetify.Player.getName() : "")
-                       || "";
 
-            let apiKey = "";
+        const trackItem = Spicetify.Player?.data?.item || Spicetify.Player?.data?.track;
+        const trackUri = trackItem?.uri || Spicetify.Player?.data?.uri || "";
+        const artist = trackItem?.metadata?.artist_name
+                    || trackItem?.artists?.[0]?.name
+                    || (typeof Spicetify.Player?.getArtist === "function" ? Spicetify.Player.getArtist() : "")
+                    || "";
+        const title = trackItem?.metadata?.title
+                   || trackItem?.name
+                   || (typeof Spicetify.Player?.getName === "function" ? Spicetify.Player.getName() : "")
+                   || "";
+
+        // Reset fetch ref if user changed tracks
+        if (trackUri && fetchedTrackUriRef.current && fetchedTrackUriRef.current !== trackUri) {
+            fetchedTrackUriRef.current = null;
+            isFetchingRef.current = false;
+        }
+
+        // Fetch ONCE per track
+        if (trackUri && fetchedTrackUriRef.current !== trackUri && !isFetchingRef.current) {
+            isFetchingRef.current = true;
+
+            let apiKeys = [];
             try {
                 const rawKeys = (typeof ConfigUtils !== "undefined" && ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-keys"))
                              || (CONFIG?.visual?.["gemini-api-keys"]);
-                const keys = JSON.parse(rawKeys || "[]");
-                if (Array.isArray(keys) && keys.length > 0) {
-                    apiKey = keys[Math.floor(Math.random() * keys.length)];
-                } else {
-                    apiKey = (typeof ConfigUtils !== "undefined" && ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key"))
-                          || (CONFIG?.visual?.["gemini-api-key"])
-                          || "";
+                apiKeys = JSON.parse(rawKeys || "[]");
+                if (!Array.isArray(apiKeys) || apiKeys.length === 0) {
+                    const single = (typeof ConfigUtils !== "undefined" && ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key"))
+                                || (CONFIG?.visual?.["gemini-api-key"]);
+                    if (single) apiKeys = [single];
                 }
             } catch (e) {}
 
-            if (artist && title && apiKey && window.GeminiClient?.fetchSongInsights) {
+            if (artist && title && apiKeys.length > 0 && window.GeminiClient?.fetchSongInsights) {
                 setStreams((prev) => ({ ...prev, insights: getText("ui.insightsLoading") || "Đang dùng Google Search tra cứu ý nghĩa bài hát & từ lóng…" }));
-                window.GeminiClient.fetchSongInsights({ artist, title, apiKey })
+                window.GeminiClient.fetchSongInsights({ artist, title, apiKeys })
                     .then((res) => {
+                        fetchedTrackUriRef.current = trackUri;
                         setStreams((prev) => ({ ...prev, insights: res.text }));
                     })
                     .catch((err) => {
                         setStreams((prev) => ({ ...prev, insights: `Lỗi tra cứu: ${err.message}` }));
+                    })
+                    .finally(() => {
+                        isFetchingRef.current = false;
                     });
-            } else if (!apiKey) {
+            } else if (apiKeys.length === 0) {
                 setStreams((prev) => ({ ...prev, insights: getText("ui.insightsKeyMissing") || "Vui lòng nhập Gemini API Key trong Settings để dùng tính năng tra cứu." }));
+                isFetchingRef.current = false;
             } else if (!artist || !title) {
                 setStreams((prev) => ({ ...prev, insights: getText("ui.insightsNoTrack") || "Không lấy được thông tin bài hát từ Spotify." }));
+                isFetchingRef.current = false;
             }
         }
-    }, [open, streams.insights]);
+    }, [open]);
 
     // Always show all 3 tabs: insights (default), translation, phonetic
     const availableTabs = useMemo(() => ["insights", "translation", "phonetic"], []);

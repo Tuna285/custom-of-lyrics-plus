@@ -1304,8 +1304,13 @@ const GeminiClient = {
         return { ...result, duration, reasoningContent };
     },
 
-    async fetchSongInsights({ artist, title, apiKey }) {
-        if (!apiKey?.trim()) throw new Error("Missing API key");
+    async fetchSongInsights({ artist, title, apiKeys }) {
+        let keysList = Array.isArray(apiKeys) && apiKeys.length > 0 ? apiKeys : [];
+        if (typeof apiKeys === "string" && apiKeys.trim()) keysList = [apiKeys.trim()];
+        if (keysList.length === 0) throw new Error("Missing API key");
+
+        // Shuffle keys to distribute load evenly
+        const shuffledKeys = [...keysList].sort(() => Math.random() - 0.5);
 
         const insightsModel = CONFIG?.visual?.["gemini:insights-model"] || "gemini-3.5-flash-lite";
 
@@ -1316,45 +1321,60 @@ Provide a clear, clean, beautifully formatted summary in Vietnamese with two sec
 
         const userPrompt = `Song: "${title}" by "${artist}". Search Google and provide song insights & lyric slang notes in Vietnamese.`;
 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${insightsModel}:generateContent?key=${apiKey.trim()}`;
+        let lastError = null;
+        for (const key of shuffledKeys) {
+            if (!key || !key.trim()) continue;
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${insightsModel}:generateContent?key=${key.trim()}`;
 
-        const postData = JSON.stringify({
-            systemInstruction: {
-                parts: [{ text: systemPrompt }]
-            },
-            contents: [
-                {
-                    role: "user",
-                    parts: [{ text: userPrompt }]
+                const postData = JSON.stringify({
+                    systemInstruction: {
+                        parts: [{ text: systemPrompt }]
+                    },
+                    contents: [
+                        {
+                            role: "user",
+                            parts: [{ text: userPrompt }]
+                        }
+                    ],
+                    tools: [
+                        { googleSearch: {} }
+                    ],
+                    generationConfig: {
+                        temperature: 0.7,
+                        maxOutputTokens: 1000
+                    }
+                });
+
+                console.log(`[Lyrics+] Fetching song insights via ${insightsModel} for ${artist} - ${title}...`);
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: postData
+                });
+
+                if (response.status === 429) {
+                    console.warn(`[Lyrics+] Key hit 429 rate limit. Trying next key in list...`);
+                    continue;
                 }
-            ],
-            tools: [
-                { googleSearch: {} }
-            ],
-            generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 1000
+
+                if (!response.ok) {
+                    const errJson = await response.json().catch(() => ({}));
+                    const errMsg = errJson.error?.message || response.statusText;
+                    console.error(`[Lyrics+] Insights API HTTP ${response.status}:`, errMsg);
+                    throw new Error(`HTTP ${response.status}: ${errMsg}`);
+                }
+
+                const data = await response.json();
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Không tìm thấy thông tin bổ sung cho bài hát này.";
+                console.log(`[Lyrics+] Successfully received song insights.`);
+                return { text };
+            } catch (err) {
+                lastError = err;
             }
-        });
-
-        console.log(`[Lyrics+] Fetching song insights via ${insightsModel} for ${artist} - ${title}...`);
-        const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: postData
-        });
-
-        if (!response.ok) {
-            const errJson = await response.json().catch(() => ({}));
-            const errMsg = errJson.error?.message || response.statusText;
-            console.error(`[Lyrics+] Insights API HTTP ${response.status}:`, errMsg);
-            throw new Error(`Insights API error ${response.status}: ${errMsg}`);
         }
 
-        const data = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Không tìm thấy thông tin bổ sung cho bài hát này.";
-        console.log(`[Lyrics+] Successfully received song insights.`);
-        return { text };
+        throw lastError || new Error("All API keys failed or rate-limited (429).");
     }
 };
 
