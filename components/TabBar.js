@@ -96,7 +96,7 @@ const getReactDOM = () => Spicetify.ReactDOM;
 
 const TabBarContext = ({ children }) => {
 	const reactDOMRef = getReactDOM();
-	const target = document.querySelector(".main-topBar-topbarContentWrapper");
+	const target = document.querySelector(".main-topBar-topbarContentWrapper, .main-topBar-topbarContent, .main-topBar-container, .Root__top-bar, [data-testid='topbar-content-wrapper']");
 	if (!reactDOMRef?.createPortal || !target) return children;
 
 	return reactDOMRef.createPortal(
