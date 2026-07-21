@@ -1324,7 +1324,15 @@ class LyricsContainer extends react.Component {
 								}
 							},
 						},
-						"N"
+						react.createElement("svg", {
+							width: 16,
+							height: 16,
+							viewBox: "0 0 16 16",
+							fill: "currentColor",
+							dangerouslySetInnerHTML: {
+								__html: Spicetify.SVGIcons["search"] || '<path d="M7 2a5 5 0 1 0 0 10A5 5 0 0 0 7 2zM1 7a6 6 0 1 1 10.89 3.476l3.817 3.817a.75.75 0 0 1-1.06 1.06l-3.817-3.817A6 6 0 0 1 1 7z"/>',
+							},
+						})
 					)
 				),
 				// 4. Video Background Settings Button (▶)

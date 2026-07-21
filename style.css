@@ -1171,18 +1171,18 @@ div.lyrics-tabBar-headerItemLink {
 
 .lyrics-config-button {
   align-items: center;
-  background-color: var(--lp-fab-bg, rgba(0, 0, 0, 0.5));
+  justify-content: center;
+  display: inline-flex;
+  background-color: var(--lp-fab-bg, rgba(0, 0, 0, 0.4));
   border: 0;
-  margin: 5px;
-  border-radius: 4px;
+  margin: 4px;
+  border-radius: 6px;
   color: var(--lp-fab-icon, var(--spice-button));
   cursor: pointer;
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  padding: 12px;
-  height: 40px;
-  width: 40px;
+  padding: 0;
+  height: 38px;
+  width: 38px;
+  box-sizing: border-box;
   transition:
     transform 0.16s ease,
     box-shadow 0.16s ease,
@@ -1192,14 +1192,15 @@ div.lyrics-tabBar-headerItemLink {
 }
 
 .lyrics-config-button:hover {
-  transform: translateZ(0) scale(1.03);
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
+  transform: translateZ(0) scale(1.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .lyrics-config-button svg {
-  filter:
-    drop-shadow(0 0 1px rgba(0, 0, 0, 0.9))
-    drop-shadow(0 0 1px rgba(255, 255, 255, 0.7));
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex-shrink: 0;
 }
 
 .lyrics-config-button-container .main-contextMenu-menu {
