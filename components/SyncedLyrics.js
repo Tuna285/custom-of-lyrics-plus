@@ -177,7 +177,7 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                         nextLine.startTime - 5500
                     );
                     const insertTime = Math.max(lineEnd + IDLE_GRACE_MS, currentLine.startTime + estDur + 1000);
-                    if (nextLine.startTime - insertTime >= 4000) {
+                    if (nextLine.startTime - insertTime >= 3000) {
                         processed.push({
                             text: "♪",
                             startTime: insertTime,
@@ -204,8 +204,8 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                 }
                 const durationToNext = nextRealLine ? (nextRealLine.startTime - current.startTime) : 0;
 
-                // Drop short note lines (< 4000ms) so previous real lyric line holds continuously
-                if (durationToNext > 0 && durationToNext < 4000 && nextRealLine) {
+                // Drop short note lines (< 3000ms) so previous real lyric line holds continuously
+                if (durationToNext > 0 && durationToNext < 3000 && nextRealLine) {
                     continue;
                 }
 
