@@ -280,6 +280,25 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara,
         react.createElement(
             "div",
             {
+                style: {
+                    position: "absolute",
+                    top: "10px",
+                    left: "10px",
+                    background: "rgba(0,0,0,0.8)",
+                    color: "#00ff00",
+                    padding: "8px",
+                    borderRadius: "5px",
+                    zIndex: 9999,
+                    fontSize: "11px",
+                    fontFamily: "monospace",
+                    pointerEvents: "none",
+                }
+            },
+            `Paused: ${Spicetify.Player?.data?.is_paused} | Progress: ${Spicetify.Player.getProgress()} | Position: ${position} | Lines: ${lyrics.length} | Synced: ${lyrics[0]?.startTime !== undefined}`
+        ),
+        react.createElement(
+            "div",
+            {
                 className: "lyrics-lyricsContainer-SyncedLyrics",
                 style: {
                     "--offset": `${offset}px`,
@@ -565,6 +584,25 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
             key: trackUri || lyricsId,
             ref: pageRef,
         },
+        react.createElement(
+            "div",
+            {
+                style: {
+                    position: "absolute",
+                    top: "10px",
+                    left: "10px",
+                    background: "rgba(0,0,0,0.8)",
+                    color: "#ffa500",
+                    padding: "8px",
+                    borderRadius: "5px",
+                    zIndex: 9999,
+                    fontSize: "11px",
+                    fontFamily: "monospace",
+                    pointerEvents: "none",
+                }
+            },
+            `Paused: ${Spicetify.Player?.data?.is_paused} | Progress: ${Spicetify.Player.getProgress()} | Position: ${position} | Lines: ${lyrics.length} | Synced: ${lyrics[0]?.startTime !== undefined}`
+        ),
         react.createElement("p", {
             className: "lyrics-lyricsContainer-LyricsUnsyncedPadding",
         }),
