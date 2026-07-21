@@ -815,7 +815,7 @@ class LyricsContainer extends react.Component {
 				}
 
 				if (CACHE[this.currentTrackUri]) {
-					const resetKeys = ["romaji", "furigana", "hiragana", "katakana", "hangul", "romaja", "cn", "hk", "tw", "musixmatchTranslation", "musixmatchTranslationLanguage"];
+					const resetKeys = ["romaji", "furigana", "hiragana", "katakana", "hangul", "romaja", "cn", "hk", "tw", "musixmatchTranslation", "musixmatchTranslationLanguage", "neteaseTranslation"];
 					for (const k of resetKeys) {
 						delete CACHE[this.currentTrackUri][k];
 					}
@@ -840,6 +840,7 @@ class LyricsContainer extends react.Component {
 					tw: null,
 					musixmatchTranslation: null,
 					musixmatchTranslationLanguage: null,
+					neteaseTranslation: null,
 					provider: "local"
 				});
 				this.saveLocalLyrics(this.currentTrackUri, localLyrics);
@@ -1200,7 +1201,7 @@ class LyricsContainer extends react.Component {
 									ProviderNetease.openManualSearchModal((selectedLyrics) => {
 										if (selectedLyrics) {
 											if (CACHE[selectedLyrics.uri]) {
-												const resetKeys = ["romaji", "furigana", "hiragana", "katakana", "hangul", "romaja", "cn", "hk", "tw", "musixmatchTranslation", "musixmatchTranslationLanguage"];
+												const resetKeys = ["romaji", "furigana", "hiragana", "katakana", "hangul", "romaja", "cn", "hk", "tw", "musixmatchTranslation", "musixmatchTranslationLanguage", "neteaseTranslation"];
 												for (const k of resetKeys) {
 													delete CACHE[selectedLyrics.uri][k];
 												}
@@ -1234,6 +1235,7 @@ class LyricsContainer extends react.Component {
 												tw: null,
 												musixmatchTranslation: null,
 												musixmatchTranslationLanguage: null,
+												neteaseTranslation: null,
 												mode: finalMode,
 												isLoading: false,
 												isCached: this.lyricsSaved(selectedLyrics.uri),

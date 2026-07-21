@@ -160,7 +160,7 @@ const ProviderNetease = (() => {
             
             // Fallback to tlyric if original lrc is empty
             const rawLrc = lyricData?.lrc?.lyric?.trim() ? lyricData.lrc.lyric : (lyricData?.tlyric?.lyric || "");
-            const { synced, unsynced } = parseLyrics(rawLrc);
+            let { synced, unsynced } = parseLyrics(rawLrc);
             if (!synced && !unsynced) return err("NetEase: no lyrics found for this track");
 
             let neteaseTranslation = null;
@@ -168,6 +168,20 @@ const ProviderNetease = (() => {
             if (lyricData?.tlyric?.lyric && lyricData.tlyric.lyric !== rawLrc) {
                 const transResult = parseLyrics(lyricData.tlyric.lyric);
                 neteaseTranslation = transResult.synced || transResult.unsynced || null;
+            }
+
+            if (!synced && unsynced && neteaseTranslation && neteaseTranslation.some(l => l.startTime !== undefined)) {
+                // If original is unsynced but translation is synced, copy timestamps
+                const newSynced = unsynced.map((line, idx) => {
+                    const transLine = neteaseTranslation[idx];
+                    return {
+                        ...line,
+                        startTime: transLine ? transLine.startTime : undefined
+                    };
+                });
+                if (newSynced.some(l => l.startTime !== undefined)) {
+                    synced = newSynced;
+                }
             }
 
             return {
@@ -287,13 +301,31 @@ const ProviderNetease = (() => {
                             // Fallback to tlyric if original lrc is empty
                             const rawLrc = lyricData?.lrc?.lyric?.trim() ? lyricData.lrc.lyric : (lyricData?.tlyric?.lyric || "");
                             
-                            let isSynced = false;
-                            let hasLyrics = false;
-                            if (rawLrc.trim()) {
-                                hasLyrics = true;
-                                const parsed = parseLyrics(rawLrc);
-                                isSynced = !!(parsed?.synced);
-                            }
+                             let isSynced = false;
+                             let hasLyrics = false;
+                             if (rawLrc.trim()) {
+                                 hasLyrics = true;
+                                 const parsed = parseLyrics(rawLrc);
+                                 let neteaseTrans = null;
+                                 if (lyricData?.tlyric?.lyric && lyricData.tlyric.lyric !== rawLrc) {
+                                     const transResult = parseLyrics(lyricData.tlyric.lyric);
+                                     neteaseTrans = transResult.synced || transResult.unsynced || null;
+                                 }
+                                 let finalSynced = parsed.synced;
+                                 if (!finalSynced && parsed.unsynced && neteaseTrans && neteaseTrans.some(l => l.startTime !== undefined)) {
+                                     const newSynced = parsed.unsynced.map((line, idx) => {
+                                         const transLine = neteaseTrans[idx];
+                                         return {
+                                             ...line,
+                                             startTime: transLine ? transLine.startTime : undefined
+                                         };
+                                     });
+                                     if (newSynced.some(l => l.startTime !== undefined)) {
+                                         finalSynced = newSynced;
+                                     }
+                                 }
+                                 isSynced = !!finalSynced;
+                             }
                             
                             return {
                                 ...song,
@@ -346,7 +378,7 @@ const ProviderNetease = (() => {
                         };
                     }
 
-                    const { synced, unsynced } = parseLyrics(lyricData.lyricText);
+                    let { synced, unsynced } = parseLyrics(lyricData.lyricText);
                     if (!synced && !unsynced) {
                         Spicetify.showNotification("❌ No lyrics found for this track", true);
                         setStatus("done");
@@ -357,6 +389,20 @@ const ProviderNetease = (() => {
                     if (lyricData.tlyricText) {
                         const transResult = parseLyrics(lyricData.tlyricText);
                         neteaseTranslation = transResult.synced || transResult.unsynced || null;
+                    }
+
+                    if (!synced && unsynced && neteaseTranslation && neteaseTranslation.some(l => l.startTime !== undefined)) {
+                        // If original is unsynced but translation is synced, copy timestamps
+                        const newSynced = unsynced.map((line, idx) => {
+                            const transLine = neteaseTranslation[idx];
+                            return {
+                                ...line,
+                                startTime: transLine ? transLine.startTime : undefined
+                            };
+                        });
+                        if (newSynced.some(l => l.startTime !== undefined)) {
+                            synced = newSynced;
+                        }
                     }
 
                     onFound?.({
