@@ -97,12 +97,12 @@ const TopBarContent = ({ links, activeLink, lockLink, switchCallback, lockCallba
 	);
 };
 
-const getReactDOM = () => Spicetify.ReactDOM;
+const getReactDOM = () => Spicetify.ReactDOM || window.ReactDOM || (typeof ReactDOM !== "undefined" ? ReactDOM : null);
 
 const TabBarContext = ({ children }) => {
 	const reactDOMRef = getReactDOM();
 	const target = document.querySelector(".main-topBar-topbarContentWrapper");
-	if (!reactDOMRef?.createPortal || !target) return children;
+	if (!reactDOMRef?.createPortal || !target) return null;
 
 	return reactDOMRef.createPortal(
 		react.createElement(
