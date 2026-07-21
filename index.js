@@ -1239,7 +1239,33 @@ class LyricsContainer extends react.Component {
 							})
 						)
 					),
-				// AI Reasoning window toggle button
+				// NetEase Search button (N)
+				react.createElement(
+					Spicetify.ReactComponent.TooltipWrapper,
+					{
+						label: getText("tooltips.searchNetease", {}, "Search NetEase"),
+					},
+					react.createElement(
+						"button",
+						{
+							className: "lyrics-config-button",
+							onClick: () => {
+								const info = this.infoFromTrack(Spicetify.Player.data.item);
+								if (info && typeof ProviderNetease?.openSearchModal === "function") {
+									ProviderNetease.openSearchModal(info.title, info.artist, (selectedLyrics) => {
+										if (selectedLyrics) {
+											const mode = CONFIG.modes[this.state.mode];
+											this.setState({ [mode]: selectedLyrics });
+										}
+									});
+								}
+							},
+							style: { color: "var(--lp-fab-icon, var(--spice-button))" },
+						},
+						"N"
+					)
+				),
+				// AI Reasoning window toggle button (Reasoning)
 				react.createElement(
 					Spicetify.ReactComponent.TooltipWrapper,
 					{
@@ -1252,7 +1278,15 @@ class LyricsContainer extends react.Component {
 							onClick: this.toggleReasoning,
 							style: { color: this.state.isReasoningVisible ? "var(--spice-button)" : "var(--lp-fab-icon, var(--spice-button))" },
 						},
-						"N"
+						react.createElement("svg", {
+							width: 16,
+							height: 16,
+							viewBox: "0 0 16 16",
+							fill: "currentColor",
+							dangerouslySetInnerHTML: {
+								__html: '<path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM2.5 8a5.5 5.5 0 1111 0 5.5 5.5 0 01-11 0z"/><path d="M8 4a1 1 0 00-1 1v3a1 1 0 002 0V5a1 1 0 00-1-1zM8 10a1 1 0 100 2 1 1 0 000-2z"/>',
+							},
+						})
 					)
 				),
 				// Open Settings modal button
