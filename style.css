@@ -1337,19 +1337,19 @@ div.lyrics-tabBar-headerItemLink {
   0% {
     filter: brightness(1);
     box-shadow: 0 0 0 rgba(255, 255, 255, 0);
-    transform: scale(0.4);
+    transform: translateY(0);
   }
 
   85% {
     filter: brightness(1.7);
     box-shadow: 0 0 20px var(--lyrics-color-active);
-    transform: scale(0.85);
+    transform: translateY(-5px);
   }
 
   100% {
     filter: brightness(1);
     box-shadow: 0 0 0 rgba(255, 255, 255, 0);
-    transform: scale(0.7);
+    transform: translateY(0);
   }
 }
 
