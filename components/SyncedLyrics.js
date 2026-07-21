@@ -323,10 +323,9 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                     // Find next line's start time to calculate progress
                     let nextStartTime = startTime + 5000; // Default fallback
 
-                    // Find the next line index in the full array
-                    const currentFullIndex = lineNumber;
-                    if (currentFullIndex < lyricWithEmptyLines.length - 1) {
-                        nextStartTime = lyricWithEmptyLines[currentFullIndex + 1].startTime;
+                    // Find the next line in the activeLines array
+                    if (i < activeLines.length - 1) {
+                        nextStartTime = activeLines[i + 1].startTime;
                     }
 
                     const rawDuration = nextStartTime - startTime;
