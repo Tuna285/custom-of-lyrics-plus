@@ -134,6 +134,7 @@ const CONFIG = {
         "translation-mode-2:gemini": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode-2:gemini") || "none",
         "gemini-api-key": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key") || "",
         "gemini-api-key-romaji": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key-romaji") || "",
+        "gemini-api-keys": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-keys") || "[]",
         "gemini:endpoint": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:endpoint") || "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
         "gemini:model": (() => {
             const val = ConfigUtils.getPersisted("lyrics-plus:visual:gemini:model");
@@ -143,6 +144,7 @@ const CONFIG = {
             }
             return val;
         })(),
+        "gemini:phonetic-model": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:phonetic-model") || "gemini-2.5-flash-lite",
         "gemini:response-mode": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:response-mode") || "json_schema",
         // Reasoning effort: "off" | "low" | "medium" | "high"
         // Migration from legacy boolean `gemini:disable-thinking`:
@@ -159,8 +161,8 @@ const CONFIG = {
         "fullscreen-key": ConfigUtils.getPersisted("lyrics-plus:visual:fullscreen-key") || "f12",
         "synced-compact": ConfigUtils.getPersisted("lyrics-plus:visual:synced-compact") !== "false",
         "dual-genius": ConfigUtils.getPersisted("lyrics-plus:visual:dual-genius") === "true",
-        "pre-translation": ConfigUtils.getPersisted("lyrics-plus:visual:pre-translation") !== "false",
-        "pre-translation-time": ConfigUtils.getPersisted("lyrics-plus:visual:pre-translation-time") || "30",
+        "smart-pre-load": ConfigUtils.getPersisted("lyrics-plus:visual:smart-pre-load") !== "false",
+        "smart-pre-load-time": ConfigUtils.getPersisted("lyrics-plus:visual:smart-pre-load-time") || "30",
         "global-delay": Number(ConfigUtils.getPersisted("lyrics-plus:visual:global-delay")) || 0,
         delay: 0,
         "video-background": ConfigUtils.get("lyrics-plus:visual:video-background", false),
@@ -169,6 +171,7 @@ const CONFIG = {
         "video-background-dim": Number(localStorage.getItem("lyrics-plus:visual:video-background-dim")) || 50,
         "video-host": localStorage.getItem("lyrics-plus:visual:video-host") || "www.youtube.com",
         "video-background-scale": Number(localStorage.getItem("lyrics-plus:visual:video-background-scale")) || 1.0,
+        "video-background-fullscreen": ConfigUtils.get("lyrics-plus:visual:video-background-fullscreen", false),
         "mini-lyrics": ConfigUtils.get("lyrics-plus:visual:mini-lyrics", false),
     },
     providers: {

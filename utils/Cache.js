@@ -198,8 +198,14 @@ const CacheManager = {
             }
         }
 
-        // L2 would require iteration - skip for now
-        // Can add IDBCache.deleteByPattern() if needed
+        // L2: Clear from IndexedDB too
+        try {
+            await this._migrate();
+            const l2Count = await IDBCache.deleteByPattern(uri);
+            count += l2Count;
+        } catch (e) {
+            console.warn('[Cache] Failed to clear L2 entries for URI:', uri, e);
+        }
 
         return count;
     },

@@ -225,6 +225,8 @@ function buildTranslationGuardrails() {
    - "đắm chìm" / "chìm đắm" → use "hòa mình", "say đắm", or "lạc vào" (avoid overusing "đắm chìm")
    - "hoài niệm" → use "nhớ về", "ký ức", or "kỷ niệm xưa"
    - "tô điểm" / "hòa quyện" → use natural, simpler V-pop phrasings
+   - "thấu suốt" / "thấu triệt" → use natural, softer pure-Vietnamese alternatives: "thấu hiểu", "hiểu thấu", "hiểu rõ", "nhận ra" (never use "thấu suốt" in romantic/pop songs)
+   - Stiff single-syllable word splitting: Avoid splitting standard compound words into stiff single-syllable units (e.g., do not use a lone "thấu", "phương", or "tình" if it sounds unnatural or cut off; use full natural compounds like "thấu hiểu", "phương trời", "tình yêu").
    "khẽ khàng" and "chao nghiêng" in particular are known LLM tics — actively avoid them.
 8) NO POETIC-WORD REPETITION — EXCEPT for direct, verbatim repeated lines (like a chorus, hook, or refrain, which MUST be translated consistently and repeated exactly), any Hán-Việt / thi vị word (vấn vương, bâng khuâng, xao xuyến, mơ màng, man mác, da diết, ngọt lịm, dịu êm, mộng mị, u hoài, nhẹ nhàng, đắm chìm, ngập tràn, hoài niệm...) may appear AT MOST ONCE per song in non-identical lines. If the source repeats a motif in different/non-identical lines, vary the Vietnamese word each time. Same-word repetition across different lines is the main thing that makes auto-translated lyrics sound artificial.
 9) CRITICAL: Every single line MUST be fully translated into Vietnamese. Under no circumstances should you copy or output the original foreign text (Japanese, Korean, Chinese, etc.) for any line. Outputting original, untranslated lines is an absolute failure.`;
@@ -284,7 +286,7 @@ ${hygiene}
 
 REASONING GUIDE:
 Use your reasoning space to perform an in-depth translation design and thorough self-audit:
-1. **Thematic & Genre Analysis:** Analyze the song's musical style, era, subtext, and emotional narrative. Identify cultural reference points.
+1. **Thematic & Slang Analysis:** Analyze the song's musical style, era, subtext, modern slang, and emotional narrative. Identify cultural reference points or metaphors and decode their true non-literal meaning before drafting the translation.
 2. **Grammar & Tone Integration:** Map sentence structures and inversion strategies. Pick matching pronouns and refine V-Pop phrasing.
 3. **Melodic Singability & Rhythm Audit:** Ensure every translated line matches the original tempo, syllable pacing, and vowel-flow.
 4. **Vocabulary & Repetition Check:** Review and eliminate cliché words, unnecessary subject pronouns, and repetitive poetic terms. Check that no poetic Hán-Việt term appears more than once per song.
@@ -300,7 +302,7 @@ REASONING GUIDE:
 Use your reasoning space to plan the translation:
 1. **Genre & Mood:** Identify the style and emotional theme of the track.
 2. **Pronoun Locking:** Choose and maintain the perfect pronoun pair based on the song's relationship context.
-3. **Metaphor Transcreation:** Select non-literal transcreation strategies for complex idioms.
+3. **Metaphor & Slang Strategy:** Identify complex idioms, cultural metaphors, or modern slang. Use this thinking space to analyze their true non-literal meaning and plan their natural, poetic Vietnamese transcreation instead of translating literally word-by-word.
 4. **Syllable Control:** Ensure translated lines fit the rhythm and are singable.
 
 *Constraint:* Keep reasoning to a general, high-level overview. Absolutely DO NOT list lines, write out draft translations, or draft specific line translations inside the reasoning block.`;
@@ -314,7 +316,7 @@ REASONING GUIDE:
 Use your thinking space to perform a quick, focused translation planning:
 1. **Genre & Mood:** Identify the song's musical style and overall emotional theme.
 2. **Pronoun Check:** Select the appropriate pronoun pair based on the narrative context.
-3. **Metaphor Strategy:** Identify any complex idioms or non-literal phrases and plan their natural Vietnamese transcreation.
+3. **Metaphor & Slang Strategy:** Identify complex idioms, cultural metaphors, or modern slang. Use this thinking space to analyze their true non-literal meaning and plan their natural, poetic Vietnamese transcreation instead of translating literally word-by-word.
 4. **Flow & Length:** Ensure the syllable count and pace of the Vietnamese draft feel natural and singable alongside the source lines.
 
 *Constraint:* Keep reasoning to a general, high-level overview. Absolutely DO NOT list lines, write out draft translations, or draft specific line translations inside the reasoning block.`;
@@ -450,15 +452,55 @@ const Prompts = {
      * @param {string} [options.styleKey] - Style instruction key
      * @param {string} [options.pronounKey] - Pronoun mode key
      * @param {boolean} [options.wantSmartPhonetic] - True if requesting phonetic prompt
+     * @param {boolean} [options.wantFurigana] - True if Japanese Furigana is requested
      * @param {"off" | "low" | "medium" | "high"} [options.reasoningEffort] - Level of reasoning effort
      * @returns {{ system: string, user: string }}
      */
-    buildPromptEngPrompt({ artist, title, text, styleKey = "smart_adaptive", pronounKey = "default", wantSmartPhonetic = false, reasoningEffort = "low" }) {
+    buildPromptEngPrompt({ artist, title, text, styleKey = "smart_adaptive", pronounKey = "default", wantSmartPhonetic = false, wantFurigana = false, reasoningEffort = "low" }) {
         const lines = text.split("\n");
         const lineCount = lines.length;
         const taggedInput = lines.map((l, i) => `<${i + 1}>${l}</${i + 1}>`).join("\n");
 
         if (wantSmartPhonetic) {
+            if (wantFurigana) {
+                const furiganaCore = `You are a Japanese Furigana transcriber. Output valid XML tags only.
+Wrap Japanese Kanji characters with HTML <ruby> tags to show their Hiragana readings.
+
+OUTPUT FORMAT (STRICT — TAGS):
+<1>[furigana line 1]</1>
+<2>[furigana line 2]</2>
+...
+<${lineCount}>[furigana line ${lineCount}]</${lineCount}>
+
+EXAMPLES:
+Source: 新しい朝が来た
+Target: <ruby>新<rt>あたら</rt></ruby>しい<ruby>朝<rt>あさ</rt></ruby>が<ruby>来<rt>き</rt></ruby>た
+
+Source: 星になる
+Target: <ruby>星<rt>ほし</rt></ruby>になる
+
+RULES:
+1. Output EXACTLY ${lineCount} tags from <1> to <${lineCount}>.
+2. Only wrap Kanji with <ruby>[Kanji]<rt>[Hiragana reading]</rt></ruby>. Do NOT wrap Hiragana, Katakana, English, or punctuation.
+3. Keep line structure, punctuation, and English text unchanged.
+4. Do not translate, explain, or add notes.
+5. Empty/whitespace-only source line → empty tag: <5></5>
+6. ${reasoningEffort === "off" ? "Start DIRECTLY with <1>. NO preamble, NO thinking, NO explanation." : "If reasoning/thinking is active, tags must start immediately after the closing thought block."}
+
+${buildPhoneticTaskThinkingRules("furigana tags (<1>...</1>)", reasoningEffort)}`;
+
+                return {
+                    system: furiganaCore,
+                    user: `Generate Furigana tags for: "${artist} - ${title}".
+CRITICAL: Do NOT translate. Output Japanese text with <ruby> tags for Kanji only.
+
+Input (${lineCount} lines):
+${taggedInput}
+
+Output (${lineCount} tags):`
+                };
+            }
+
             const phoneticCore = `${PHONETIC_ROLE}
 
 ${PHONETIC_TRANSCRIPTION_STANDARDS}
@@ -517,26 +559,50 @@ Output (${lineCount} tags):`
      * @param {string} options.text
      * @returns {string}
      */
-    buildMinimalFallbackPrompt({ artist, title, text }) {
+    buildMinimalFallbackPrompt({ artist, title, text, wantSmartPhonetic = false, wantFurigana = false }) {
         const lines = text.split("\n");
         const linesJson = JSON.stringify(lines);
+        if (wantSmartPhonetic) {
+            if (wantFurigana) {
+                return `Generate Japanese Furigana. Output valid JSON Array of ${lines.length} strings containing Japanese Kanji wrapped in HTML <ruby> tags for their Hiragana readings. No translation.
+Input: ${linesJson}
+Output JSON:`;
+            }
+            return `Romanize lyrics. Output valid JSON Array of ${lines.length} strings containing only the pronunciation (Romaji/Romaja/Pinyin). 1:1 mapping. No translation.
+Input: ${linesJson}
+Output JSON:`;
+        }
         return `Translate to Vietnamese. Output valid JSON Array of ${lines.length} strings. 1:1 mapping. No merging.
 Input: ${linesJson}
 Output JSON:`;
     },
 
     /**
-     * Builds fallback tags translation prompt.
+     * Builds fallback tags translation/phonetic prompt.
      * @param {object} options
      * @param {string} options.artist
      * @param {string} options.title
      * @param {string} options.text
+     * @param {boolean} [options.wantSmartPhonetic]
+     * @param {boolean} [options.wantFurigana]
      * @returns {string}
      */
-    buildMinimalFallbackTagsPrompt({ artist, title, text }) {
+    buildMinimalFallbackTagsPrompt({ artist, title, text, wantSmartPhonetic = false, wantFurigana = false }) {
         const lines = text.split("\n");
         const lineCount = lines.length;
         const taggedInput = lines.map((l, i) => `<${i + 1}>${l}</${i + 1}>`).join("\n");
+        if (wantSmartPhonetic) {
+            if (wantFurigana) {
+                return `Generate Japanese Furigana. Output EXACTLY ${lineCount} XML tags (<1>...</1> to <${lineCount}>...</${lineCount}>) containing Japanese Kanji wrapped in HTML <ruby> tags for their Hiragana readings. No translation.
+Input:
+${taggedInput}
+Output:`;
+            }
+            return `Romanize lyrics. Output EXACTLY ${lineCount} XML tags (<1>...</1> to <${lineCount}>...</${lineCount}>) containing only the pronunciation (Romaji/Romaja/Pinyin). 1:1 mapping. No translation.
+Input:
+${taggedInput}
+Output:`;
+        }
         return `Translate to Vietnamese. Output EXACTLY ${lineCount} XML tags (<1>...</1> to <${lineCount}>...</${lineCount}>). 1:1 mapping. No merging.
 Input:
 ${taggedInput}
@@ -579,12 +645,37 @@ Output: A single JSON object with key "translations" only. The "translations" va
      * @param {string} options.artist
      * @param {string} options.title
      * @param {string} options.text
+     * @param {boolean} [options.wantFurigana]
      * @param {"off" | "low" | "medium" | "high"} [options.reasoningEffort]
      * @returns {{ system: string, user: string }}
      */
-    buildJsonSchemaPhoneticPrompt({ artist, title, text, reasoningEffort = "low" }) {
+    buildJsonSchemaPhoneticPrompt({ artist, title, text, wantFurigana = false, reasoningEffort = "low" }) {
         const lines = text.split("\n");
         const lineCount = lines.length;
+
+        if (wantFurigana) {
+            return {
+                system: `You are a Japanese Furigana transcriber. Wrap Japanese Kanji characters with HTML <ruby> tags to show their Hiragana readings.
+OUTPUT FORMAT (STRICT — JSON ONLY):
+1. Output MUST be JSON with key "phonetics" only (no other keys, no markdown fences).
+2. "phonetics" MUST be an array of EXACTLY ${lineCount} strings.
+3. 1 source line = 1 string. NEVER split, merge, or reorder lines.
+4. Empty/whitespace-only source line → "".
+5. Wrap Kanji with <ruby>[Kanji]<rt>[Hiragana reading]</rt></ruby>. Do NOT wrap Hiragana, Katakana, English, or punctuation.
+6. Keep punctuation, English, and line structure unchanged. No translation, no notes.
+7. Example: "新しい朝が来た" -> "<ruby>新<rt>あたら</rt></ruby>しい<ruby>朝<rt>あさ</rt></ruby>が<ruby>来<rt>き</rt></ruby>た".
+
+${buildPhoneticTaskThinkingRules('JSON object (key "phonetics" only)', reasoningEffort)}`,
+
+                user: `Generate Furigana for: "${artist} - ${title}".
+CRITICAL: Do NOT translate the lyrics. Output Japanese text with <ruby> tags for Kanji only.
+
+Input (${lineCount} lines):
+${lines.map((l, i) => `${i + 1}. ${l}`).join("\n")}
+
+Output: JSON with key "phonetics" containing array of ${lineCount} Furigana strings.`
+            };
+        }
 
         return {
             system: `${PHONETIC_ROLE}

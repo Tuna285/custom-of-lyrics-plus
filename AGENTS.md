@@ -26,13 +26,10 @@ React is accessed via `Spicetify.React` (not imported). Config is persisted with
 
 ## Development & Deployment Commands
 
-There is no package manager or build tool. To test changes locally:
+There is no package manager or build tool. Since this workspace is developed directly inside Spicetify's CustomApps directory, to test changes locally you only need to run:
 
 ```powershell
-# Copy the repo folder to Spicetify's CustomApps directory (Windows)
-Copy-Item -Recurse -Force "." "$env:LOCALAPPDATA\spicetify\CustomApps\lyrics-plus"
-
-# Apply and reload Spotify
+# Apply changes and reload Spotify
 spicetify apply
 ```
 

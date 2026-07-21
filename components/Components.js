@@ -437,15 +437,11 @@ const TranslatingIndicatorRow = react.memo(
         isVisible,
         status,
         text = getText("ui.translating"),
-        reasoningStreams = {},
+        hasReasoningText = false,
         onReasoningClick,
         isReasoningOpen = false,
     }) => {
         const showPill = isVisible || !!status;
-        const hasReasoningText = !!(
-            (reasoningStreams.translation && reasoningStreams.translation.trim()) ||
-            (reasoningStreams.phonetic && reasoningStreams.phonetic.trim())
-        );
         // Brain only shows alongside the active pill. Once translation finishes the pill (and brain) disappear; the modal — if user opened it — stays open independently.
         const showBrain = showPill;
         if (!showPill) return null;
@@ -587,7 +583,7 @@ const useLyricsContainerRect = () => {
 const TranslationStatusOverlay = ({
     isVisible,
     status,
-    reasoningStreams,
+    hasReasoningText,
     onReasoningClick,
     isReasoningOpen,
     preTranslateChip,
@@ -620,7 +616,7 @@ const TranslationStatusOverlay = ({
         react.createElement(TranslatingIndicatorRow, {
             isVisible,
             status,
-            reasoningStreams,
+            hasReasoningText,
             onReasoningClick,
             isReasoningOpen,
         }),
@@ -650,8 +646,56 @@ const REASONING_TAB_LABELS = {
 // Persisted geometry key — survives close, song change, and Spotify restart.
 const REASONING_WINDOW_GEOMETRY_KEY = "lyrics-plus:reasoning-window-geometry";
 
-const ReasoningWindow = ({ open, streams = {}, activeTab, onTabChange, isStreaming, onClose, anchorRect }) => {
+const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab, onTabChange, isStreaming: propIsStreaming, onClose, anchorRect }) => {
     const reactDOMRef = (typeof Spicetify !== "undefined" && Spicetify.ReactDOM) || window.ReactDOM;
+
+    const [streams, setStreams] = useState(() => {
+        return (window.LyricsPlus && window.LyricsPlus.currentReasoning) || propStreams || { translation: "", phonetic: "" };
+    });
+    const [isStreaming, setIsStreaming] = useState(() => {
+        return (window.LyricsPlus && window.LyricsPlus.isReasoningStreaming) || propIsStreaming || false;
+    });
+    const [activeTab, setActiveTab] = useState(propActiveTab);
+
+    // Listen to custom DOM events for isolated stream updates
+    useEffect(() => {
+        if (!open) return;
+
+        const handleProgress = (e) => {
+            const { taskKey, partial } = e.detail;
+            setStreams((prev) => {
+                const next = { ...prev, [taskKey]: partial };
+                return next;
+            });
+        };
+
+        const handleStatus = (e) => {
+            const { isStreaming: nextStreaming } = e.detail;
+            setIsStreaming(nextStreaming);
+        };
+
+        const handleClear = () => {
+            setStreams({ translation: "", phonetic: "" });
+            setIsStreaming(false);
+            setActiveTab(null);
+        };
+
+        window.addEventListener('lyrics-plus:reasoning-progress', handleProgress);
+        window.addEventListener('lyrics-plus:reasoning-status', handleStatus);
+        window.addEventListener('lyrics-plus:reasoning-clear', handleClear);
+
+        // Synchronize state with current global values on open
+        if (window.LyricsPlus) {
+            setStreams({ ...(window.LyricsPlus.currentReasoning || { translation: "", phonetic: "" }) });
+            setIsStreaming(!!window.LyricsPlus.isReasoningStreaming);
+        }
+
+        return () => {
+            window.removeEventListener('lyrics-plus:reasoning-progress', handleProgress);
+            window.removeEventListener('lyrics-plus:reasoning-status', handleStatus);
+            window.removeEventListener('lyrics-plus:reasoning-clear', handleClear);
+        };
+    }, [open]);
 
     // Build the list of available tabs from streams that have content
     const availableTabs = useMemo(() => {
@@ -668,6 +712,13 @@ const ReasoningWindow = ({ open, streams = {}, activeTab, onTabChange, isStreami
         if (activeTab && availableTabs.includes(activeTab)) return activeTab;
         return availableTabs[0] || activeTab || null;
     }, [activeTab, availableTabs]);
+
+    // Auto-focus the first tab that gets content if no tab is active
+    useEffect(() => {
+        if (availableTabs.length > 0 && !activeTab) {
+            setActiveTab(availableTabs[0]);
+        }
+    }, [availableTabs, activeTab]);
 
     // Compute a sensible initial geometry based on the anchor container.
     // Used as fallback when no persisted geometry exists in localStorage.
@@ -854,7 +905,10 @@ const ReasoningWindow = ({ open, streams = {}, activeTab, onTabChange, isStreami
                     onPointerDown: (e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (!isActive) onTabChange && onTabChange(key);
+                        if (!isActive) {
+                            setActiveTab(key);
+                            onTabChange && onTabChange(key);
+                        }
                     },
                     onClick: (e) => { e.preventDefault(); e.stopPropagation(); },
                 },

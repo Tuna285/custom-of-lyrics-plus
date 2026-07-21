@@ -86,16 +86,16 @@ window.LANG_VI = {
       "desc": "URL API tương thích OpenAI (<code>/v1/chat/completions</code>). Chọn preset từ dropdown hoặc dán URL tùy ý."
     },
     "modelName": {
-      "label": "Tên Model",
-      "desc": "Tên model LLM của nhà cung cấp. Chọn model phổ biến hoặc nhập tên tùy ý."
+      "label": "Model Dịch Thuật",
+      "desc": "Model LLM dùng để dịch nghĩa lời nhạc (ví dụ: gemini-3.5-flash)."
     },
-    "apiKey": {
-      "label": "API Key",
-      "desc": "Key chính cho dịch thuật."
+    "phoneticModelName": {
+      "label": "Model Phiên Âm",
+      "desc": "Model LLM dùng để tạo Romaji/Furigana. Nên chọn model nhẹ, nhanh (như gemini-2.5-flash-lite) để tiết kiệm quota của model dịch chính."
     },
-    "apiKey2": {
-      "label": "API Key 2",
-      "desc": "Key phụ cho phiên âm (tùy chọn, dùng key chính nếu bỏ trống)."
+    "apiKeys": {
+      "label": "Danh sách Gemini API Keys",
+      "desc": "Thêm nhiều key để tự động xoay vòng tránh lỗi giới hạn lượt dùng."
     },
     "responseMode": {
       "label": "Định dạng Response",
@@ -106,13 +106,13 @@ window.LANG_VI = {
       },
       "unsupportedToast": "Model này không hỗ trợ JSON Schema — đã tự chuyển sang Prompt Engineering."
     },
-    "preTranslation": {
-      "label": "Dịch trước (Pre-translation)",
-      "desc": "Tự động dịch trước khi bài hát bắt đầu."
+    "smartPreload": {
+      "label": "Tải trước thông minh",
+      "desc": "Tự động chuẩn bị và lưu sẵn lời dịch (Gemini) và video background (YouTube) ở nền cho bài tiếp theo."
     },
-    "preTranslationTime": {
-      "label": "Thời gian dịch trước",
-      "desc": "Bắt đầu dịch trước bao lâu trước khi bài hát kết thúc."
+    "smartPreloadTime": {
+      "label": "Thời gian chuẩn bị trước",
+      "desc": "Bắt đầu chuẩn bị bài tiếp theo trước khi bài hát hiện tại kết thúc bao nhiêu giây."
     },
     "disableQueue": {
       "label": "Tắt hàng đợi (Parallel)",
@@ -153,6 +153,10 @@ window.LANG_VI = {
     },
     "videoBackgroundBlur": {
       "label": "Độ mờ Video"
+    },
+    "videoBackgroundFullscreen": {
+      "label": "Bao phủ toàn bộ cửa sổ",
+      "desc": "Cho phép video nền tràn ra toàn bộ cửa sổ Spotify thay vì chỉ ở khung lời nhạc."
     },
     "debugMode": {
       "label": "Chế độ Debug",
@@ -308,7 +312,8 @@ window.LANG_VI = {
     },
     "geminiModes": {
       "romaji": "Romaji, Romaja, Pinyin (AI)",
-      "vi": "Tiếng Việt (AI)"
+      "vi": "Tiếng Việt (AI)",
+      "furigana": "Furigana (AI)"
     },
     "styles": {
       "smart_adaptive": "Tự động (Đề xuất)",
@@ -356,6 +361,8 @@ window.LANG_VI = {
   "videoModal": {
     "title": "Video Background",
     "topVideos": "Top Video Phù hợp",
+    "searchQuery": "Từ khóa tìm kiếm:",
+    "search": "Tìm kiếm",
     "inputId": "YouTube Video ID hoặc URL:",
     "placeholder": "Ví dụ: dQw4w9WgXcQ hoặc https://youtube.com/...",
     "totalOffset": "Điều chỉnh Offset:",
@@ -367,7 +374,19 @@ window.LANG_VI = {
     "currentVideo": "Video hiện tại",
     "pasteCopied": "Dán liên kết đã sao chép:",
     "paste": "Dán từ clipboard",
-    "noResults": "Không tìm thấy video phù hợp."
+    "noResults": "Không tìm thấy video phù hợp.",
+    "change": "Thay đổi",
+    "remove": "Xóa",
+    "enterManual": "Nhập ID/URL thủ công",
+    "save": "Lưu",
+    "searchYoutubeLink": "← Tìm kiếm trên YouTube",
+    "active": "Hoạt động",
+    "done": "Xong",
+    "backToSync": "← Quay lại đồng bộ",
+    "unsynced": "chưa đồng bộ",
+    "syncHint": "Kéo thanh trượt để đồng bộ: giá trị âm phát video sớm hơn, giá trị dương phát muộn hơn.",
+    "searchPlaceholder": "Nhập tên video để tìm...",
+    "aiSuggestions": "Gợi ý phiên âm CJK:"
   },
   "modal": {
     "title": "Cài đặt Lyrics Plus"

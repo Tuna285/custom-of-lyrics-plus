@@ -133,6 +133,45 @@ const IDBCache = {
     },
 
     /**
+     * Delete items matching a key prefix/pattern
+     * @param {string} pattern - Substring pattern to match keys against
+     * @returns {Promise<number>} - Number of deleted items
+     */
+    async deleteByPattern(pattern) {
+        if (!pattern) return 0;
+        try {
+            const db = await this._getDB();
+            return new Promise((resolve) => {
+                const tx = db.transaction(this._storeName, 'readwrite');
+                const store = tx.objectStore(this._storeName);
+                const request = store.openCursor();
+                let deletedCount = 0;
+
+                request.onsuccess = (event) => {
+                    const cursor = event.target.result;
+                    if (cursor) {
+                        if (cursor.key.includes(pattern)) {
+                            cursor.delete();
+                            deletedCount++;
+                        }
+                        cursor.continue();
+                    } else {
+                        resolve(deletedCount);
+                    }
+                };
+
+                request.onerror = () => {
+                    console.warn('[IDBCache] Delete by pattern error:', request.error);
+                    resolve(deletedCount);
+                };
+            });
+        } catch (e) {
+            console.warn('[IDBCache] Delete by pattern failed:', e);
+            return 0;
+        }
+    },
+
+    /**
      * Clear all items from IndexedDB
      * @returns {Promise<boolean>}
      */

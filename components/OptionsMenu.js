@@ -264,8 +264,9 @@ const getStaticOptions = () => ({
 		none: getText("contextMenu.modeBase.none", {}, "None"),
 	},
 	geminiModes: {
-		gemini_romaji: getText("contextMenu.geminiModes.romaji", {}, "Romaji, Romaja, Pinyin (AI)"),
 		gemini_vi: getText("contextMenu.geminiModes.vi", {}, "Vietnamese (AI)"),
+		gemini_romaji: getText("contextMenu.geminiModes.romaji", {}, "Romaji, Romaja, Pinyin (AI)"),
+		gemini_furigana: getText("contextMenu.geminiModes.furigana", {}, "Furigana (AI)"),
 	},
 	languageModes: {
 		japanese: {
@@ -382,6 +383,10 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 			if (provider === "geminiVi") {
 				// Add Gemini options first
 				combinedOptions = { ...STATIC_OPTIONS.geminiModes };
+				// Remove Japanese-specific Furigana option for Chinese/Korean
+				if (friendlyLanguage !== "japanese") {
+					delete combinedOptions.gemini_furigana;
+				}
 				// Then add local options from Traditional mode
 				const localModes = STATIC_OPTIONS.languageModes[friendlyLanguage];
 				if (localModes) {

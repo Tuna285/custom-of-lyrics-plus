@@ -124,6 +124,77 @@ const GeminiClient = {
         this.lastNotificationMessage = message;
         return true;
     },
+
+    repairTruncatedJson(text) {
+        let raw = String(text || "").trim();
+        if (!raw) return "";
+
+        // Remove markdown code fences if present
+        raw = raw.replace(/```[a-z]*\n?/gim, "").replace(/```/g, "").trim();
+
+        // 1. Balance quotation marks (quotes inside strings)
+        let inString = false;
+        let escape = false;
+        for (let i = 0; i < raw.length; i++) {
+            const char = raw[i];
+            if (escape) {
+                escape = false;
+            } else if (char === '\\') {
+                escape = true;
+            } else if (char === '"') {
+                inString = !inString;
+            }
+        }
+
+        if (inString) {
+            if (raw.endsWith('\\')) {
+                raw = raw.slice(0, -1);
+            }
+            raw += '"';
+        }
+
+        // 2. Clean up trailing commas, colons, or incomplete array/object elements
+        raw = raw.replace(/,\s*$/, "");
+        raw = raw.replace(/:\s*$/, "");
+
+        // 3. Balance braces and brackets
+        let stack = [];
+        inString = false;
+        escape = false;
+        for (let i = 0; i < raw.length; i++) {
+            const char = raw[i];
+            if (escape) {
+                escape = false;
+            } else if (char === '\\') {
+                escape = true;
+            } else if (char === '"') {
+                inString = !inString;
+            } else if (!inString) {
+                if (char === '{' || char === '[') {
+                    stack.push(char);
+                } else if (char === '}') {
+                    if (stack[stack.length - 1] === '{') {
+                        stack.pop();
+                    }
+                } else if (char === ']') {
+                    if (stack[stack.length - 1] === '[') {
+                        stack.pop();
+                    }
+                }
+            }
+        }
+
+        while (stack.length > 0) {
+            const openChar = stack.pop();
+            if (openChar === '{') {
+                raw += '}';
+            } else if (openChar === '[') {
+                raw += ']';
+            }
+        }
+
+        return raw;
+    },
     
     // Cancel all pending requests in both queues (call when track changes)
     cancelAllQueues() {
@@ -144,6 +215,8 @@ const GeminiClient = {
             // Parse / empty-body failures won't succeed on identical retry — avoid loops.
             const msg = String(error.message || "");
             if (/Empty response|No response from API/i.test(msg)) throw error;
+            // Hard quota exceeded (429 with quota message) won't succeed on same key retry — throw immediately to let key rotation handle it.
+            if (error.status === 429 && /quota/i.test(msg)) throw error;
 
             // True exponential backoff: delay = baseDelay * 2^attempt
             const delay = baseDelay * Math.pow(2, attempt - 1);
@@ -217,20 +290,58 @@ const GeminiClient = {
         raw = raw.replace(/```[a-z]*\n?/gim, "").replace(/```/g, "").trim();
 
         // Priority 0: Parse compact tag format (e.g., <1>content</1>)
-        const compactPattern = /<(\d+)>(.*?)<\/\1>/gs;
-        const compactMatches = [...raw.matchAll(compactPattern)];
-        if (compactMatches.length > 0) {
+        // Using a robust scan-based parser instead of strict regex matching
+        const tagRegex = /<(\d+)>/g;
+        let match;
+        const tags = [];
+        while ((match = tagRegex.exec(raw)) !== null) {
+            tags.push({
+                number: parseInt(match[1], 10),
+                index: match.index,
+                length: match[0].length
+            });
+        }
+
+        if (tags.length > 0) {
             const result = [];
-            for (const match of compactMatches) {
-                const idx = parseInt(match[1], 10) - 1;
-                result[idx] = match[2].trim();
+            for (let i = 0; i < tags.length; i++) {
+                const currentTag = tags[i];
+                const startPos = currentTag.index + currentTag.length;
+                const endPos = (i + 1 < tags.length) ? tags[i + 1].index : raw.length;
+                
+                let content = raw.substring(startPos, endPos);
+                
+                // Look for standard closing tag </number>
+                const closingTagStr = `</${currentTag.number}>`;
+                const closingTagIdx = content.indexOf(closingTagStr);
+                if (closingTagIdx !== -1) {
+                    content = content.substring(0, closingTagIdx);
+                } else {
+                    // Try to match malformed closing tag like </number (missing >)
+                    const malformedIdx = content.indexOf(`</${currentTag.number}`);
+                    if (malformedIdx !== -1) {
+                        content = content.substring(0, malformedIdx);
+                    }
+                }
+                
+                // Cleanup helper regexes for any remaining garbage at the end
+                // 1. If model used opening tag as closing tag: <number>
+                const openingReg = new RegExp(`<${currentTag.number}>\\s*$`, 'i');
+                content = content.replace(openingReg, '');
+                
+                // 2. Generic malformed closing tag like </ or </digit
+                content = content.replace(/<\/\d*>?[ \t]*$/, '');
+                
+                result[currentTag.number - 1] = content.trim();
             }
+
             // Fill any gaps with empty strings
             for (let i = 0; i < result.length; i++) {
                 if (result[i] === undefined) result[i] = '';
             }
+
             if (result.length > 0) {
-                console.log(`[Lyrics+] Parsed ${result.length} lines via Compact Tags`);
+                console.log(`[Lyrics+] Parsed ${result.length} lines via Robust Compact Tags`);
                 return { vi: result, phonetic: result.join('\n') };
             }
         }
@@ -284,27 +395,28 @@ const GeminiClient = {
         let parsed = safeParse(raw);
         let arr = extractArray(parsed);
 
+        const sliceJson = (text, openCh, closeCh) => {
+            const start = text.indexOf(openCh);
+            if (start === -1) return null;
+            let depth = 0, inStr = false, esc = false;
+            for (let i = start; i < text.length; i++) {
+                const c = text[i];
+                if (inStr) {
+                    if (esc) { esc = false; continue; }
+                    if (c === "\\") { esc = true; continue; }
+                    if (c === '"') inStr = false;
+                    continue;
+                }
+                if (c === '"') { inStr = true; continue; }
+                if (c === openCh) depth++;
+                else if (c === closeCh) { depth--; if (depth === 0) return text.slice(start, i + 1); }
+            }
+            return null;
+        };
+
         // Bracket-balanced object/array slice (handles strings + escapes, ignores brackets inside quotes).
         // Used when raw has prose around the JSON (e.g. "Here is the output: {...}").
         if (!arr) {
-            const sliceJson = (text, openCh, closeCh) => {
-                const start = text.indexOf(openCh);
-                if (start === -1) return null;
-                let depth = 0, inStr = false, esc = false;
-                for (let i = start; i < text.length; i++) {
-                    const c = text[i];
-                    if (inStr) {
-                        if (esc) { esc = false; continue; }
-                        if (c === "\\") { esc = true; continue; }
-                        if (c === '"') inStr = false;
-                        continue;
-                    }
-                    if (c === '"') { inStr = true; continue; }
-                    if (c === openCh) depth++;
-                    else if (c === closeCh) { depth--; if (depth === 0) return text.slice(start, i + 1); }
-                }
-                return null;
-            };
             // Try object first (more common from Gemini structured output), then array
             const objSlice = sliceJson(raw, "{", "}");
             if (objSlice) arr = extractArray(safeParse(objSlice));
@@ -312,6 +424,22 @@ const GeminiClient = {
                 const arrSlice = sliceJson(raw, "[", "]");
                 const slicedParsed = safeParse(arrSlice || "");
                 arr = extractArray(slicedParsed);
+            }
+        }
+
+        // FALLBACK: Self-healing JSON Repair for truncated content
+        if (!arr) {
+            const repaired = this.repairTruncatedJson(raw);
+            parsed = safeParse(repaired);
+            arr = extractArray(parsed);
+            if (!arr) {
+                const objSlice = sliceJson(repaired, "{", "}");
+                if (objSlice) arr = extractArray(safeParse(objSlice));
+                if (!arr) {
+                    const arrSlice = sliceJson(repaired, "[", "]");
+                    const slicedParsed = safeParse(arrSlice || "");
+                    arr = extractArray(slicedParsed);
+                }
             }
         }
 
@@ -812,21 +940,24 @@ const GeminiClient = {
      *   Phonetic:    ~60 tokens (romanization is shorter than VI translation)
      * Floor at 2000 (short songs / single quote requests), cap at 16000 (provider limits).
      */
-    estimateMaxTokens(lineCount, wantSmartPhonetic) {
-        const perLine = wantSmartPhonetic ? 60 : 80;
+    estimateMaxTokens(lineCount, wantSmartPhonetic, wantFurigana = false) {
+        const perLine = wantFurigana ? 160 : (wantSmartPhonetic ? 60 : 80);
         const overhead = 400; // JSON wrapper, system echoes, reasoning tag boilerplate
         const estimated = lineCount * perLine + overhead;
         return Math.min(16000, Math.max(2000, estimated));
     },
 
-    async callGemini({ apiKey, artist, title, text, styleKey, pronounKey, wantSmartPhonetic, _isRetry, priority, taskId, onReasoningProgress }) {
+    async callGemini({ apiKey, artist, title, text, styleKey, pronounKey, wantSmartPhonetic, wantFurigana, _isRetry, priority, taskId, onReasoningProgress }) {
         const startTime = Date.now();
         const lineCount = text.split('\n').length;
 
         DebugLogger.group(`${wantSmartPhonetic ? 'Phonetic' : 'Translation'} Request`);
 
         const endpoint = CONFIG?.visual?.["gemini:endpoint"] || "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-        const model = CONFIG?.visual?.["gemini:model"] || "gemini-3.1-flash-lite";
+        let model = CONFIG?.visual?.["gemini:model"] || "gemini-3.1-flash-lite";
+        if (wantSmartPhonetic) {
+            model = CONFIG?.visual?.["gemini:phonetic-model"] || "gemini-2.5-flash-lite";
+        }
         let responseMode = CONFIG?.visual?.["gemini:response-mode"] || "prompt";
 
         // Auto-demote JSON Schema → Prompt Engineering for models that don't support it
@@ -862,11 +993,16 @@ const GeminiClient = {
         const isThinkingActive = isGemma4Google || (isGeminiWithBudget && reasoningEffort !== "off");
 
         // Calculate max_tokens budget. If the model is actively thinking, the reasoning block
-        // will consume thousands of tokens. We must drastically increase the output budget (6144+)
-        // so the final translation output itself doesn't get truncated (resulting in no output).
-        let tokens = this.estimateMaxTokens(lineCount, wantSmartPhonetic);
+        // will consume thousands of tokens. We must dynamically scale the token budget based
+        // on reasoning effort (low -> +512, medium -> +2048, high -> +8192) to avoid truncation,
+        // and cap it at 16000 (standard provider maximum).
+        let tokens = this.estimateMaxTokens(lineCount, wantSmartPhonetic, wantFurigana);
         if (isThinkingActive) {
-            tokens = Math.max(tokens, 6144);
+            const budgetOffset = reasoningEffort === "off" ? 0 
+                               : reasoningEffort === "low" ? 512 
+                               : reasoningEffort === "medium" ? 2048 
+                               : 8192;
+            tokens = Math.min(16000, Math.max(tokens + budgetOffset, 6144));
         }
 
         if (responseMode === "json_schema") {
@@ -874,11 +1010,11 @@ const GeminiClient = {
             let prompt;
             if (_isRetry) {
                 prompt = {
-                    system: "You are a translator. Output valid JSON only.",
-                    user: Prompts.buildMinimalFallbackPrompt({ artist, title, text })
+                    system: wantSmartPhonetic ? "You are a phonetic transcriber. Output valid JSON only." : "You are a translator. Output valid JSON only.",
+                    user: Prompts.buildMinimalFallbackPrompt({ artist, title, text, wantSmartPhonetic, wantFurigana })
                 };
             } else if (wantSmartPhonetic) {
-                prompt = Prompts.buildJsonSchemaPhoneticPrompt({ artist, title, text, reasoningEffort });
+                prompt = Prompts.buildJsonSchemaPhoneticPrompt({ artist, title, text, wantFurigana, reasoningEffort });
             } else {
                 prompt = Prompts.buildJsonSchemaTranslationPrompt({ artist, title, text, styleKey, pronounKey, reasoningEffort });
             }
@@ -898,11 +1034,11 @@ const GeminiClient = {
             let prompt;
             if (_isRetry) {
                 prompt = {
-                    system: "You are a translator. Output compact tags <1>...</1> only.",
-                    user: Prompts.buildMinimalFallbackTagsPrompt({ artist, title, text })
+                    system: wantSmartPhonetic ? "You are a phonetic transcriber. Output compact tags <1>...</1> only." : "You are a translator. Output compact tags <1>...</1> only.",
+                    user: Prompts.buildMinimalFallbackTagsPrompt({ artist, title, text, wantSmartPhonetic, wantFurigana })
                 };
             } else {
-                prompt = Prompts.buildPromptEngPrompt({ artist, title, text, styleKey, pronounKey, wantSmartPhonetic, reasoningEffort });
+                prompt = Prompts.buildPromptEngPrompt({ artist, title, text, styleKey, pronounKey, wantSmartPhonetic, wantFurigana, reasoningEffort });
             }
 
             let msgs = [];
@@ -1001,14 +1137,15 @@ const GeminiClient = {
             });
             console.groupEnd();
 
-            // Retry with fallback prompt if first attempt failed
-            const isClientError = error.status === 401 || error.status === 403 || error.status === 404;
-            if (error.name !== 'AbortError' && !_isRetry && !isClientError) {
+            // Retry with fallback prompt ONLY if format/parsing validation failed on a successful HTTP response.
+            // Do NOT retry with fallback prompt for HTTP status errors (400, 429, 503, etc.) or network aborts.
+            const isFormatError = !error.status && /Format validation|JSON format|parse|Empty response/i.test(errorMsg);
+            if (isFormatError && !_isRetry && error.name !== 'AbortError') {
                 console.log('[Lyrics+] Retrying with fallback minimal prompt...');
                 return this.callGemini({
                     apiKey, artist, title, text,
                     styleKey: 'literal_study', pronounKey: 'default',
-                    wantSmartPhonetic, _isRetry: true,
+                    wantSmartPhonetic, wantFurigana, _isRetry: true,
                     onReasoningProgress
                 });
             }
@@ -1128,7 +1265,13 @@ const GeminiClient = {
 
         // Validate line count and structure integrity
         if (result.vi && result.vi.length !== lineCount) {
-            if (!isRetry) {
+            const ratio = result.vi.length / lineCount;
+            // If we got less than 85% of the expected lines, we treat it as a major truncation
+            // and trigger a retry (if not already a retry). Otherwise, we accept the partial
+            // translation and pad the missing lines to prevent showing a full crash/error to the user.
+            const isMajorMismatch = ratio < 0.85;
+
+            if (!isRetry && isMajorMismatch) {
                 if (result.isFallbackSplit) {
                     throw new Error(`Format validation failed: expected ${lineCount} structured lines, but parser fell back to raw line splitting and got ${result.vi.length} lines.`);
                 }
@@ -1137,7 +1280,7 @@ const GeminiClient = {
                 }
             }
 
-            DebugLogger.warn(`Line count mismatch! Expected: ${lineCount}, Got: ${result.vi.length}`);
+            DebugLogger.warn(`Line count mismatch! Expected: ${lineCount}, Got: ${result.vi.length} (Ratio: ${ratio.toFixed(2)}). Padding/trimming to fit.`);
             // Pad or trim to match expected count
             if (result.vi.length < lineCount) {
                 while (result.vi.length < lineCount) result.vi.push("");

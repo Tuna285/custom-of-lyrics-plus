@@ -1,10 +1,3 @@
-const kuroshiroPath = "https://cdn.jsdelivr.net/npm/kuroshiro@1.2.0/dist/kuroshiro.min.js";
-const kuromojiPath = "https://cdn.jsdelivr.net/npm/kuroshiro-analyzer-kuromoji@1.1.0/dist/kuroshiro-analyzer-kuromoji.min.js";
-const aromanize = "https://cdn.jsdelivr.net/npm/aromanize@0.1.5/aromanize.min.js";
-const openCCPath = "https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.min.js";
-const pinyinProPath = "https://unpkg.com/pinyin-pro"; // UMD, exposes window.pinyinPro
-// Note: tiny-pinyin removed because it uses CommonJS require() which doesn't work in browser
-
 const dictPath = "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict";
 
 // Translator Class - Coordinator for External Utils and API Delegation
@@ -19,7 +12,6 @@ class Translator {
 
 	async initializeAsync(lang) {
 		try {
-			await this.injectExternals(lang);
 			await this.createTranslator(lang);
 		} catch (error) {
 			console.error(`Failed to initialize translator for language ${lang}:`, error);
@@ -41,46 +33,10 @@ class Translator {
 		return GeminiClient.callGemini(params);
 	}
 
-	// External Scripts
-	includeExternal(url) {
-		return new Promise((resolve, reject) => {
-			const existingScript = document.querySelector(`script[src="${url}"]`);
-			if (existingScript) {
-				if (existingScript.dataset) existingScript.dataset.loaded = existingScript.dataset.loaded || 'true';
-				return resolve();
-			}
-			const script = document.createElement("script");
-			script.setAttribute("type", "text/javascript");
-			script.setAttribute("src", url);
-			script.addEventListener('load', () => { script.dataset.loaded = 'true'; resolve(); });
-			script.addEventListener('error', () => { reject(new Error(`Failed to load script: ${url}`)); });
-			document.head.appendChild(script);
-		});
-	}
-
-	async injectExternals(lang) {
-		const langCode = lang?.slice(0, 2);
-		try {
-			switch (langCode) {
-				case "ja": await Promise.all([this.includeExternal(kuromojiPath), this.includeExternal(kuroshiroPath)]); break;
-				case "ko": await this.includeExternal(aromanize); break;
-				case "zh":
-					await this.includeExternal(openCCPath);
-					// Load pinyin-pro (UMD), await with timeout
-					await Promise.race([
-						this.includeExternal(pinyinProPath),
-						new Promise(resolve => setTimeout(resolve, 5000)) // 5s timeout
-					]);
-					break;
-			}
-		} catch (error) { console.error(`Failed to load externals for ${langCode}`, error); throw error; }
-	}
-
 	async awaitFinished(language) {
 		const langCode = language?.slice(0, 2);
 		if (this.initializationPromise) await this.initializationPromise;
 		if (langCode && !this.finished[langCode]) {
-			await this.injectExternals(language);
 			await this.createTranslator(language);
 		}
 	}

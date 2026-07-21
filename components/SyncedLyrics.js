@@ -29,19 +29,20 @@ const DEFAULT_MS_PER_CHAR = 120;
 const MIN_LINE_DUR = 3000;
 // Grace period: keep "♪" hidden for this long after the estimated line end,
 // so it doesn't pop in while a held note is still ringing out.
-const IDLE_GRACE_MS = 1500;
+const IDLE_GRACE_MS = 2000;
 // Minimum time the "♪" must remain visible before the next lyric, otherwise skip it.
-const IDLE_MIN_VISIBLE_MS = 2000;
+// Increased from 2s -> 4s to prevent fast, flashing dots on short pauses.
+const IDLE_MIN_VISIBLE_MS = 4000;
 // Minimum raw interval between consecutive lines before we'll even consider inserting "♪".
-// Raised from 5s -> 7s: real musical pauses tend to be >=7s; anything shorter is almost
-// always the line still being sung + a short breath. Prevents the "30 lines, 30 idle pops"
-// symptom on songs where char-count-based duration estimates severely underestimate held notes.
-const GAP_THRESHOLD_MIN = 7000;
-const GAP_THRESHOLD_MAX = 10000;
+// Raised from 7s -> 10s: True musical instrumental breaks are almost always >=10s.
+// This completely eliminates indicators popping up between standard slow-paced lines.
+const GAP_THRESHOLD_MIN = 10000;
+const GAP_THRESHOLD_MAX = 16000;
 // Safety floor: even if char-estimate says the line ended at 500ms, assume the singer held
 // the line for at least this fraction of the interval to the next line. Prevents premature
 // "♪" pop-in on lines with short lyrics but long held notes.
-const LINE_END_INTERVAL_FLOOR_RATIO = 0.6;
+// Increased from 0.75 -> 0.82 to prevent premature pop-in on slow tracks.
+const LINE_END_INTERVAL_FLOOR_RATIO = 0.82;
 const INTRO_THRESHOLD_MIN = 3000;
 const INTRO_THRESHOLD_MAX = 8000;
 
@@ -104,7 +105,7 @@ const estimateLineDuration = (line, stats) => {
     return Math.max(MIN_LINE_DUR, len * (stats?.msPerChar || DEFAULT_MS_PER_CHAR));
 };
 
-const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara }) => {
+const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara, trackUri }) => {
     const [position, setPosition] = useState(0);
     const activeLineEle = useRef();
     const lyricContainerEle = useRef();
@@ -166,14 +167,14 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
                     // Dynamic safety floor ratio based on character length.
                     // Short lines (ad-libs, held vowels like "Ooh", "Yeah", "Ah") have highly unreliable
                     // durations and are often held much longer. We apply a stricter ratio floor.
-                    const ratio = len < 10 ? 0.75 : len < 20 ? 0.70 : LINE_END_INTERVAL_FLOOR_RATIO;
+                    const ratio = len < 10 ? 0.90 : len < 20 ? 0.86 : LINE_END_INTERVAL_FLOOR_RATIO;
 
                     // Safety: even if char-estimate says the line ends very early, assume the
-                    // singer held it for at least `ratio` of the interval.
-                    // This is the key fix for the "♪ appears mid-line" bug on ballads / held notes.
-                    const lineEnd = currentLine.startTime + Math.max(
-                        estDur,
-                        interval * ratio
+                    // singer held it for at least `ratio` of the interval, capped at 2.0x of estimated dur
+                    // to keep the indicator functional on long instrumental breaks.
+                    const lineEnd = currentLine.startTime + Math.min(
+                        Math.max(estDur, interval * ratio),
+                        estDur * 2.0
                     );
                     const insertTime = lineEnd + IDLE_GRACE_MS;
                     if (nextLine.startTime - insertTime >= IDLE_MIN_VISIBLE_MS) {
@@ -284,7 +285,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
                     "--offset": `${offset}px`,
                     "--lyric-position": CONFIG.visual["lyric-position"] ?? 50,
                 },
-                key: lyricsId,
+                key: trackUri || lyricsId,
             },
             activeLines.map(({ text, lineNumber, startTime, originalText, text2 }, i) => {
                 let className = "lyrics-lyricsContainer-LyricsLine";
@@ -413,7 +414,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, copyright, isKara 
     );
 });
 
-const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKara }) => {
+const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKara, trackUri }) => {
     const [position, setPosition] = useState(0);
     const activeLineRef = useRef(null);
     const pageRef = useRef(null);
@@ -457,11 +458,11 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
                     const text = currentLine.originalText || currentLine.text || "";
                     const len = typeof text === "string" ? text.trim().length : 0;
                     // Dynamic safety floor ratio based on character length.
-                    const ratio = len < 10 ? 0.75 : len < 20 ? 0.70 : LINE_END_INTERVAL_FLOOR_RATIO;
+                    const ratio = len < 10 ? 0.85 : len < 20 ? 0.80 : LINE_END_INTERVAL_FLOOR_RATIO;
 
-                    const lineEnd = currentLine.startTime + Math.max(
-                        estDur,
-                        interval * ratio
+                    const lineEnd = currentLine.startTime + Math.min(
+                        Math.max(estDur, interval * ratio),
+                        estDur * 1.5
                     );
                     const insertTime = lineEnd + IDLE_GRACE_MS;
                     if (nextLine.startTime - insertTime >= IDLE_MIN_VISIBLE_MS) {
@@ -561,7 +562,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics, provider, copyright, isKa
         "div",
         {
             className: "lyrics-lyricsContainer-UnsyncedLyricsPage",
-            key: lyricsId,
+            key: trackUri || lyricsId,
             ref: pageRef,
         },
         react.createElement("p", {

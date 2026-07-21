@@ -85,16 +85,16 @@ window.LANG_EN = {
       "desc": "OpenAI-compatible API URL (<code>/v1/chat/completions</code>). Pick a preset from the dropdown or paste a custom URL."
     },
     "modelName": {
-      "label": "Model Name",
-      "desc": "LLM model name from your provider. Pick a popular model or type any custom name."
+      "label": "Translation Model",
+      "desc": "LLM model for translating song lyrics (e.g. gemini-3.5-flash)."
     },
-    "apiKey": {
-      "label": "API Key",
-      "desc": "Primary API key for translation."
+    "phoneticModelName": {
+      "label": "Phonetic Model",
+      "desc": "LLM model for generating Romaji/Furigana. Use a light, fast model (e.g. gemini-2.5-flash-lite) to save premium quota."
     },
-    "apiKey2": {
-      "label": "API Key 2",
-      "desc": "Secondary API key for phonetic/romaji (optional, falls back to primary key)."
+    "apiKeys": {
+      "label": "Gemini API Keys",
+      "desc": "Add multiple keys to auto-rotate and avoid rate limits."
     },
     "responseMode": {
       "label": "Response Format",
@@ -105,13 +105,13 @@ window.LANG_EN = {
       },
       "unsupportedToast": "This model doesn't support JSON Schema — auto-switched to Prompt Engineering."
     },
-    "preTranslation": {
-      "label": "Pre-translation",
-      "desc": "Automatically translate lyrics before a song starts playing."
+    "smartPreload": {
+      "label": "Smart Pre-load",
+      "desc": "Prepare and cache lyrics translation & video background for the next song in the background."
     },
-    "preTranslationTime": {
-      "label": "Pre-translation time",
-      "desc": "How long before song ends to start pre-translating the next track."
+    "smartPreloadTime": {
+      "label": "Pre-load Trigger Time",
+      "desc": "How long before the current song ends to start preloading the next track."
     },
     "disableQueue": {
       "label": "Disable Queue (Parallel Requests)",
@@ -152,6 +152,10 @@ window.LANG_EN = {
     },
     "videoBackgroundBlur": {
       "label": "Video Blur"
+    },
+    "videoBackgroundFullscreen": {
+      "label": "Cover entire window",
+      "desc": "Make the video background cover the entire Spotify window instead of being restricted to the lyrics panel."
     },
     "debugMode": {
       "label": "Debug Mode",
@@ -314,7 +318,8 @@ window.LANG_EN = {
     },
     "geminiModes": {
       "romaji": "Romaji, Romaja, Pinyin (AI)",
-      "vi": "Vietnamese (AI)"
+      "vi": "Vietnamese (AI)",
+      "furigana": "Furigana (AI)"
     },
     "styles": {
       "smart_adaptive": "Smart Adaptive (Recommended)",
@@ -355,6 +360,8 @@ window.LANG_EN = {
   "videoModal": {
     "title": "Video Background",
     "topVideos": "Top Matching Videos",
+    "searchQuery": "Search keyword:",
+    "search": "Search",
     "inputId": "YouTube Video ID or URL:",
     "placeholder": "e.g., dQw4w9WgXcQ or https://youtube.com/watch?v=...",
     "totalOffset": "Total Offset:",
@@ -366,7 +373,19 @@ window.LANG_EN = {
     "currentVideo": "Current video",
     "pasteCopied": "Paste copied link:",
     "paste": "Paste from clipboard",
-    "noResults": "No matching videos found."
+    "noResults": "No matching videos found.",
+    "change": "Change",
+    "remove": "Remove",
+    "enterManual": "Enter ID/URL manually",
+    "save": "Save",
+    "searchYoutubeLink": "← Search on YouTube",
+    "active": "Active",
+    "done": "Done",
+    "backToSync": "← Back to Sync",
+    "unsynced": "unsynced",
+    "syncHint": "Drag slider to sync: negative values play video earlier, positive values play it later.",
+    "searchPlaceholder": "Search video title...",
+    "aiSuggestions": "CJK Phonetic Suggestions:"
   },
   "modal": {
     "title": "Lyrics Plus Settings"

@@ -7,6 +7,7 @@ const VideoManager = {
     _userHash: null,
     _retryAbortController: null,
     _lastSearchUri: null,
+    _lastSearchQuery: null,
     _lastSearchResults: [],
     
     // Retry configuration
@@ -41,20 +42,54 @@ const VideoManager = {
 
 
     /**
-     * Clean track titles to improve search matches (removes Remastered, Radio Edit, etc.)
+     * Clean track titles and primary artist to improve search match accuracy
+     * @private
      */
     _cleanQuery(artist, title) {
         let cleanTitle = title
             .replace(/\s*-\s*Remaster(ed)?\s*\d*/gi, "")
             .replace(/\s*-\s*Radio\s*Edit/gi, "")
             .replace(/\s*-\s*Single\s*Version/gi, "")
-            .replace(/\s*\(Remastered\)/gi, "");
-        return `${artist} - ${cleanTitle}`;
+            .replace(/\s*\(Remastered\)/gi, "")
+            .replace(/\s*\(feat\.?\s+.*?\)/gi, "")
+            .replace(/\s*feat\.?\s+.*$/gi, "")
+            .replace(/\s*\(with\s+.*?\)/gi, "")
+            .replace(/\s*\(bonus\s+track\)/gi, "")
+            .replace(/\s*-\s*live/gi, "")
+            .replace(/\s*\(live\)/gi, "")
+            .replace(/\s*-\s*deluxe\s*edition/gi, "");
+        
+        // Take primary artist to simplify query (works better on YouTube search engines)
+        const cleanArtist = artist.split(/,|\s+feat\.?\s+|&/gi)[0].trim();
+        return `${cleanTitle.trim()} - ${cleanArtist}`;
+    },
+
+    /**
+     * Parse duration string like "3:45" or "1:02:13" into seconds.
+     * @private
+     * @param {string} str - Duration string
+     * @returns {number} - Duration in seconds
+     */
+    _parseDurationStringToSeconds(str) {
+        if (!str) return 0;
+        const parts = str.split(':').map(Number);
+        if (parts.some(isNaN)) return 0;
+        if (parts.length === 2) {
+            return parts[0] * 60 + parts[1];
+        } else if (parts.length === 3) {
+            return parts[0] * 3600 + parts[1] * 60 + parts[2];
+        }
+        return 0;
     },
 
     /**
      * Score search result video by comparing duration and title metadata.
      * @private
+     * @param {Object} video - Video metadata candidate
+     * @param {string} artist - Track artist name
+     * @param {string} title - Track title
+     * @param {number} targetDurationSec - Target track duration in seconds
+     * @returns {number} - Relevance score
      */
     _scoreVideo(video, artist, title, targetDurationSec) {
         let score = 0;
@@ -63,7 +98,7 @@ const VideoManager = {
         const cleanArtist = (artist || "").toLowerCase();
         const cleanTitle = (title || "").toLowerCase();
 
-        // 1. Duration Matching (Huge Boost)
+        // 1. Duration Matching (Sliding Scale Penalty/Boost)
         if (targetDurationSec > 0 && video.lengthSeconds > 0) {
             const diff = Math.abs(video.lengthSeconds - targetDurationSec);
             if (diff <= 6) {
@@ -72,8 +107,12 @@ const VideoManager = {
                 score += 100; // Close match
             } else if (diff <= 25) {
                 score += 40;  // Marginal match
+            } else if (diff > 25 && diff <= 45) {
+                score -= 15;  // Slight mismatch
+            } else if (diff > 45 && diff <= 90) {
+                score -= 50;  // Moderate mismatch (live extensions, different cuts)
             } else if (diff > 90) {
-                score -= 80;  // Too short (anime cut) or too long (1 hour loop)
+                score -= 100; // Major mismatch (anime cuts, 1-hour loops)
             }
         }
 
@@ -83,7 +122,7 @@ const VideoManager = {
             const artistParts = cleanArtist.split(/,|\s+feat\.?\s+|&/gi).map(a => a.trim()).filter(Boolean);
             let artistMatched = false;
             for (const part of artistParts) {
-                if (part.length > 2 && (videoTitle.includes(part) || videoAuthor.includes(part))) {
+                if (part.length >= 2 && (videoTitle.includes(part) || videoAuthor.includes(part))) {
                     score += 50;
                     artistMatched = true;
                     break;
@@ -115,6 +154,24 @@ const VideoManager = {
                     if (artistMatched) break;
                 }
             }
+
+            // 3. Official Channel / VEVO Boost (Extremely strong indicators)
+            const cleanPrimaryArtist = artistParts[0] || "";
+            const isVevo = videoAuthor.endsWith("vevo") || videoAuthor.includes("vevo");
+            const normalizedAuthor = videoAuthor.replace(/\s+/g, "");
+            const normalizedArtist = cleanPrimaryArtist.replace(/\s+/g, "");
+            const isOfficialChannel = normalizedAuthor === normalizedArtist || 
+                                      normalizedAuthor === `${normalizedArtist}official` ||
+                                      (isVevo && normalizedAuthor.startsWith(normalizedArtist));
+            
+            if (isOfficialChannel) {
+                score += 80; // Huge boost for VEVO or Official artist channels
+            }
+
+            // Boost Official auto-generated topic channels (always matches Spotify duration and high audio quality)
+            if (videoAuthor.includes("topic")) {
+                score += 120;
+            }
         }
 
         // Title match
@@ -123,20 +180,33 @@ const VideoManager = {
         }
 
         // Official Video Indicators
-        const officialKeywords = ["official", "mv", "music video", "official video", "pv"];
+        const officialKeywords = ["official", "mv", "music video", "official video", "pv", "official audio"];
         if (officialKeywords.some(kw => videoTitle.includes(kw))) {
-            score += 30;
+            score += 40;
         }
 
-        // Negative Keywords
-        const negativeKeywords = [
-            "cover", "guitar", "piano", "drum", "8bit", "karaoke", "instrumental", 
-            "reaction", "dance", "1 hour", "loop", "react", "tutorial", "synthesia",
-            "bass", "violin", "vietsub", "sub", "lyrics", "parody", "remix"
-        ];
-        for (const kw of negativeKeywords) {
+        // Grouped negative keywords to aggressively penalize fan covers/remixes while protecting target tracks
+        const severeNegatives = ["cover", "fanmade", "fan-made", "fan edit", "fan-edit", "tự làm"];
+        for (const kw of severeNegatives) {
             if (videoTitle.includes(kw) && !cleanTitle.includes(kw)) {
-                score -= 80;
+                score -= 300; // Critical penalty: completely sink cover/fanmade matches
+            }
+        }
+
+        const strongNegatives = [
+            "karaoke", "instrumental", "remix", "guitar", "piano", "violin", 
+            "drum", "bass", "synthesia", "1 hour", "loop", "reaction", "react", "tutorial"
+        ];
+        for (const kw of strongNegatives) {
+            if (videoTitle.includes(kw) && !cleanTitle.includes(kw)) {
+                score -= 200; // Strong penalty: sink musical covers & non-official variants
+            }
+        }
+
+        const mildNegatives = ["parody", "live", "concert", "performance", "vietsub", "sub"];
+        for (const kw of mildNegatives) {
+            if (videoTitle.includes(kw) && !cleanTitle.includes(kw)) {
+                score -= 80; // Standard penalty for live versions or fansubs
             }
         }
 
@@ -146,6 +216,9 @@ const VideoManager = {
     /**
      * Search YouTube directly by scraping the search results page.
      * 100% serverless, CORS-bypassed in Spotify client, bypasses broken public API instances.
+     * @private
+     * @param {string} query - Cleaned search query
+     * @returns {Promise<Array<{videoId: string, title: string, author: string, lengthSeconds: number}>>}
      */
     async _searchDirectYoutube(query) {
         const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
@@ -185,7 +258,7 @@ const VideoManager = {
                 
                 if (!response.ok) {
                     console.warn(`[VideoManager] Direct YouTube search returned status: ${response.status}`);
-                    return null;
+                    return [];
                 }
                 
                 html = await response.text();
@@ -205,17 +278,24 @@ const VideoManager = {
                         const itemSection = contents.find(c => c.itemSectionRenderer);
                         const results = itemSection?.itemSectionRenderer?.contents || [];
                         
-                        // Extract the first video result
+                        const candidates = [];
                         for (const result of results) {
                             if (result.videoRenderer) {
                                 const video = result.videoRenderer;
                                 const videoId = video.videoId;
                                 const title = video.title?.runs?.[0]?.text;
-                                if (videoId) {
-                                    console.log(`[VideoManager] Direct search matched: ${videoId} ("${title}")`);
-                                    return { videoId, title };
+                                const author = video.ownerText?.runs?.[0]?.text || video.longBylineText?.runs?.[0]?.text || "";
+                                const durationStr = video.lengthText?.simpleText || "";
+                                const lengthSeconds = this._parseDurationStringToSeconds(durationStr);
+                                
+                                if (videoId && title) {
+                                    candidates.push({ videoId, title, author, lengthSeconds });
                                 }
                             }
+                        }
+                        if (candidates.length > 0) {
+                            console.log(`[VideoManager] Direct search returned ${candidates.length} candidates.`);
+                            return candidates;
                         }
                     }
                 } catch (jsonErr) {
@@ -228,19 +308,18 @@ const VideoManager = {
             const matches = [...html.matchAll(watchRegex)];
             if (matches.length > 0) {
                 const videoIds = [...new Set(matches.map(m => m[1]))];
-                if (videoIds.length > 0) {
-                    console.log(`[VideoManager] Regex fallback matched: ${videoIds[0]}`);
-                    return { videoId: videoIds[0], title: query };
-                }
+                console.log(`[VideoManager] Regex fallback matched ${videoIds.length} video IDs.`);
+                return videoIds.map(id => ({ videoId: id, title: query, author: "", lengthSeconds: 0 }));
             }
         } catch (e) {
             console.warn("[VideoManager] Direct YouTube search failed:", e.message);
         }
-        return null;
+        return [];
     },
 
     /**
      * Get active Invidious instances dynamically from api.invidious.io
+     * @private
      * @returns {Promise<string[]>}
      */
     async _getDynamicInvidiousInstances() {
@@ -282,141 +361,138 @@ const VideoManager = {
     },
 
     /**
-     * Search YouTube via public Invidious instances (CORS-enabled proxies)
+     * Search YouTube via public Invidious instances concurrently (CORS-enabled proxies)
+     * @private
+     * @param {string} query - Cleaned search query
+     * @param {string} [trackUri] - Spotify track URI
+     * @param {Object} [trackInfo] - Metadata for scoring
+     * @returns {Promise<Array<{videoId: string, title: string, author: string, lengthSeconds: number}>>}
      */
-    async _searchInvidious(query, trackUri = null) {
+    async _searchInvidiousConcurrent(query, trackUri = null, trackInfo = null) {
         const instances = await this._getDynamicInvidiousInstances();
-        const toTest = instances.slice(0, 6);
+        const toTest = instances.slice(0, 4); // Run top 4 in parallel
         
-        for (const instance of toTest) {
+        const fetchFromInstance = async (instance) => {
             const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video`;
-            console.log(`[VideoManager] Fallback search via Invidious instance: ${instance}`);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
             
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout per instance
-                
                 const response = await fetch(url, {
                     headers: { "Accept": "application/json" },
                     signal: controller.signal
                 });
                 clearTimeout(timeoutId);
                 
-                if (!response.ok) {
-                    console.warn(`[VideoManager] Instance ${instance} returned status: ${response.status}`);
-                    continue;
-                }
-                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
-                if (Array.isArray(data)) {
-                    const videos = data
-                        .filter(item => item.type === "video" && item.videoId)
-                        .slice(0, 5)
-                        .map(item => ({
-                            videoId: item.videoId,
-                            title: item.title,
-                            author: item.author || "",
-                            lengthSeconds: item.lengthSeconds || 0
-                        }));
-
-                    if (videos.length > 0) {
-                        // Populate cache for settings
-                        if (trackUri) {
-                            this._lastSearchUri = trackUri;
-                            this._lastSearchResults = videos;
-                        }
-                        return { videoId: videos[0].videoId, title: videos[0].title };
-                    }
-                }
-            } catch (e) {
-                console.warn(`[VideoManager] Failed to fetch from Invidious ${instance}:`, e.message);
+                if (!Array.isArray(data)) throw new Error("Invalid response format");
+                
+                const videos = data
+                    .filter(item => item.type === "video" && item.videoId)
+                    .map(item => ({
+                        videoId: item.videoId,
+                        title: item.title,
+                        author: item.author || "",
+                        lengthSeconds: Number(item.lengthSeconds) || 0
+                    }));
+                
+                if (videos.length === 0) throw new Error("No videos found");
+                return videos;
+            } catch (err) {
+                clearTimeout(timeoutId);
+                throw err;
             }
+        };
+
+        const promiseAny = Promise.any ? Promise.any.bind(Promise) : async (promises) => {
+            return new Promise((resolve, reject) => {
+                let rejectedCount = 0;
+                const errors = [];
+                promises.forEach((p, idx) => {
+                    Promise.resolve(p).then(resolve).catch(err => {
+                        errors[idx] = err;
+                        rejectedCount++;
+                        if (rejectedCount === promises.length) {
+                            reject(new Error("All promises rejected: " + errors.map(e => e.message).join(", ")));
+                        }
+                    });
+                });
+            });
+        };
+
+        try {
+            const candidates = await promiseAny(toTest.map(fetchFromInstance));
+            return candidates;
+        } catch (e) {
+            console.warn("[VideoManager] Concurrent Invidious search failed on all instances:", e.message);
+            return [];
         }
-        return null;
     },
 
     /**
-     * Search YouTube via public Invidious instances, returning multiple candidates
+     * Search YouTube via public Invidious instances, returning multiple candidates (used by settings panel)
+     * @param {string} query - Cleaned search query
+     * @param {string} [trackUri] - Spotify track URI
+     * @param {Object} [trackInfo] - Track metadata
+     * @returns {Promise<Array<{videoId: string, title: string, author: string, lengthSeconds: number}>>}
      */
     async searchMultipleVideos(query, trackUri = null, trackInfo = null) {
-        if (trackUri && this._lastSearchUri === trackUri && this._lastSearchResults.length > 0) {
-            console.log(`[VideoManager] Returning cached multi-search results for: ${trackUri}`);
+        if (typeof query !== "string") {
+            console.warn("[VideoManager] searchMultipleVideos: Invalid query format", query);
+            return [];
+        }
+        const cleanQuery = query.trim();
+        if (!cleanQuery) {
+            return [];
+        }
+
+        if (trackUri && this._lastSearchUri === trackUri && this._lastSearchQuery === cleanQuery && this._lastSearchResults.length > 0) {
+            console.log(`[VideoManager] Returning cached multi-search results for: ${trackUri} with query: "${cleanQuery}"`);
             return this._lastSearchResults;
         }
 
-        const instances = await this._getDynamicInvidiousInstances();
-        const toTest = instances.slice(0, 6);
+        // Try direct YouTube search first (uses user's IP, avoids geoblocks on cloud servers)
+        let candidates = await this._searchDirectYoutube(cleanQuery);
         
-        const artist = trackInfo?.artist || "";
-        const title = trackInfo?.title || "";
-        const targetDurationSec = trackInfo?.duration ? trackInfo.duration / 1000 : 0;
-
-        for (const instance of toTest) {
-            const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video`;
-            console.log(`[VideoManager] Multi-search via Invidious instance: ${instance}`);
+        // Fallback to Invidious if direct search returned nothing
+        if (!candidates || candidates.length === 0) {
+            console.log("[VideoManager] Direct search failed in searchMultipleVideos, falling back to Invidious...");
+            candidates = await this._searchInvidiousConcurrent(cleanQuery, trackUri, trackInfo);
+        }
+        
+        if (candidates && candidates.length > 0) {
+            // Get blacklist to exclude broken videos
+            const blacklist = await this.getBlacklist(trackUri);
             
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                
-                const response = await fetch(url, {
-                    headers: { "Accept": "application/json" },
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-                
-                if (!response.ok) continue;
-                
-                const data = await response.json();
-                if (Array.isArray(data)) {
-                    let videos = data
-                        .filter(item => item.type === "video" && item.videoId)
-                        .map(item => ({
-                            videoId: item.videoId,
-                            title: item.title,
-                            author: item.author || "",
-                            lengthSeconds: item.lengthSeconds || 0
-                        }));
+            // Filter out blacklisted candidates but PRESERVE YouTube's native search ranking/order!
+            const filtered = candidates.filter(video => !blacklist.includes(video.videoId));
 
-                    if (videos.length > 0) {
-                        // Apply scoring algorithm to rank results
-                        videos = videos.map(video => ({
-                            ...video,
-                            score: this._scoreVideo(video, artist, title, targetDurationSec)
-                        }));
+            // Take the top 7 candidates in their native YouTube ranking order (instead of re-sorting by our heuristic)
+            const top7 = filtered.slice(0, 7).map(({ videoId, title, author, lengthSeconds }) => ({
+                videoId,
+                title,
+                author,
+                lengthSeconds
+            }));
 
-                        // Sort descending by relevance score
-                        videos.sort((a, b) => b.score - a.score);
-
-                        // Take the top 5 candidates
-                        const top5 = videos.slice(0, 5).map(({ videoId, title, author, lengthSeconds }) => ({
-                            videoId,
-                            title,
-                            author,
-                            lengthSeconds
-                        }));
-
-                        if (trackUri) {
-                            this._lastSearchUri = trackUri;
-                            this._lastSearchResults = top5;
-                        }
-                        return top5;
-                    }
-                }
-            } catch (e) {
-                console.warn(`[VideoManager] Multi-search failed from ${instance}:`, e.message);
+            if (trackUri) {
+                this._lastSearchUri = trackUri;
+                this._lastSearchQuery = cleanQuery;
+                this._lastSearchResults = top7;
             }
+            return top7;
         }
         return [];
     },
 
     /**
-     * Fetch video background for a track using a dual-layer client-only search workflow
+     * Fetch video background for a track using a dual-layer client-only search workflow with metadata scoring
      * @param {Object} trackInfo - { title, artist, duration, uri, image }
      * @param {Function} onRetry - Deprecated/Not used in client-only search
      * @returns {Promise<Object|null>} - Video data or null
      */
-    async fetchVideoForTrack(trackInfo, onRetry = null) {
+    async fetchVideoForTrack(trackInfo, onRetry = null, isSilent = false) {
         // Input validation
         if (!trackInfo?.uri) {
             console.warn("[VideoManager] fetchVideoForTrack: Missing track URI");
@@ -424,82 +500,123 @@ const VideoManager = {
         }
 
         // Cache hit: Return cached video ONLY if it's for the same track
-        if (this._lastFetchUri === trackInfo.uri && this._currentVideo?.uri === trackInfo.uri) {
+        if (!isSilent && this._lastFetchUri === trackInfo.uri && this._currentVideo?.uri === trackInfo.uri) {
             console.log("[VideoManager] Cache hit for:", trackInfo.title);
             return this._currentVideo;
         }
         
-        // Abort any pending requests from previous track
-        if (this._retryAbortController) {
-            this._retryAbortController.abort();
+        let abortSignal;
+        if (!isSilent) {
+            // Abort any pending requests from previous track
+            if (this._retryAbortController) {
+                this._retryAbortController.abort();
+            }
+            this._retryAbortController = new AbortController();
+            abortSignal = this._retryAbortController.signal;
+            
+            // Clear stale cache when switching tracks
+            if (this._lastFetchUri !== trackInfo.uri) {
+                this._currentVideo = null;
+            }
+            this._lastFetchUri = trackInfo.uri;
+        } else {
+            // For silent pre-fetch, use a separate local abort controller to avoid interfering with current track
+            const localAbort = new AbortController();
+            abortSignal = localAbort.signal;
         }
-        this._retryAbortController = new AbortController();
-        const abortSignal = this._retryAbortController.signal;
-        
-        // Clear stale cache when switching tracks
-        if (this._lastFetchUri !== trackInfo.uri) {
-            this._currentVideo = null;
-        }
-        this._lastFetchUri = trackInfo.uri;
+
+        // Fetch blacklist to exclude broken videos
+        const blacklist = await this.getBlacklist(trackInfo.uri);
 
         // Check for manual video override FIRST
         const manualVideoId = await this.getManualVideo(trackInfo.uri);
-        if (manualVideoId) {
+        if (manualVideoId && !blacklist.includes(manualVideoId)) {
             const savedOffset = (await this.getOffset(trackInfo.uri)) || 0;
-            this._currentVideo = {
+            const videoData = {
                 video_id: manualVideoId,
                 sync_offset: savedOffset,
                 title: `${trackInfo.artist} - ${trackInfo.title}`,
                 uri: trackInfo.uri,
                 source: "manual+saved"
             };
-            console.log(`[VideoManager] Using saved manual video: ${manualVideoId} (offset: ${savedOffset}s)`);
-            return this._currentVideo;
+            if (!isSilent) {
+                this._currentVideo = videoData;
+                console.log(`[VideoManager] Using saved manual video: ${manualVideoId} (offset: ${savedOffset}s)`);
+            }
+            return videoData;
         }
 
         // Check for cached automatic search result SECOND
         const cachedAuto = await this.getAutoVideo(trackInfo.uri);
-        if (cachedAuto) {
+        if (cachedAuto && !blacklist.includes(cachedAuto.videoId)) {
             const savedOffset = (await this.getOffset(trackInfo.uri)) || 0;
-            this._currentVideo = {
+            const videoData = {
                 video_id: cachedAuto.videoId,
                 sync_offset: savedOffset,
                 title: cachedAuto.title,
                 uri: trackInfo.uri,
                 source: "auto_cache"
             };
-            console.log(`[VideoManager] Using cached automatic video: ${cachedAuto.videoId} (offset: ${savedOffset}s)`);
-            return this._currentVideo;
+            if (!isSilent) {
+                this._currentVideo = videoData;
+                console.log(`[VideoManager] Using cached automatic video: ${cachedAuto.videoId} (offset: ${savedOffset}s)`);
+            }
+            return videoData;
         }
 
         const query = this._cleanQuery(trackInfo.artist || "", trackInfo.title || "");
-        console.log(`[VideoManager] Searching video background for: ${query}`);
+        console.log(`[VideoManager] Searching video background (${isSilent ? "silent" : "active"}) for: ${query}`);
         
         try {
             // Try Direct YouTube Scrape (highly accurate, fast, domestic IP bypasses bot bans)
-            let result = await this._searchDirectYoutube(query);
+            let candidates = await this._searchDirectYoutube(query);
             let source = "youtube_direct";
             
             // Check if aborted after fetch
-            if (abortSignal.aborted || this._lastFetchUri !== trackInfo.uri) {
+            if (abortSignal.aborted || (!isSilent && this._lastFetchUri !== trackInfo.uri)) {
                 console.log(`[VideoManager] Ignored stale response for: ${trackInfo.title}`);
                 return null;
             }
 
-            // Fallback to Invidious if direct search failed (direct search fails due to CORS in Spotify UI)
-            if (!result || !result.videoId) {
-                console.log("[VideoManager] Direct search failed (CORS or network), attempting Invidious fallback...");
-                result = await this._searchInvidious(query, trackInfo.uri);
-                source = "invidious";
+            let bestVideo = null;
+            const artist = trackInfo.artist || "";
+            const title = trackInfo.title || "";
+            const targetDurationSec = trackInfo.duration ? trackInfo.duration / 1000 : 0;
+
+            if (candidates && candidates.length > 0) {
+                // Filter out blacklisted candidates
+                const filtered = candidates.filter(c => !blacklist.includes(c.videoId));
+                
+                if (filtered.length > 0) {
+                    // Directly select the top 1 YouTube search result (respecting YouTube's native ranking)
+                    bestVideo = filtered[0];
+                }
             }
 
-            if (result && result.videoId) {
-                const videoId = result.videoId;
-                const title = result.title || `${trackInfo.artist} - ${trackInfo.title}`;
+            // Fallback to Invidious if direct search returned nothing
+            if (!bestVideo) {
+                console.log("[VideoManager] Direct search returned no candidates, attempting Invidious fallback...");
+                const invidiousCandidates = await this._searchInvidiousConcurrent(query, trackInfo.uri, trackInfo);
+                
+                if (invidiousCandidates && invidiousCandidates.length > 0) {
+                    // Filter out blacklisted candidates
+                    const filteredInvidious = invidiousCandidates.filter(c => !blacklist.includes(c.videoId));
+                    
+                    if (filteredInvidious.length > 0) {
+                        // Directly select the top 1 Invidious search result
+                        bestVideo = filteredInvidious[0];
+                        source = "invidious";
+                    }
+                }
+            }
+
+            if (bestVideo && bestVideo.videoId) {
+                const videoId = bestVideo.videoId;
+                const videoTitle = bestVideo.title || `${trackInfo.artist} - ${trackInfo.title}`;
                 let syncOffset = 0; // Default offset
                 
                 // Cache this successful automatic search in IndexedDB
-                await this.saveAutoVideo(trackInfo.uri, videoId, title);
+                await this.saveAutoVideo(trackInfo.uri, videoId, videoTitle);
 
                 // Check for user-saved offset override
                 const savedOffset = await this.getOffset(trackInfo.uri);
@@ -509,16 +626,21 @@ const VideoManager = {
                     console.log(`[VideoManager] Using saved offset: ${savedOffset}s`);
                 }
                 
-                this._currentVideo = {
+                const videoData = {
                     video_id: videoId,
                     sync_offset: syncOffset,
-                    title: title,
+                    title: videoTitle,
                     uri: trackInfo.uri,
                     source: source
                 };
                 
-                console.log(`[VideoManager] Found video: ${videoId} (offset: ${syncOffset}s, source: ${source})`);
-                return this._currentVideo;
+                if (!isSilent) {
+                    this._currentVideo = videoData;
+                    console.log(`[VideoManager] Found video: ${videoId} (score: ${bestVideo.score || 0}, offset: ${syncOffset}s, source: ${source})`);
+                } else {
+                    console.log(`[VideoManager] Pre-cached video silently: ${videoId} for: ${trackInfo.title}`);
+                }
+                return videoData;
             } else {
                 console.log("[VideoManager] No video found on any channels");
             }
@@ -526,7 +648,9 @@ const VideoManager = {
             console.error(`[VideoManager] Video search failed:`, e.message);
         }
 
-        this._currentVideo = null;
+        if (!isSilent) {
+            this._currentVideo = null;
+        }
         return null;
     },
 
@@ -571,11 +695,13 @@ const VideoManager = {
             const manualKey = `video-manual:${trackUri}`;
             const offsetKey = `video-offset:${trackUri}`;
             const autoKey = `video-auto:${trackUri}`;
+            const blacklistKey = `video-blacklist:${trackUri}`;
             try {
                 await IDBCache.delete(manualKey);
                 await IDBCache.delete(offsetKey);
                 await IDBCache.delete(autoKey);
-                console.log(`[VideoManager] Cleared DB cache and manual configs for: ${trackUri.split(':').pop()}`);
+                await IDBCache.delete(blacklistKey);
+                console.log(`[VideoManager] Cleared DB cache, manual configs, and blacklist for: ${trackUri.split(':').pop()}`);
             } catch (e) {
                 console.warn("[VideoManager] Failed to clear DB for track:", e);
             }
@@ -720,6 +846,42 @@ const VideoManager = {
             console.warn('[VideoManager] Failed to get offset:', e);
         }
         return null;
+    },
+
+    /**
+     * Blacklist a broken video ID for a specific track to prevent loading it again.
+     * @param {string} trackUri - Spotify track URI
+     * @param {string} videoId - YouTube Video ID
+     * @returns {Promise<void>}
+     */
+    async blacklistVideo(trackUri, videoId) {
+        if (!trackUri || !videoId) return;
+        const key = `video-blacklist:${trackUri}`;
+        try {
+            const current = (await IDBCache.get(key)) || [];
+            if (!current.includes(videoId)) {
+                current.push(videoId);
+                await IDBCache.set(key, current, 30 * 24 * 60 * 60 * 1000); // 30-day TTL
+                console.log(`[VideoManager] Blacklisted video ${videoId} for: ${trackUri.split(':').pop()}`);
+            }
+        } catch (e) {
+            console.warn("[VideoManager] Failed to blacklist video:", e);
+        }
+    },
+
+    /**
+     * Get the list of blacklisted video IDs for a track.
+     * @param {string} trackUri - Spotify track URI
+     * @returns {Promise<string[]>} - List of blacklisted video IDs
+     */
+    async getBlacklist(trackUri) {
+        if (!trackUri) return [];
+        const key = `video-blacklist:${trackUri}`;
+        try {
+            return (await IDBCache.get(key)) || [];
+        } catch (e) {
+            return [];
+        }
     },
 
     /**

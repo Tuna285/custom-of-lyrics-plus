@@ -1,168 +1,46 @@
-# Lyric Plus Translate
+# Spicetify Custom App
 
-**Language / 言語 / 언어 / Ngôn ngữ / 语言:**
-[English](README.md) | [Tiếng Việt](README_VI.md) | [한국어](assets/readme/README_KO.md) | [日本語](assets/readme/README_JA.md) | [中文（简体）](assets/readme/README_ZH.md)
+### Lyrics Plus
 
-[![Ko-fi](https://img.shields.io/badge/Donate-Ko--fi-F16061?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/gunjoutuna)
+Show current track lyrics. Current lyrics providers:
 
+- Internal Spotify lyrics service.
+- Netease: From Chinese developers and users. Provides karaoke and synced lyrics.
+- Musixmatch: A company from Italy. Provided synced lyrics.
+- Genius: Provides unsynced lyrics but with description/insight from artists themselves (Disabled and cannot be used as a provider on `1.2.31` and higher).
 
+![kara](./kara.png)
 
-> A personalized version of **Lyrics Plus** for Spicetify, rebuilt to focus on high-quality lyric translation, ideal for Vietnamese users. Connects to any OpenAI-compatible LLM endpoint — Google Gemini/Gemma, OpenRouter, OpenAI, DeepSeek, Anthropic Claude, or local Ollama.
+![genius](./genius.png)
 
-> [!NOTE]
-> **Currently, the translation feature only supports Vietnamese (Tiếng Việt).** Support for other languages may be added in future updates if requested.
+Different lyrics modes: Karaoke, Synced, Unsynced and Genius. At the moment, only Netease provides karaoke-able lyrics. Mode is automatically falled back, from Karaoke, Synced, Unsynced to Genius when lyrics are not available in that mode.
 
-<img width="800" height="800" alt="image" src="https://github.com/user-attachments/assets/32e85501-567d-4896-a7e4-bb4b098a30a6" />
+Right click or Double click at any mode tab to "lock in", so lyric mode won't auto switch. It should show a dot next to mode name when mode is locked. Right click or double click again to unlock
 
----
+![lockin](./lockin.png)
 
-## Key Features
+Lyrics in Unsynced and Genius modes can be search and jump to. Hit Ctrl + Shift + F to open search box at bottom left of screen. Hit Enter/Shift+Enter to loop over results.
 
-### 1. Lyric Translation with LLM API
+![search](./search.png)
 
-Connects to any OpenAI-compatible LLM endpoint (Google Gemini/Gemma, OpenRouter, OpenAI, DeepSeek, Anthropic Claude, local Ollama, etc.) to translate lyrics naturally and accurately.
+Choose between different option of displaying Japanese lyrics. (Furigana, Romaji, Hiragana, Katakana)
 
-- **Built-in endpoint & model presets** — One-click pickers for popular providers (Gemini/Gemma, OpenRouter, OpenAI, DeepSeek, Claude, Ollama) with curated model lists; custom URL/model still accepted.
-- **Dual display modes** — Romaji (Japanese), Romaja (Korean), Pinyin (Chinese) + **Vietnamese** translation — ideal for language learning.
-- **Translation Style** — 6 tones (Smart Adaptive / Poetic / Youth-Anime / Street-Rap / Vintage / Literal) to match the mood of the song.
-- **Pronoun Lock** — 9 Vietnamese pronoun pairs (Auto, Anh-Em, Tớ-Cậu, Tao-Mày…) for a consistent voice across the whole track.
-- **Pre-translation** — Translates the next track in the background before it plays, with adjustable lead time.
-- **Live AI Reasoning** — Brain icon next to the translating indicator opens a draggable window that streams the model's thinking in real time (separate tabs for translation and phonetic).
-- **Response format** — Choose Prompt Engineering (universal) or JSON Schema (stricter parsing on capable models, with automatic fallback if unsupported).
-- **High quality** — Prompts tuned for musical context, preserving meaning and emotion.
+![conversion](./conversion.png)
 
+Customise colors, change providers' priorities in config menu. Config menu locates in Profile Menu (top right button with your user name).
 
-| Japanese → Romaji | Korean → Romaja | Chinese → Pinyin |
-| ----------------- | --------------- | ---------------- |
-|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/e9b7f1f5-0c3c-474d-8fe1-8e2e37552bfb" />|<img width="1919" height="1018" alt="image" src="https://github.com/user-attachments/assets/e8b56a5e-621e-420f-be68-ffc69e3236c1" />|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/a9e36436-9027-4fbe-a31d-2ffc27d97574" />|
+To install, run:
 
-
-
-
-
-
-### 2. Mini Lyrics in Picture-in-Picture
-
-Inject synchronized lyrics directly into Spotify's native Picture-in-Picture mini player so you can read along while working in any other app. Toggle from the PiP settings panel or with `Ctrl+Shift+M`.
-
-### 3. Video Background
-
-Animated YouTube music-video backdrops for the lyrics page. Adjustable scale, dim, and blur — pairs nicely with the transparent mode and any Spicetify theme.
-
-<img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/51520969-7a8f-44e5-bf70-3262e9d658c7" />
-
-### 4. Modern Interface & Optimized Experience
-
-- **Transparent background** — harmonizes with any Spicetify theme.
-- **Auto-hiding controls** — setting buttons only appear on hover, maximizing display space.
-- **Smooth transitions** — optimized animations for seamless line transitions.
-- **Full Vietnamese UI** — complete localization for Vietnamese users 🇻🇳.
-
----
-
-## Installation
-
-> **Requirement:** [Spotify](https://download.scdn.co/SpotifySetup.exe) installed from web, NOT from Microsoft Store.
-
-Install Spicetify:
-
-```powershell
-iwr -useb https://raw.githubusercontent.com/spicetify/cli/main/install.ps1 | iex
+```bash
+spicetify config custom_apps lyrics-plus
+spicetify apply
 ```
 
-### - Quick Install (Recommended)
+### Credits
 
-Open **PowerShell** and run:
-
-```powershell
-iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/install.ps1 | iex
-```
-
-This will automatically download and configure the app for you.
-
-### Uninstall
-
-```powershell
-iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/uninstall.ps1 | iex
-```
-
-### - Manual Installation
-
-1. Download and extract this repository
-  Download
-2. Copy the `lyrics-plus` folder to Spicetify's CustomApps directory:
-  - **Windows:** `%LocalAppData%\spicetify\CustomApps`
-  - **MacOS/Linux:** `~/.config/spicetify/CustomApps`
-  - 
-<img width="498" height="367" alt="image" src="https://github.com/user-attachments/assets/31a5b810-ee06-447d-91f4-1e463a601dee" />
-
-3. Run in terminal:
-  ```bash
-   spicetify config custom_apps lyrics-plus
-   spicetify apply
-  ```
-
----
-
-## Configuration
-
-1. Open Spotify, click on your avatar → **Lyric Plus Translate config**
-2. Go to the **Translation** tab and fill in:
-  - **API Endpoint** — pick a preset (Gemini/Gemma, OpenRouter, OpenAI, DeepSeek, Claude, Ollama) or paste any OpenAI-compatible URL.
-  - **Model Name** — pick from the curated dropdown or type a custom model name.
-  - **API Key** — your provider's key (free tier available at [Google AI Studio](https://aistudio.google.com/)). Up to 2 keys for round-robin.
-  - **Response Format** — *Prompt Engineering* (works on every model) or *JSON Schema* (auto-falls back to Prompt Engineering if the model doesn't support it).
-  - **Pre-translation** — toggle on/off and pick the lead time (how many seconds before the current song ends to start translating the next one).
-3. Hover over lyrics and click the translation icon (⇄) to customize **Display Modes**, **Translation Style**, and **Pronouns**.
-4. *(Optional)* Press `Ctrl+Shift+M` while a track is playing to toggle Mini Lyrics in Picture-in-Picture.
-
----
-
-## Supported Languages
-
-### Local Mode (Kuromoji, Aromanize, OpenCC)
-
-
-| Source Language | Display Mode 1                  | Display Mode 2 |
-| --------------- | ------------------------------- | -------------- |
-| Japanese (日本語)  | Romaji, Hiragana, Katakana      | -              |
-| Korean (한국어)    | Romaja                          | -              |
-| Chinese (中文)    | Pinyin, Simplified, Traditional | -              |
-
-
-### AI Mode (LLM Translation)
-
-
-| Source Language | Display Mode 1                  | Display Mode 2 |
-| --------------- | ------------------------------- | -------------- |
-| Japanese (日本語)  | Romaji (AI), include Local Mode | Vietnamese     |
-| Korean (한국어)    | Romaja (AI), include Local Mode | Vietnamese     |
-| Chinese (中文)    | Pinyin (AI), include Local Mode | Vietnamese     |
-| Other           | -                               | Vietnamese     |
-
-
----
-
-## Credits
-
-- Original [lyrics-plus](https://github.com/spicetify/cli/tree/main/CustomApps/lyrics-plus) by Spicetify team
-- Translation powered by any OpenAI-compatible LLM (Google Gemini/Gemma, OpenRouter, OpenAI, DeepSeek, Anthropic, Ollama, …)
-- Romanization: [Kuroshiro](https://github.com/hexenq/kuroshiro), [Aromanize](https://github.com/fujaru/aromanize-js), [OpenCC](https://github.com/BYVoid/OpenCC)
-
----
-
-<p align="center">
-  <a href="https://ko-fi.com/gunjoutuna" target="_blank">
-    <img src="https://storage.ko-fi.com/cdn/brandasset/kofi_bg_tag_dark.png" alt="Buy Me a Coffee at ko-fi.com" height="50" style="height: 50px !important; border-radius: 8px;">
-  </a>
-</p>
-
----
-
-## License
-
-[LGPL-2.1](LICENSE)
-
----
-
-*This project is under active development. Please report any issues!*
+- A few parts of app code are taken from Spotify official app, including SyncedLyricsPage, CSS animation and TabBar. Please do not distribute these code else where out of Spotify/Spicetify context.
+- Netease synced lyrics parser is adapted from [mantou132/Spotify-Lyrics](https://github.com/mantou132/Spotify-Lyrics). Give it a Star if you like this app.
+- The algorithm for converting Japanese lyrics is based on [Hexenq's Kuroshiro](https://github.com/hexenq/kuroshiro).
+- The algorithm for converting Chinese lyrics is based on [BYVoid's OpenCC](https://github.com/BYVoid/OpenCC) via [nk2028's opencc-js](https://github.com/nk2028/opencc-js).
+- The algorithm for converting Korean lyrics is based on [fujaru's aromanize-js](https://github.com/fujaru/aromanize-js)
+- The algorithm for detecting Simplified Chinese is adapted from [nickdrewe's traditional-or-simplified](https://github.com/nickdrewe/traditional-or-simplified).

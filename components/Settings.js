@@ -181,6 +181,109 @@ const ConfigInput = ({ name, defaultValue, onChange = () => { }, placeholder = "
 	);
 };
 
+const ConfigDynamicKeys = ({ name, defaultValue, onChange = () => { }, info = "" }) => {
+	const parseValue = (val) => {
+		try {
+			if (val) {
+				const parsed = JSON.parse(val);
+				if (Array.isArray(parsed) && parsed.length > 0) {
+					return parsed.filter(k => typeof k === 'string');
+				}
+			}
+		} catch (e) {
+			// ignore
+		}
+		if (typeof val === 'string' && val.trim() !== '' && val !== '[]') {
+			return [val];
+		}
+		
+		// Fallback: If new dynamic keys list is empty, pre-populate with legacy single keys
+		const legacyKey1 = CONFIG.visual["gemini-api-key"];
+		const legacyKey2 = CONFIG.visual["gemini-api-key-romaji"];
+		const legacyKeys = [legacyKey1, legacyKey2].filter(k => typeof k === 'string' && k.trim() !== '');
+		
+		if (legacyKeys.length > 0) {
+			return legacyKeys;
+		}
+		
+		return [""]; // Default to 1 empty field if absolutely nothing exists
+	};
+
+	const [keys, setKeys] = useState(() => parseValue(defaultValue));
+
+	useEffect(() => {
+		setKeys(parseValue(defaultValue));
+	}, [defaultValue]);
+
+	const updateKeys = (newKeys) => {
+		setKeys(newKeys);
+		const filtered = newKeys.filter(k => k.trim() !== "");
+		const jsonStr = JSON.stringify(filtered);
+		onChange(jsonStr);
+		
+		const firstKey = filtered[0] || "";
+		CONFIG.visual["gemini-api-key"] = firstKey;
+		localStorage.setItem("lyrics-plus:visual:gemini-api-key", firstKey);
+	};
+
+	const handleKeyChange = (index, value) => {
+		const newKeys = [...keys];
+		newKeys[index] = value;
+		updateKeys(newKeys);
+	};
+
+	const addKeyField = () => {
+		updateKeys([...keys, ""]);
+	};
+
+	const removeKeyField = (index) => {
+		if (keys.length <= 1) {
+			updateKeys([""]);
+			return;
+		}
+		const newKeys = keys.filter((_, i) => i !== index);
+		updateKeys(newKeys);
+	};
+
+	return react.createElement("div", { className: "setting-row dynamic-keys-row", style: { alignItems: "flex-start" } },
+		react.createElement("label", { className: "col description" }, 
+			name,
+			info && react.createElement("span", { className: "info-text", style: { display: "block", fontSize: "11px", opacity: 0.6, marginTop: "4px", lineHeight: "1.4" } }, info)
+		),
+		react.createElement("div", { className: "col action dynamic-keys-container", style: { display: "flex", flexDirection: "column", gap: "8px", width: "100%", maxWidth: "300px" } },
+			keys.map((keyVal, idx) => react.createElement("div", { key: idx, className: "dynamic-key-item", style: { display: "flex", gap: "8px", alignItems: "center", width: "100%" } },
+				react.createElement("input", {
+					value: keyVal,
+					onChange: (e) => handleKeyChange(idx, e.target.value),
+					placeholder: idx === 0 ? "Primary API Key" : `API Key ${idx + 1}`,
+					type: "password",
+					autoComplete: "off",
+					spellCheck: false,
+					style: { flexGrow: 1, width: "100%" }
+				}),
+				react.createElement("button", {
+					className: "btn small",
+					onClick: (e) => {
+						e.stopPropagation();
+						e.preventDefault();
+						removeKeyField(idx);
+					},
+					style: { padding: "4px 8px", minWidth: "30px", background: "rgba(255, 0, 0, 0.15)", color: "#ff5555", border: "none", cursor: "pointer", borderRadius: "4px" }
+				}, "X")
+			)),
+			react.createElement("button", {
+				className: "btn small add-key-btn",
+				onClick: (e) => {
+					e.stopPropagation();
+					e.preventDefault();
+					addKeyField();
+				},
+				style: { alignSelf: "flex-start", marginTop: "4px", padding: "4px 12px" }
+			}, "+ Add API Key")
+		)
+	);
+};
+
 // Combo input = free-form text input + native <datalist> of preset suggestions.
 // Users can either pick a preset from the dropdown or type any custom value.
 // `options` accepts either ["string", ...] or [{ value, label }, ...] entries.
@@ -585,8 +688,8 @@ const ConfigHelper = () => {
 	const translationSettings = [
 		{ desc: getText("settings.apiEndpoint.label"), key: "gemini:endpoint", type: ConfigComboBox, info: getText("settings.apiEndpoint.desc"), placeholder: "https://…/v1/chat/completions", options: ENDPOINT_PRESETS },
 		{ desc: getText("settings.modelName.label"), key: "gemini:model", type: ConfigComboBox, info: getText("settings.modelName.desc"), placeholder: "gemini-3.1-flash-lite", options: MODEL_PRESETS },
-		{ desc: getText("settings.apiKey.label"), key: "gemini-api-key", type: ConfigInput, info: getText("settings.apiKey.desc"), inputType: "password", placeholder: "••••••••" },
-		{ desc: getText("settings.apiKey2.label"), key: "gemini-api-key-romaji", type: ConfigInput, info: getText("settings.apiKey2.desc"), inputType: "password", placeholder: "Optional" },
+		{ desc: getText("settings.phoneticModelName.label"), key: "gemini:phonetic-model", type: ConfigComboBox, info: getText("settings.phoneticModelName.desc"), placeholder: "gemini-2.5-flash-lite", options: MODEL_PRESETS },
+		{ desc: getText("settings.apiKeys.label"), key: "gemini-api-keys", type: ConfigDynamicKeys, info: getText("settings.apiKeys.desc") },
 		{ desc: getText("settings.responseMode.label"), key: "gemini:response-mode", type: ConfigSelection, options: { prompt: getText("settings.responseMode.options.prompt"), json_schema: getText("settings.responseMode.options.json_schema") }, info: getText("settings.responseMode.desc") },
 		{
 			desc: getText("settings.reasoningEffort.label"),
@@ -600,8 +703,8 @@ const ConfigHelper = () => {
 			},
 			info: getText("settings.reasoningEffort.desc")
 		},
-		{ desc: getText("settings.preTranslation.label"), key: "pre-translation", type: ConfigSlider, info: getText("settings.preTranslation.desc") },
-		{ desc: getText("settings.preTranslationTime.label"), key: "pre-translation-time", type: ConfigSelection, options: preTranslationTimePresets, info: getText("settings.preTranslationTime.desc"), when: () => CONFIG.visual["pre-translation"] },
+		{ desc: getText("settings.smartPreload.label"), key: "smart-pre-load", type: ConfigSlider, info: getText("settings.smartPreload.desc") },
+		{ desc: getText("settings.smartPreloadTime.label"), key: "smart-pre-load-time", type: ConfigSelection, options: preTranslationTimePresets, info: getText("settings.smartPreloadTime.desc"), when: () => CONFIG.visual["smart-pre-load"] },
 		{ desc: getText("settings.disableQueue.label"), key: "gemini:disable-queue", type: ConfigSlider, info: getText("settings.disableQueue.desc") },
 	];
 
@@ -659,6 +762,7 @@ const ConfigHelper = () => {
 				{ desc: getText("settings.videoBackgroundScale.label"), key: "video-background-scale", type: ConfigAdjust, min: 1, max: 2, step: 0.1, defaultValue: 1.1 },
 				{ desc: getText("settings.videoBackgroundDim.label"), key: "video-background-dim", type: ConfigAdjust, min: 0, max: 100, step: 10, defaultValue: 50 },
 				{ desc: getText("settings.videoBackgroundBlur.label") || "Độ mờ Video", key: "video-background-blur", type: ConfigAdjust, min: 0, max: 80, step: 2, defaultValue: 0 },
+				{ desc: getText("settings.videoBackgroundFullscreen.label") || "Bao phủ toàn bộ cửa sổ", key: "video-background-fullscreen", type: ConfigSlider, info: getText("settings.videoBackgroundFullscreen.desc") || "Cho phép video nền tràn ra toàn bộ cửa sổ Spotify thay vì chỉ ở khung lời nhạc." },
 				{ desc: getText("settings.transparentBackground.label"), key: "transparent-background", type: ConfigSlider, info: getText("settings.transparentBackground.desc") },
 				{ desc: getText("settings.noise.label"), key: "noise", type: ConfigSlider },
 				{ desc: getText("settings.backgroundBrightness.label"), key: "background-brightness", type: ConfigAdjust, min: 0, max: 100, step: 10 },

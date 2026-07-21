@@ -26,6 +26,7 @@
     "services/LyricsFetcher.js",
     "services/GeminiClient.js",
     "services/Translator.js",
+    "services/TranslationCoordinator.js",
     "components/Components.js",
     "providers/ProviderLRCLIB.js",
     "providers/ProviderMusixmatch.js",
@@ -38,6 +39,7 @@
     "components/OptionsMenu.js",
     "components/PlaybarButton.js",
     "components/MiniLyrics.js",
+    "components/VideoSettingsModal.js",
     "components/VideoBackground.js"
   ],
   "authors": [

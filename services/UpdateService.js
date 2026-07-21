@@ -10,11 +10,11 @@ const UpdateService = {
     UPDATE_FILES: [
         "index.js", "style.css", "manifest.json", "version.json", "types.d.ts", "variables.css",
         "utils/Namespace.js", "utils/Utils.js", "utils/Config.js", "utils/Cache.js", "utils/Prompts.js", "utils/TranslationUtils.js",
-        "i18n/I18n.js", "i18n/LangEN.js", "i18n/LangVI.js",
+        "i18n/I18n.js", "i18n/LangEN.js", "i18n/LangVI.js", "i18n/LangKO.js", "i18n/LangJA.js", "i18n/LangZH.js",
         "parsers/LRCParser.js",
         "services/AdBlocker.js", "services/IDBCache.js", "services/LyricsFetcher.js", "services/GeminiClient.js", "services/Translator.js", "services/UpdateService.js",
-        "components/Components.js", "components/SyncedLyrics.js", "components/UnsyncedLyrics.js", "components/TabBar.js", "components/Settings.js", "components/OptionsMenu.js", "components/PlaybarButton.js", "components/VideoBackground.js", "components/VideoManager.js",
-        "providers/ProviderLRCLIB.js", "providers/ProviderMusixmatch.js", "providers/Providers.js",
+        "components/Components.js", "components/SyncedLyrics.js", "components/UnsyncedLyrics.js", "components/TabBar.js", "components/Settings.js", "components/OptionsMenu.js", "components/PlaybarButton.js", "components/MiniLyrics.js", "components/VideoBackground.js", "components/VideoManager.js",
+        "providers/ProviderLRCLIB.js", "providers/ProviderMusixmatch.js", "providers/ProviderNetease.js", "providers/Providers.js",
         "assets/preview.gif"
     ],
 

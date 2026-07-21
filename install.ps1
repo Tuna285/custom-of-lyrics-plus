@@ -57,6 +57,11 @@ $filesToDownload = @(
     "assets/chinese_conversion.png",
     "assets/manual_download.png",
     "utils/Namespace.js",
+    "assets/libs/kuroshiro.min.js",
+    "assets/libs/kuroshiro-analyzer-kuromoji.min.js",
+    "assets/libs/aromanize.min.js",
+    "assets/libs/opencc.min.js",
+    "assets/libs/pinyin-pro.min.js",
     "i18n/LangEN.js",
     "i18n/LangVI.js",
     "i18n/LangKO.js",
@@ -76,6 +81,7 @@ $filesToDownload = @(
     "services/LyricsFetcher.js",
     "services/GeminiClient.js",
     "services/Translator.js",
+    "services/TranslationCoordinator.js",
     "components/Components.js",
     "providers/ProviderLRCLIB.js",
     "providers/ProviderMusixmatch.js",
@@ -88,6 +94,7 @@ $filesToDownload = @(
     "components/OptionsMenu.js",
     "components/PlaybarButton.js",
     "components/MiniLyrics.js",
+    "components/VideoSettingsModal.js",
     "components/VideoBackground.js"
 )
 
