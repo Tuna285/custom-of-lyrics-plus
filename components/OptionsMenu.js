@@ -546,7 +546,6 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 			{
 				className: "lyrics-config-button",
 				onClick: open,
-				style: { color: "var(--lp-fab-icon, var(--spice-button))" }
 			},
 			"⇄"
 		)
@@ -603,7 +602,6 @@ const AdjustmentsMenu = react.memo(({ mode }) => {
 			{
 				className: "lyrics-config-button",
 				onClick: open,
-				style: { color: "var(--lp-fab-icon, var(--spice-button))" }
 			},
 			react.createElement(
 				"svg",

@@ -1272,7 +1272,57 @@ class LyricsContainer extends react.Component {
 									});
 								}
 							},
-							style: { color: "var(--lp-fab-icon, var(--spice-button))" },
+							className: "lyrics-config-button",
+							onClick: () => {
+								if (typeof ProviderNetease?.openManualSearchModal === "function") {
+									ProviderNetease.openManualSearchModal((selectedLyrics) => {
+										if (selectedLyrics) {
+											if (CACHE[selectedLyrics.uri]) {
+												const resetKeys = ["romaji", "furigana", "hiragana", "katakana", "hangul", "romaja", "cn", "hk", "tw", "musixmatchTranslation", "musixmatchTranslationLanguage", "neteaseTranslation"];
+												for (const k of resetKeys) {
+													delete CACHE[selectedLyrics.uri][k];
+												}
+											}
+											CACHE[selectedLyrics.uri] = {
+												...CACHE[selectedLyrics.uri],
+												...selectedLyrics
+											};
+											let finalMode = -1;
+											if (selectedLyrics.karaoke) {
+												finalMode = KARAOKE;
+											} else if (selectedLyrics.synced) {
+												finalMode = SYNCED;
+											} else if (selectedLyrics.unsynced) {
+												finalMode = UNSYNCED;
+											} else if (selectedLyrics.genius) {
+												finalMode = GENIUS;
+											}
+											this.state.explicitMode = finalMode;
+											const newCurrentLyrics = selectedLyrics.synced || selectedLyrics.unsynced || selectedLyrics.genius || null;
+											this.setState({
+												...emptyState,
+												...selectedLyrics,
+												currentLyrics: newCurrentLyrics,
+												romaji: null,
+												furigana: null,
+												hiragana: null,
+												katakana: null,
+												hangul: null,
+												romaja: null,
+												cn: null,
+												hk: null,
+												tw: null,
+												musixmatchTranslation: null,
+												musixmatchTranslationLanguage: null,
+												neteaseTranslation: selectedLyrics.neteaseTranslation ?? null,
+												mode: finalMode,
+												isLoading: false,
+												isCached: this.lyricsSaved(selectedLyrics.uri),
+											});
+										}
+									});
+								}
+							},
 						},
 						"N"
 					)
@@ -1289,7 +1339,6 @@ class LyricsContainer extends react.Component {
 								onClick: () => {
 									this.openVideoSettingsModal();
 								},
-								style: { color: "var(--lp-fab-icon, var(--spice-button))" },
 							},
 							react.createElement("svg", {
 								width: 16,
@@ -1384,7 +1433,6 @@ class LyricsContainer extends react.Component {
 							"button",
 							{
 								className: "lyrics-config-button",
-								style: { color: "var(--lp-fab-icon, var(--spice-button))" },
 								onClick: () => {
 									const modeKey = this.modeKey || "gemini";
 									const mode1 = CONFIG.visual[`translation-mode:${modeKey}`];
@@ -1418,7 +1466,6 @@ class LyricsContainer extends react.Component {
 						"button",
 						{
 							className: "lyrics-config-button",
-							style: { color: "var(--lp-fab-icon, var(--spice-button))" },
 							onClick: () => {
 								openConfig();
 							},
