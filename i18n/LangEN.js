@@ -11,9 +11,12 @@ window.LANG_EN = {
     "reasoningTitle": "AI Reasoning Process",
     "reasoningPending": "Still waiting for the model response. If your endpoint returns reasoning only after the full reply, text will appear here when ready.",
     "reasoningEmpty": "No separate reasoning text for this response. Many models hide thinking, or your prompt asks for output only.",
-    "reasoningTabInsights": "💡 Insights & Search",
+    "reasoningTabInsights": "Song Insights",
     "reasoningTabTranslation": "Translation",
     "reasoningTabPhonetic": "Phonetic",
+    "insightsLoading": "Searching song background and lyric notes via Google Search…",
+    "insightsKeyMissing": "Please enter a Gemini API Key in Settings to use Song Insights.",
+    "insightsNoTrack": "Could not retrieve track information from Spotify.",
     "preTranslateChip": "Next: {title}"
   },
   "tabs": {

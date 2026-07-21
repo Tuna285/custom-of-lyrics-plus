@@ -12,9 +12,12 @@ window.LANG_VI = {
     "reasoningTitle": "Quá trình suy nghĩ của AI",
     "reasoningPending": "Đang chờ model trả lời. Nếu API chỉ gửi reasoning sau khi xong, nội dung sẽ hiện ở đây.",
     "reasoningEmpty": "Không có đoạn reasoning riêng cho lần gọi này. Nhiều model không hiện thinking, hoặc prompt đang yêu cầu chỉ xuất kết quả.",
-    "reasoningTabInsights": "💡 Ý nghĩa & Search",
+    "reasoningTabInsights": "Ý nghĩa bài hát",
     "reasoningTabTranslation": "Dịch",
     "reasoningTabPhonetic": "Phiên âm",
+    "insightsLoading": "Đang dùng Google Search tra cứu ý nghĩa bài hát & từ lóng…",
+    "insightsKeyMissing": "Vui lòng nhập Gemini API Key trong Settings để dùng tính năng tra cứu.",
+    "insightsNoTrack": "Không lấy được thông tin bài hát từ Spotify.",
     "preTranslateChip": "Tiếp: {title}"
   },
   "tabs": {

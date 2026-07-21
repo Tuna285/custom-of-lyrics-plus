@@ -1310,13 +1310,13 @@ const GeminiClient = {
         const insightsModel = CONFIG?.visual?.["gemini:insights-model"] || "gemini-3.5-flash-lite";
 
         const systemPrompt = `You are a professional music historian and pop culture researcher. Use Google Search to find authentic lore, MV plot, background story, and lyric slang notes for the given song.
-Provide a clear, beautifully formatted summary in Vietnamese with two sections:
-1. 💡 **Ý NGHĨA & HOÀN CẢNH SÁNG TÁC**: 2-3 sentences summarizing the song's background, mood, or story.
-2. 📖 **CHÚ THÍCH TỪ LÓNG & ẨN DỤ**: Explain 1-3 interesting slang words, metaphors, or cultural references in the lyrics if any.`;
+Provide a clear, clean, beautifully formatted summary in Vietnamese with two sections:
+1. **Ý NGHĨA & HOÀN CẢNH SÁNG TÁC**: 2-3 sentences summarizing the song's background, mood, or story.
+2. **CHÚ THÍCH TỪ LÓNG & ẨN DỤ**: Explain 1-3 interesting slang words, metaphors, or cultural references in the lyrics if any. Do not use emojis.`;
 
         const userPrompt = `Song: "${title}" by "${artist}". Search Google and provide song insights & lyric slang notes in Vietnamese.`;
 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${insightsModel}:generateContent?key=${apiKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${insightsModel}:generateContent?key=${apiKey.trim()}`;
 
         const postData = JSON.stringify({
             systemInstruction: {
@@ -1337,6 +1337,7 @@ Provide a clear, beautifully formatted summary in Vietnamese with two sections:
             }
         });
 
+        console.log(`[Lyrics+] Fetching song insights via ${insightsModel} for ${artist} - ${title}...`);
         const response = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1345,11 +1346,14 @@ Provide a clear, beautifully formatted summary in Vietnamese with two sections:
 
         if (!response.ok) {
             const errJson = await response.json().catch(() => ({}));
-            throw new Error(`Insights API error ${response.status}: ${errJson.error?.message || response.statusText}`);
+            const errMsg = errJson.error?.message || response.statusText;
+            console.error(`[Lyrics+] Insights API HTTP ${response.status}:`, errMsg);
+            throw new Error(`Insights API error ${response.status}: ${errMsg}`);
         }
 
         const data = await response.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Không tìm thấy thông tin bổ sung cho bài hát này.";
+        console.log(`[Lyrics+] Successfully received song insights.`);
         return { text };
     }
 };

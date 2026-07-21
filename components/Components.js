@@ -638,7 +638,7 @@ window.TranslationStatusOverlay = TranslationStatusOverlay;
  *  - Initial position: anchored just under the brain icon (top-right of lyrics area)
  */
 const REASONING_TAB_LABELS = {
-    insights: () => getText("ui.reasoningTabInsights") || "💡 Ý nghĩa & Search",
+    insights: () => getText("ui.reasoningTabInsights") || "Ý nghĩa bài hát",
     translation: () => getText("ui.reasoningTabTranslation") || "Translation",
     phonetic: () => getText("ui.reasoningTabPhonetic") || "Phonetic",
 };
@@ -703,7 +703,7 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
     // Auto-fetch song insights via Google Search when modal opens
     useEffect(() => {
         if (!open) return;
-        if (!streams.insights || streams.insights.startsWith("⚠️")) {
+        if (!streams.insights || streams.insights.startsWith("Lỗi")) {
             const trackItem = Spicetify.Player?.data?.item || Spicetify.Player?.data?.track;
             const artist = trackItem?.metadata?.artist_name
                         || trackItem?.artists?.[0]?.name
@@ -729,18 +729,18 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
             } catch (e) {}
 
             if (artist && title && apiKey && window.GeminiClient?.fetchSongInsights) {
-                setStreams((prev) => ({ ...prev, insights: "🔍 Đang dùng Google Search tra cứu ý nghĩa bài hát & từ lóng..." }));
+                setStreams((prev) => ({ ...prev, insights: getText("ui.insightsLoading") || "Đang dùng Google Search tra cứu ý nghĩa bài hát & từ lóng…" }));
                 window.GeminiClient.fetchSongInsights({ artist, title, apiKey })
                     .then((res) => {
                         setStreams((prev) => ({ ...prev, insights: res.text }));
                     })
                     .catch((err) => {
-                        setStreams((prev) => ({ ...prev, insights: `⚠️ Lỗi tra cứu: ${err.message}` }));
+                        setStreams((prev) => ({ ...prev, insights: `Lỗi tra cứu: ${err.message}` }));
                     });
             } else if (!apiKey) {
-                setStreams((prev) => ({ ...prev, insights: "⚠️ Vui lòng nhập Gemini API Key trong Cài đặt để sử dụng tính năng tra cứu Google Search này." }));
+                setStreams((prev) => ({ ...prev, insights: getText("ui.insightsKeyMissing") || "Vui lòng nhập Gemini API Key trong Settings để dùng tính năng tra cứu." }));
             } else if (!artist || !title) {
-                setStreams((prev) => ({ ...prev, insights: "⚠️ Không lấy được tên bài hát/ca sĩ từ Spotify." }));
+                setStreams((prev) => ({ ...prev, insights: getText("ui.insightsNoTrack") || "Không lấy được thông tin bài hát từ Spotify." }));
             }
         }
     }, [open, streams.insights]);
