@@ -954,9 +954,9 @@ const GeminiClient = {
         DebugLogger.group(`${wantSmartPhonetic ? 'Phonetic' : 'Translation'} Request`);
 
         const endpoint = CONFIG?.visual?.["gemini:endpoint"] || "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-        let model = CONFIG?.visual?.["gemini:model"] || "gemini-3.1-flash-lite";
+        let model = CONFIG?.visual?.["gemini:model"] || "gemini-3.6-flash";
         if (wantSmartPhonetic) {
-            model = CONFIG?.visual?.["gemini:phonetic-model"] || "gemini-2.5-flash-lite";
+            model = CONFIG?.visual?.["gemini:phonetic-model"] || "gemini-3.5-flash-lite";
         }
         let responseMode = CONFIG?.visual?.["gemini:response-mode"] || "prompt";
 

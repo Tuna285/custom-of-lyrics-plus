@@ -138,13 +138,20 @@ const CONFIG = {
         "gemini:endpoint": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:endpoint") || "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
         "gemini:model": (() => {
             const val = ConfigUtils.getPersisted("lyrics-plus:visual:gemini:model");
-            if (!val || val === "gemma-4-26b-a4b-it") {
-                ConfigUtils.setPersisted("lyrics-plus:visual:gemini:model", "gemini-3.1-flash-lite");
-                return "gemini-3.1-flash-lite";
+            if (!val || val === "gemma-4-26b-a4b-it" || val === "gemini-3.1-flash-lite") {
+                ConfigUtils.setPersisted("lyrics-plus:visual:gemini:model", "gemini-3.6-flash");
+                return "gemini-3.6-flash";
             }
             return val;
         })(),
-        "gemini:phonetic-model": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:phonetic-model") || "gemini-2.5-flash-lite",
+        "gemini:phonetic-model": (() => {
+            const val = ConfigUtils.getPersisted("lyrics-plus:visual:gemini:phonetic-model");
+            if (!val || val === "gemini-2.5-flash-lite") {
+                ConfigUtils.setPersisted("lyrics-plus:visual:gemini:phonetic-model", "gemini-3.5-flash-lite");
+                return "gemini-3.5-flash-lite";
+            }
+            return val;
+        })(),
         "gemini:response-mode": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:response-mode") || "json_schema",
         // Reasoning effort: "off" | "low" | "medium" | "high"
         // Migration from legacy boolean `gemini:disable-thinking`:

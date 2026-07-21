@@ -667,8 +667,8 @@ const ConfigHelper = () => {
 	// Translation Settings (OpenAI-compatible endpoint + keys; no proxy/official split)
 	const translationSettings = [
 		{ desc: getText("settings.apiEndpoint.label"), key: "gemini:endpoint", type: ConfigComboBox, info: getText("settings.apiEndpoint.desc"), placeholder: "https://…/v1/chat/completions", options: ENDPOINT_PRESETS },
-		{ desc: getText("settings.modelName.label"), key: "gemini:model", type: ConfigComboBox, info: getText("settings.modelName.desc"), placeholder: "gemini-3.1-flash-lite", options: MODEL_PRESETS },
-		{ desc: getText("settings.phoneticModelName.label"), key: "gemini:phonetic-model", type: ConfigComboBox, info: getText("settings.phoneticModelName.desc"), placeholder: "gemini-2.5-flash-lite", options: MODEL_PRESETS },
+		{ desc: getText("settings.modelName.label"), key: "gemini:model", type: ConfigComboBox, info: getText("settings.modelName.desc"), placeholder: "gemini-3.6-flash", options: MODEL_PRESETS },
+		{ desc: getText("settings.phoneticModelName.label"), key: "gemini:phonetic-model", type: ConfigComboBox, info: getText("settings.phoneticModelName.desc"), placeholder: "gemini-3.5-flash-lite", options: MODEL_PRESETS },
 		{ desc: getText("settings.apiKeys.label"), key: "gemini-api-keys", type: ConfigDynamicKeys, info: getText("settings.apiKeys.desc") },
 		{ desc: getText("settings.responseMode.label"), key: "gemini:response-mode", type: ConfigSelection, options: { prompt: getText("settings.responseMode.options.prompt"), json_schema: getText("settings.responseMode.options.json_schema") }, info: getText("settings.responseMode.desc") },
 		{
