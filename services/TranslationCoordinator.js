@@ -120,7 +120,7 @@ window.LyricsPlus.TranslationCoordinator = {
 		// CRITICAL: Use ||= instead of || to avoid resetting cached data on subsequent calls
 		self._dmResults = self._dmResults || {};
 		if (!self._dmResults[currentUri]) {
-			self._dmResults[currentUri] = { mode1: null, mode2: null };
+			self._dmResults[currentUri] = {};
 		}
 
 		// Settings change detection logic adjusted to ignore initial undefined state
@@ -138,7 +138,7 @@ window.LyricsPlus.TranslationCoordinator = {
 		if (settingsChanged && self._dmResults[currentUri]) {
 			// Clear cached results for this URI to force re-fetch with new settings
 			// Old translation continues to display via currentLyrics until new arrives
-			self._dmResults[currentUri] = { mode1: null, mode2: null };
+			self._dmResults[currentUri] = {};
 			console.log(`[Lyrics+] Settings changed (${self._lastStyleKey}/${self._lastPronounKey} → ${currentStyleKey}/${currentPronounKey}), re-fetching...`);
 		}
 		
@@ -174,17 +174,17 @@ window.LyricsPlus.TranslationCoordinator = {
 		};
 
 		// Preload cached translations (async)
-		if (!self._dmResults[currentUri].mode1 && displayMode1) {
-			self._dmResults[currentUri].mode1 = await tryLoadCachedTranslation(displayMode1);
+		if (displayMode1 && displayMode1 !== "none" && !self._dmResults[currentUri][displayMode1]) {
+			self._dmResults[currentUri][displayMode1] = await tryLoadCachedTranslation(displayMode1);
 		}
-		if (!self._dmResults[currentUri].mode2 && displayMode2) {
-			self._dmResults[currentUri].mode2 = await tryLoadCachedTranslation(displayMode2);
+		if (displayMode2 && displayMode2 !== "none" && !self._dmResults[currentUri][displayMode2]) {
+			self._dmResults[currentUri][displayMode2] = await tryLoadCachedTranslation(displayMode2);
 		}
 
 		// Get current results - always read from _dmResults to avoid stale closure
 		const getResults = () => ({
-			mode1: (displayMode1 && displayMode1 !== "none") ? (self._dmResults?.[currentUri]?.mode1 || null) : null,
-			mode2: (displayMode2 && displayMode2 !== "none") ? (self._dmResults?.[currentUri]?.mode2 || null) : null
+			mode1: (displayMode1 && displayMode1 !== "none") ? (self._dmResults?.[currentUri]?.[displayMode1] || null) : null,
+			mode2: (displayMode2 && displayMode2 !== "none") ? (self._dmResults?.[currentUri]?.[displayMode2] || null) : null
 		});
 
 		const updateCombinedLyrics = (force = false) => {
@@ -265,11 +265,11 @@ window.LyricsPlus.TranslationCoordinator = {
 		// Start first request immediately (non-blocking)
 		const promise1 = processMode(firstMode, lyrics).then(result => {
 			if (self.state.uri !== uri) return;
-			if (self._dmResults?.[currentUri]) self._dmResults[currentUri][firstModeKey] = result;
+			if (self._dmResults?.[currentUri]) self._dmResults[currentUri][firstMode] = result;
 			updateCombinedLyrics(true);
 		}).catch(error => {
 			if (self.state.uri !== uri) return;
-			console.warn(`Display ${firstModeKey} failed:`, error.message);
+			console.warn(`Display ${firstMode} failed:`, error.message);
 			updateCombinedLyrics(true);
 		});
 
@@ -277,11 +277,11 @@ window.LyricsPlus.TranslationCoordinator = {
 		const promise2 = new Promise(resolve => setTimeout(resolve, 500)).then(() => {
 			return processMode(secondMode, lyrics).then(result => {
 				if (self.state.uri !== uri) return;
-				if (self._dmResults?.[currentUri]) self._dmResults[currentUri][secondModeKey] = result;
+				if (self._dmResults?.[currentUri]) self._dmResults[currentUri][secondMode] = result;
 				updateCombinedLyrics(true);
 			}).catch(error => {
 				if (self.state.uri !== uri) return;
-				console.warn(`Display ${secondModeKey} failed:`, error.message);
+				console.warn(`Display ${secondMode} failed:`, error.message);
 				updateCombinedLyrics(true);
 			});
 		});
@@ -942,8 +942,7 @@ window.LyricsPlus.TranslationCoordinator = {
 				const currentMode2 = CONFIG.visual[`translation-mode-2:${mKey}`];
 				
 				modesToClear.forEach(mode => {
-					if (mode === currentMode1) self._dmResults[uri].mode1 = null;
-					if (mode === currentMode2) self._dmResults[uri].mode2 = null;
+					delete self._dmResults[uri][mode];
 				});
 			}
 			
