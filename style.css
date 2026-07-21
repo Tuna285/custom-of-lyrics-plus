@@ -1321,10 +1321,8 @@ div.lyrics-tabBar-headerItemLink {
   transform-origin: center;
 
   transition-property: transform, opacity, filter, box-shadow;
-  transition-duration:
-    var(--indicator-delay), var(--indicator-delay),
-    calc(var(--indicator-delay) * 2), calc(var(--indicator-delay) * 2);
-  transition-timing-function: linear;
+  transition-duration: 0.2s;
+  transition-timing-function: ease-out;
 }
 
 .lyrics-idling-indicator__circle.active {
@@ -1337,21 +1335,25 @@ div.lyrics-tabBar-headerItemLink {
   0% {
     filter: brightness(1);
     box-shadow: 0 0 0 rgba(255, 255, 255, 0);
+    transform: scale(0.7);
   }
 
   80% {
     filter: brightness(1);
     box-shadow: 0 0 0 rgba(255, 255, 255, 0);
+    transform: scale(0.7);
   }
 
   85% {
     filter: brightness(1.7);
     box-shadow: 0 0 20px var(--lyrics-color-active);
+    transform: scale(0.85);
   }
 
   100% {
     filter: brightness(1);
     box-shadow: 0 0 0 rgba(255, 255, 255, 0);
+    transform: scale(0.7);
   }
 }
 
