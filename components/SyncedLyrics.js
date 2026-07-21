@@ -168,15 +168,8 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
 
                 if (canInsert) {
                     const estDur = estimateLineDuration(currentLine, timingStats);
-                    const text = currentLine.originalText || currentLine.text || "";
-                    const len = typeof text === "string" ? text.trim().length : 0;
-                    const ratio = len < 10 ? 0.85 : len < 20 ? 0.78 : LINE_END_INTERVAL_FLOOR_RATIO;
-
-                    const lineEnd = currentLine.startTime + Math.min(
-                        Math.max(estDur, interval * ratio),
-                        nextLine.startTime - 5500
-                    );
-                    const insertTime = Math.max(lineEnd + IDLE_GRACE_MS, currentLine.startTime + estDur + 1000);
+                    const lineEnd = currentLine.startTime + Math.min(estDur + 1000, interval * 0.4);
+                    const insertTime = lineEnd + 1000;
                     if (nextLine.startTime - insertTime >= 3000) {
                         processed.push({
                             text: "♪",
