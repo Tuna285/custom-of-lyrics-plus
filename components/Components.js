@@ -978,6 +978,35 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
         })
     );
 
+    const renderFormattedMarkdown = (rawText) => {
+        if (!rawText) return null;
+        const lines = rawText.split("\n");
+        return lines.map((line, idx) => {
+            let trimmed = line.trim();
+            if (!trimmed) return react.createElement("div", { key: idx, style: { height: "6px" } });
+
+            // Handle headers (### or ##)
+            if (trimmed.startsWith("#")) {
+                const cleanHeader = trimmed.replace(/^#+\s*/, "").replace(/\*\*/g, "");
+                return react.createElement("h4", {
+                    key: idx,
+                    style: { margin: "10px 0 6px 0", fontSize: "14px", fontWeight: "600", color: "#fff" }
+                }, cleanHeader);
+            }
+
+            // Parse **bold** syntax inside lines
+            const parts = trimmed.split(/(\*\*.*?\*\*)/g);
+            const children = parts.map((part, pIdx) => {
+                if (part.startsWith("**") && part.endsWith("**") && part.length >= 4) {
+                    return react.createElement("strong", { key: pIdx, style: { color: "var(--text-bright, #fff)", fontWeight: "600" } }, part.slice(2, -2));
+                }
+                return part;
+            });
+
+            return react.createElement("p", { key: idx, style: { margin: "0 0 6px 0", lineHeight: "1.5" } }, ...children);
+        });
+    };
+
     const node = react.createElement(
         "div",
         {
@@ -1028,7 +1057,7 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
             },
             placeholder
                 ? react.createElement("p", { className: "reasoning-window-placeholder" }, placeholder)
-                : text
+                : renderFormattedMarkdown(text)
         ),
         react.createElement("div", {
             className: "reasoning-window-resize",
