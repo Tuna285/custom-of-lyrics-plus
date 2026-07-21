@@ -56,8 +56,8 @@ const IdlingIndicator = react.memo(react.forwardRef(({
     // Memoize circle states to avoid unnecessary re-renders
     const circleStates = useMemo(() => [
         progress >= 0.05 ? "active" : "",
-        progress >= 0.25 ? "active" : "",
-        progress >= 0.45 ? "active" : ""
+        progress >= 0.33 ? "active" : "",
+        progress >= 0.66 ? "active" : ""
     ], [progress]);
 
     return react.createElement(
