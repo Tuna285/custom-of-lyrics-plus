@@ -158,8 +158,7 @@ const ProviderNetease = (() => {
             const songId  = best.id;
             const lyricData = await fetchLyricsById(songId);
             
-            // Fallback to tlyric if original lrc is empty
-            const rawLrc = lyricData?.lrc?.lyric?.trim() ? lyricData.lrc.lyric : (lyricData?.tlyric?.lyric || "");
+            const rawLrc = lyricData?.lrc?.lyric || "";
             let { synced, unsynced } = parseLyrics(rawLrc);
             if (!synced && !unsynced) return err("NetEase: no lyrics found for this track");
 
@@ -297,9 +296,7 @@ const ProviderNetease = (() => {
                     const songsWithLyrics = await Promise.all(songs.map(async (song) => {
                         try {
                             const lyricData = await fetchLyricsById(song.id);
-                            
-                            // Fallback to tlyric if original lrc is empty
-                            const rawLrc = lyricData?.lrc?.lyric?.trim() ? lyricData.lrc.lyric : (lyricData?.tlyric?.lyric || "");
+                            const rawLrc = lyricData?.lrc?.lyric || "";
                             
                              let isSynced = false;
                              let hasLyrics = false;
@@ -332,7 +329,7 @@ const ProviderNetease = (() => {
                                 hasLyrics,
                                 isSynced,
                                 lyricText: rawLrc,
-                                tlyricText: lyricData?.lrc?.lyric?.trim() ? (lyricData?.tlyric?.lyric || null) : null
+                                tlyricText: lyricData?.tlyric?.lyric || null
                             };
                         } catch (_) {
                             return { ...song, hasLyrics: false, isSynced: false };
@@ -369,12 +366,12 @@ const ProviderNetease = (() => {
                     let lyricData = song;
                     if (song.hasLyrics === undefined) {
                         const d = await fetchLyricsById(song.id);
-                        const rawLrc = d?.lrc?.lyric?.trim() ? d.lrc.lyric : (d?.tlyric?.lyric || "");
+                        const rawLrc = d?.lrc?.lyric || "";
                         lyricData = {
                             hasLyrics: !!(rawLrc.trim()),
                             isSynced: /\[\d{1,2}:\d{2}/.test(rawLrc),
                             lyricText: rawLrc,
-                            tlyricText: d?.lrc?.lyric?.trim() ? (d?.tlyric?.lyric || null) : null
+                            tlyricText: d?.tlyric?.lyric || null
                         };
                     }
 

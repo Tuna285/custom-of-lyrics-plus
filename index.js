@@ -1195,9 +1195,11 @@ class LyricsContainer extends react.Component {
 												finalMode = GENIUS;
 											}
 											this.state.explicitMode = finalMode;
+											const newCurrentLyrics = selectedLyrics.synced || selectedLyrics.unsynced || selectedLyrics.genius || null;
 											this.setState({
 												...emptyState,
 												...selectedLyrics,
+												currentLyrics: newCurrentLyrics,
 												romaji: null,
 												furigana: null,
 												hiragana: null,
@@ -1209,7 +1211,7 @@ class LyricsContainer extends react.Component {
 												tw: null,
 												musixmatchTranslation: null,
 												musixmatchTranslationLanguage: null,
-												neteaseTranslation: null,
+												neteaseTranslation: selectedLyrics.neteaseTranslation ?? null,
 												mode: finalMode,
 												isLoading: false,
 												isCached: this.lyricsSaved(selectedLyrics.uri),
