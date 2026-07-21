@@ -128,6 +128,8 @@ const VideoBackground = (() => {
                         mute: 1,
                         playsinline: 1,
                         cc_load_policy: 0, // Disable captions/subtitles by default
+                        cc_lang_pref: "none",
+                        hl: "en",
                         origin: window.location.origin,
                     },
                     events: {
@@ -136,8 +138,12 @@ const VideoBackground = (() => {
                             setIsPlayerReady(true);
                             event.target.mute();
 
-                            // Unload captions/subtitles modules completely to prevent layout interference
+                            // Unload & clear captions/subtitles modules completely to prevent layout interference
                             try {
+                                if (typeof event.target.setOption === "function") {
+                                    event.target.setOption("captions", "track", {});
+                                    event.target.setOption("cc", "track", {});
+                                }
                                 if (typeof event.target.unloadModule === "function") {
                                     event.target.unloadModule("captions");
                                     event.target.unloadModule("cc");

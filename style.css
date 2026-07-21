@@ -413,9 +413,9 @@
   filter: none !important;
   /* Glow effect for active line */
   text-shadow:
-    0 0 30px rgba(255, 255, 255, 0.5),
-    0 0 60px rgba(255, 255, 255, 0.3),
-    0 2px 10px rgba(0, 0, 0, 0.8);
+    0 0 20px rgba(255, 255, 255, 0.35),
+    0 0 40px rgba(255, 255, 255, 0.15),
+    0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .lyrics-lyricsContainer-SyncedLyrics
@@ -425,22 +425,16 @@
 
 /* Video Background Active - Enhanced text visibility for bright videos */
 .video-bg-active .lyrics-lyricsContainer-LyricsLine {
-  /* Dark outline shadow removed for inactive lines as per user request */
-  /* text-shadow: 0 0 8px rgba(0, 0, 0, 0.9), 0 0 16px rgba(0, 0, 0, 0.6),
-    0 2px 4px rgba(0, 0, 0, 0.9), 0 0 32px rgba(0, 0, 0, 0.4); */
   text-shadow: none;
 }
 
-/* Video BG: Active line keeps its glow but with added dark outline */
+/* Video BG: Active line keeps its glow but with soft dark outline */
 .video-bg-active
   .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active {
   text-shadow:
-		/* Existing white glow */
-    0 0 30px rgba(255, 255, 255, 0.5),
-    0 0 60px rgba(255, 255, 255, 0.3),
-    /* Dark outline for contrast */ 0 0 8px rgba(0, 0, 0, 0.95),
-    0 0 16px rgba(0, 0, 0, 0.7),
-    0 2px 6px rgba(0, 0, 0, 1);
+    0 0 20px rgba(255, 255, 255, 0.4),
+    0 0 8px rgba(0, 0, 0, 0.6),
+    0 2px 6px rgba(0, 0, 0, 0.5);
 }
 
 .lyrics-lyricsContainer-LyricsLine,
