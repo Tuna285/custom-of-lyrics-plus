@@ -19,7 +19,7 @@ function getConfig(name, defaultVal = true) {
 	return value ? value === "true" : defaultVal;
 }
 
-const APP_NAME = "lyrics-plus";
+// APP_NAME is already declared in utils/Config.js
 const MUSIXMATCH_TRANSLATION_PREFIX_DEFAULT = "musixmatchTranslation:";
 const MUSIXMATCH_TRANSLATION_PREFIX_GLOBAL_KEY = "__lyricsPlusMusixmatchTranslationPrefix";
 const MUSIXMATCH_TRANSLATION_FETCH_MESSAGE = "Fetching translation...";
