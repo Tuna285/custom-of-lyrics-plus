@@ -255,6 +255,26 @@ class LyricsContainer extends react.Component {
 		}
 	}
 
+	async fetchVideoBackground(info) {
+		if (!CONFIG.visual["video-background"]) {
+			if (this.state.videoBackground) {
+				this.setState({ videoBackground: null });
+			}
+			return;
+		}
+		if (!info || !info.uri) return;
+		if (window.VideoManager && typeof window.VideoManager.fetchVideoForTrack === "function") {
+			try {
+				const videoData = await window.VideoManager.fetchVideoForTrack(info);
+				if (this.currentTrackUri === info.uri || this.state.uri === info.uri) {
+					this.setState({ videoBackground: videoData });
+				}
+			} catch (e) {
+				console.warn("[Lyrics+] Failed to fetch video background:", e);
+			}
+		}
+	}
+
 	async refreshMusixmatchTranslation() {
 		const selectedLanguage = CONFIG.visual["musixmatch-translation-language"] || "none";
 		const availableTranslations = this.state.musixmatchAvailableTranslations || [];
@@ -529,6 +549,7 @@ class LyricsContainer extends react.Component {
 
 		// if song changed one time
 		if (tempState.uri !== this.state.uri || refresh) {
+			this.fetchVideoBackground(info);
 			// when a song starts for the first time and language-override is selected, the lyrics are converted to the specified language.
 			// however, when switching it off again, the detected language needs to be known, so defaultLanguage has been introduced.
 			const newLyrics = tempState.synced || tempState.unsynced || tempState.genius || [];
@@ -826,6 +847,7 @@ class LyricsContainer extends react.Component {
 			this.state.explicitMode = this.state.lockMode;
 			this.currentTrackUri = Spicetify.Player.data.item.uri;
 			this.fetchLyrics(Spicetify.Player.data.item, this.state.explicitMode);
+			this.fetchVideoBackground(this.infoFromTrack(Spicetify.Player.data.item));
 		}
 
 		this.updateVisualOnConfigChange();
@@ -834,6 +856,9 @@ class LyricsContainer extends react.Component {
 		lyricContainerUpdate = () => {
 			this.reRenderLyricsPage = !this.reRenderLyricsPage;
 			this.updateVisualOnConfigChange();
+			if (Spicetify.Player?.data?.item) {
+				this.fetchVideoBackground(this.infoFromTrack(Spicetify.Player.data.item));
+			}
 			this.forceUpdate();
 
 			if (this.currentMusixmatchLanguage !== CONFIG.visual["musixmatch-translation-language"]) {
@@ -994,15 +1019,32 @@ class LyricsContainer extends react.Component {
 		const fadLyricsContainer = document.getElementById("fad-lyrics-plus-container");
 		this.state.isFADMode = !!fadLyricsContainer;
 
+		const isTransparentBg = CONFIG.visual["transparent-background"] || (CONFIG.visual["video-background"] && !!this.state.videoBackground?.video_id);
 		if (this.state.isFADMode) {
 			// Text colors will be set by FAD extension
 			this.styleVariables = {};
+		} else if (isTransparentBg) {
+			this.styleVariables = {
+				"--lyrics-color-active": "white",
+				"--lyrics-color-inactive": "rgba(255, 255, 255, 0.45)",
+				"--lyrics-color-background": "transparent",
+				"--lyrics-highlight-background": "rgba(255, 255, 255, 0.1)",
+				"--lyrics-background-noise": "none",
+			};
 		} else if (CONFIG.visual.colorful) {
 			this.styleVariables = {
 				"--lyrics-color-active": "white",
 				"--lyrics-color-inactive": "rgba(255, 255, 255, 0.35)",
 				"--lyrics-color-background": this.state.colors.background || "transparent",
 				"--lyrics-highlight-background": this.state.colors.inactive,
+				"--lyrics-background-noise": CONFIG.visual.noise ? "var(--background-noise)" : "unset",
+			};
+		} else {
+			this.styleVariables = {
+				"--lyrics-color-active": CONFIG.visual["active-color"],
+				"--lyrics-color-inactive": CONFIG.visual["inactive-color"],
+				"--lyrics-color-background": CONFIG.visual["background-color"] || "transparent",
+				"--lyrics-highlight-background": CONFIG.visual["highlight-color"],
 				"--lyrics-background-noise": CONFIG.visual.noise ? "var(--background-noise)" : "unset",
 			};
 		}
@@ -1124,7 +1166,7 @@ class LyricsContainer extends react.Component {
 			{
 				className: `lyrics-lyricsContainer-LyricsContainer${CONFIG.visual["fade-blur"] ? " blur-enabled" : ""}${
 					fadLyricsContainer ? " fad-enabled" : ""
-				}`,
+				}${this.state.videoBackground?.video_id ? " video-bg-active" : ""}`,
 				style: this.styleVariables,
 				ref: (el) => {
 					if (!el) return;
@@ -1134,6 +1176,16 @@ class LyricsContainer extends react.Component {
 			react.createElement("div", {
 				className: "lyrics-lyricsContainer-LyricsBackground",
 			}),
+			CONFIG.visual["video-background"] &&
+				window.VideoBackground &&
+				react.createElement(window.VideoBackground, {
+					trackUri: trackUriNow,
+					brightness: CONFIG.visual["video-background-dim"],
+					blurAmount: CONFIG.visual["video-background-blur"],
+					scale: CONFIG.visual["video-background-scale"],
+					fullscreen: CONFIG.visual["video-background-fullscreen"],
+					videoInfo: this.state.videoBackground,
+				}),
 			react.createElement(window.TranslationStatusOverlay, {
 				isVisible: translationIndicatorVisible,
 				status: translationStatusForTrack,
