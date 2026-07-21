@@ -346,7 +346,7 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                             animationIndex: (animationIndex < 0 ? 0 : animationIndex) + 1,
                             blurIndex: Math.abs(animationIndex),
                             isPadding: paddingLine,
-                            isExiting: nextStartTime - position <= 300,
+                            isExiting: animationIndex < 0 || position >= nextStartTime,
                             key: lineNumber,
                             ref: ref
                         });
@@ -630,7 +630,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
                         animationIndex: (animationIndex < 0 ? 0 : animationIndex) + 1,
                         blurIndex: Math.abs(animationIndex),
                         isPadding: paddingLine,
-                        isExiting: nextStartTime - position <= 300,
+                        isExiting: animationIndex < 0 || position >= nextStartTime,
                         key: i,
                         ref: ref
                     });
