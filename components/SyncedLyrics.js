@@ -343,11 +343,13 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                             animationIndex: (animationIndex < 0 ? 0 : animationIndex) + 1,
                             blurIndex: Math.abs(animationIndex),
                             isPadding: paddingLine,
-                            isExiting: position >= nextStartTime,
+                            isExiting: nextStartTime - position <= 600,
                             key: lineNumber,
                             ref: ref
                         });
                     }
+                    // Hide short note lines (< 4000ms) so raw "♪" text does not render between lines
+                    return null;
                 }
 
                 return react.createElement(
@@ -625,11 +627,13 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
                         animationIndex: (animationIndex < 0 ? 0 : animationIndex) + 1,
                         blurIndex: Math.abs(animationIndex),
                         isPadding: paddingLine,
-                        isExiting: nextStartTime - position < 500,
+                        isExiting: nextStartTime - position <= 600,
                         key: i,
                         ref: ref
                     });
                 }
+                // Hide short note lines (< 4000ms) so raw "♪" text does not render between lines
+                return null;
             }
 
             return react.createElement(
