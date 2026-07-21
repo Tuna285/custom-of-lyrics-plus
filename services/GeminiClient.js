@@ -1318,82 +1318,83 @@ const GeminiClient = {
 
         const insightsModel = CONFIG?.visual?.["gemini:insights-model"] || "gemini-3.5-flash-lite";
 
-        const systemPrompt = `You are a professional music historian and pop culture researcher. Use Google Search to find authentic lore, MV plot, background story, and lyric slang notes for the given song.
+        const systemPrompt = `You are a music historian and pop culture researcher. Provide authentic lore, background story, and lyric slang notes for the given song.
 Provide a clear, clean, beautifully formatted summary in Vietnamese with two sections:
-1. **Ý NGHĨA & HOÀN CẢNH SÁNG TÁC**: 2-3 sentences summarizing the song's background, mood, or story.
-2. **CHÚ THÍCH TỪ LÓNG & ẨN DỤ**: Explain 1-3 interesting slang words, metaphors, or cultural references in the lyrics if any. Do not use emojis.`;
+1. Ý NGHĨA & HOÀN CẢNH SÁNG TÁC: 2-3 sentences summarizing the song's background, mood, or story.
+2. CHÚ THÍCH TỪ LÓNG & ẨN DỤ: Explain 1-3 interesting slang words, metaphors, or cultural references in the lyrics if any. Do not use emojis.`;
 
-        const userPrompt = `Song: "${title}" by "${artist}". Search Google and provide song insights & lyric slang notes in Vietnamese.`;
+        const userPrompt = `Song: "${title}" by "${artist}". Provide song insights & lyric slang notes in Vietnamese.`;
 
         let lastError = null;
-        let consecutive429Count = 0;
-
         const shuffledKeys = [...keysList].sort(() => Math.random() - 0.5);
-        for (const key of shuffledKeys) {
-            if (!key || !key.trim()) continue;
-            try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${insightsModel}:generateContent?key=${key.trim()}`;
 
-                const postData = JSON.stringify({
-                    systemInstruction: {
-                        parts: [{ text: systemPrompt }]
-                    },
-                    contents: [
-                        {
-                            role: "user",
-                            parts: [{ text: userPrompt }]
+        // Try with Google Search tool first; if 429 (Search Quota exceeded on free key), automatically fallback to standard model knowledge
+        for (const useSearch of [true, false]) {
+            for (const key of shuffledKeys) {
+                if (!key || !key.trim()) continue;
+                try {
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${insightsModel}:generateContent?key=${key.trim()}`;
+
+                    const bodyObj = {
+                        systemInstruction: {
+                            parts: [{ text: systemPrompt }]
+                        },
+                        contents: [
+                            {
+                                role: "user",
+                                parts: [{ text: userPrompt }]
+                            }
+                        ],
+                        generationConfig: {
+                            temperature: 0.7,
+                            maxOutputTokens: 1000
                         }
-                    ],
-                    tools: [
-                        { googleSearch: {} }
-                    ],
-                    generationConfig: {
-                        temperature: 0.7,
-                        maxOutputTokens: 1000
+                    };
+
+                    if (useSearch) {
+                        bodyObj.tools = [{ googleSearch: {} }];
                     }
-                });
 
-                console.log(`[Lyrics+] Fetching song insights via ${insightsModel} for ${artist} - ${title}...`);
-                const response = await fetch(url, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: postData
-                });
+                    console.log(`[Lyrics+] Fetching song insights via ${insightsModel} (search: ${useSearch}) for ${artist} - ${title}...`);
+                    const response = await fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(bodyObj)
+                    });
 
-                if (response.status === 429) {
-                    consecutive429Count++;
-                    console.warn(`[Lyrics+] Key hit 429 rate limit on ${insightsModel}. (${consecutive429Count} key(s) limited)`);
-                    if (consecutive429Count >= 2) {
-                        throw new Error("Tất cả API Key hiện tại đều đang bị giới hạn tần suất (429 Too Many Requests). Vui lòng đợi 1 phút rồi thử lại.");
+                    if (response.status === 429) {
+                        console.warn(`[Lyrics+] Search/Key 429 rate limit on ${insightsModel} (useSearch: ${useSearch}).`);
+                        if (useSearch) {
+                            // Search quota exceeded on free API key — break search loop & fallback to standard AI model knowledge
+                            break;
+                        }
+                        await new Promise(r => setTimeout(r, 200));
+                        continue;
                     }
-                    await new Promise(r => setTimeout(r, 200));
-                    continue;
-                }
 
-                consecutive429Count = 0;
+                    if (!response.ok) {
+                        const errJson = await response.json().catch(() => ({}));
+                        const errMsg = errJson.error?.message || response.statusText;
+                        console.error(`[Lyrics+] Insights API HTTP ${response.status}:`, errMsg);
+                        throw new Error(`HTTP ${response.status}: ${errMsg}`);
+                    }
 
-                if (!response.ok) {
-                    const errJson = await response.json().catch(() => ({}));
-                    const errMsg = errJson.error?.message || response.statusText;
-                    console.error(`[Lyrics+] Insights API HTTP ${response.status}:`, errMsg);
-                    throw new Error(`HTTP ${response.status}: ${errMsg}`);
+                    const data = await response.json();
+                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Không tìm thấy thông tin bổ sung cho bài hát này.";
+                    console.log(`[Lyrics+] Successfully received song insights (search: ${useSearch}).`);
+                    
+                    if (trackKey) {
+                        this._insightsCache[trackKey] = text;
+                    }
+                    return { text };
+                } catch (err) {
+                    lastError = err;
+                    if (!useSearch && err.message.includes("429")) break;
                 }
-
-                const data = await response.json();
-                const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Không tìm thấy thông tin bổ sung cho bài hát này.";
-                console.log(`[Lyrics+] Successfully received song insights using ${insightsModel}.`);
-                
-                if (trackKey) {
-                    this._insightsCache[trackKey] = text;
-                }
-                return { text };
-            } catch (err) {
-                lastError = err;
-                if (err.message.includes("429")) break;
             }
         }
 
-        throw lastError || new Error("Hệ thống API đang tạm quá tải (429). Vui lòng thử lại sau 1 phút.");
+        throw lastError || new Error("Không thể kết nối Gemini API. Vui lòng kiểm tra lại API Key.");
     }
 };
 
