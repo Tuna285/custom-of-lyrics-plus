@@ -188,23 +188,31 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
             }
         }
 
-        // Merge consecutive note lines into one
+        // Merge & Filter note lines
         const merged = [];
         for (let i = 0; i < processed.length; i++) {
             const current = processed[i];
-            const prev = merged[merged.length - 1];
 
-            // Use isNoteLineObject to properly detect notes after translation
             if (isNoteLineObject(current)) {
-                // Look-back Merge Strategy:
-                // Check if the current note should be merged with a previous note (ignoring empty lines).
-                // This handles cases where auto-generated notes and original source notes are separated by artifacts.
+                // Find next non-note line to determine duration
+                let nextRealLine = null;
+                for (let j = i + 1; j < processed.length; j++) {
+                    if (!isNoteLineObject(processed[j])) {
+                        nextRealLine = processed[j];
+                        break;
+                    }
+                }
+                const durationToNext = nextRealLine ? (nextRealLine.startTime - current.startTime) : 0;
 
-                // 1. Find the last non-empty item in the merged list
+                // Drop short note lines (< 4000ms) so previous real lyric line holds continuously
+                if (durationToNext > 0 && durationToNext < 4000 && nextRealLine) {
+                    continue;
+                }
+
+                // Look-back Merge Strategy: merge consecutive note lines
                 let lastNonEmptyIndex = merged.length - 1;
                 while (lastNonEmptyIndex >= 0) {
                     const item = merged[lastNonEmptyIndex];
-                    // Check if item has any meaningful text content
                     const hasContent = item.text && (typeof item.text !== "string" || item.text.trim() !== "");
                     const hasOriginal = item.originalText && (typeof item.originalText !== "string" || item.originalText.trim() !== "");
                     if (hasContent || hasOriginal) {
@@ -214,12 +222,8 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                 }
 
                 if (lastNonEmptyIndex >= 0 && isNoteLineObject(merged[lastNonEmptyIndex])) {
-                    // 2. If the last real item was ALSO a note, merge them.
-                    // We do this by removing all intermediate empty lines (truncating the array)
-                    // and skipping the addition of the current note (continue).
-                    // This effectively extends the duration of the previous note to cover this one.
                     merged.length = lastNonEmptyIndex + 1;
-                    continue; // Skip adding current note
+                    continue;
                 }
             }
             merged.push(current);
