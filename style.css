@@ -1316,7 +1316,7 @@ div.lyrics-tabBar-headerItemLink {
   height: var(--lyrics-font-size);
   width: var(--lyrics-font-size);
 
-  opacity: 0.3;
+  opacity: 1;
   transform: scale(0.4);
   transform-origin: center;
 
@@ -1335,24 +1335,21 @@ div.lyrics-tabBar-headerItemLink {
 }
 
 @keyframes idlingPulse {
-  /* 0-56% = original 0-90% (no glow, building up) */
   0% {
     filter: brightness(1);
     box-shadow: 0 0 0 rgba(255, 255, 255, 0);
   }
 
-  56% {
+  80% {
     filter: brightness(1);
     box-shadow: 0 0 0 rgba(255, 255, 255, 0);
   }
 
-  /* 56-62% = original 90-100% (quick glow up) */
-  62% {
+  85% {
     filter: brightness(1.7);
     box-shadow: 0 0 20px var(--lyrics-color-active);
   }
 
-  /* 62-100% = NEW fade phase (glow fades slowly) */
   100% {
     filter: brightness(1);
     box-shadow: 0 0 0 rgba(255, 255, 255, 0);
@@ -1371,10 +1368,18 @@ div.lyrics-tabBar-headerItemLink {
   }
 }
 
-.lyrics-idling-indicator.lyrics-idling-indicator-exiting
-  .lyrics-idling-indicator__circle,
-.lyrics-idling-indicator-hidden .lyrics-idling-indicator__circle {
-  animation: idlingDrop 0.5s cubic-bezier(0.4, 0, 0.6, 1) forwards !important;
+.lyrics-idling-indicator.lyrics-idling-indicator-exiting .lyrics-idling-indicator__circle:nth-child(1) {
+  animation: idlingDrop 0.4s cubic-bezier(0.4, 0, 0.6, 1) 0s forwards !important;
+  pointer-events: none;
+}
+
+.lyrics-idling-indicator.lyrics-idling-indicator-exiting .lyrics-idling-indicator__circle:nth-child(2) {
+  animation: idlingDrop 0.4s cubic-bezier(0.4, 0, 0.6, 1) 0.12s forwards !important;
+  pointer-events: none;
+}
+
+.lyrics-idling-indicator.lyrics-idling-indicator-exiting .lyrics-idling-indicator__circle:nth-child(3) {
+  animation: idlingDrop 0.4s cubic-bezier(0.4, 0, 0.6, 1) 0.24s forwards !important;
   pointer-events: none;
 }
 
