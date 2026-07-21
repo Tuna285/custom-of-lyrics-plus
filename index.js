@@ -531,7 +531,8 @@ class LyricsContainer extends react.Component {
 		if (tempState.uri !== this.state.uri || refresh) {
 			// when a song starts for the first time and language-override is selected, the lyrics are converted to the specified language.
 			// however, when switching it off again, the detected language needs to be known, so defaultLanguage has been introduced.
-			const defaultLanguage = Utils.detectLanguage(this.state.currentLyrics);
+			const newLyrics = tempState.synced || tempState.unsynced || tempState.genius || [];
+			const defaultLanguage = Utils.detectLanguage(newLyrics);
 			const language =
 				CONFIG.visual["translate:detect-language-override"] !== "off" ? CONFIG.visual["translate:detect-language-override"] : defaultLanguage;
 			const friendlyLanguage = language && new Intl.DisplayNames(["en"], { type: "language" }).of(language.split("-")[0])?.toLowerCase();
@@ -539,7 +540,7 @@ class LyricsContainer extends react.Component {
 
 			const isMemory = CACHE[tempState.uri]?.[targetConvert];
 			if (CONFIG.visual.translate && defaultLanguage && !isMemory) {
-				this.translateLyrics(language, this.state.currentLyrics, targetConvert).then((translated) => {
+				this.translateLyrics(language, newLyrics, targetConvert).then((translated) => {
 					const res = { [targetConvert]: translated };
 					// Cache translated lyrics
 					CACHE[tempState.uri] = { ...CACHE[tempState.uri], ...res };
