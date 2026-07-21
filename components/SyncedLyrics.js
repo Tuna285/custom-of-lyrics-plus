@@ -26,23 +26,19 @@ const isNoteLineObject = (line) => {
 // All providers (Spotify, LRCLIB, Musixmatch synced) only give startTime per line.
 // We must estimate when each line actually finishes singing using char count + a per-song tempo.
 const DEFAULT_MS_PER_CHAR = 120;
-const MIN_LINE_DUR = 3000;
+const MIN_LINE_DUR = 2800;
 // Grace period: keep "♪" hidden for this long after the estimated line end,
 // so it doesn't pop in while a held note is still ringing out.
-const IDLE_GRACE_MS = 2000;
+const IDLE_GRACE_MS = 1500;
 // Minimum time the "♪" must remain visible before the next lyric, otherwise skip it.
-// Increased from 2s -> 4s to prevent fast, flashing dots on short pauses.
-const IDLE_MIN_VISIBLE_MS = 4000;
+// Set to 5s to guarantee comfortable, unhurried 3-dot animation without fast flashing.
+const IDLE_MIN_VISIBLE_MS = 5000;
 // Minimum raw interval between consecutive lines before we'll even consider inserting "♪".
-// Raised from 7s -> 10s: True musical instrumental breaks are almost always >=10s.
-// This completely eliminates indicators popping up between standard slow-paced lines.
-const GAP_THRESHOLD_MIN = 10000;
+// Raised to 8.5s: True musical instrumental breaks are >= 8.5s.
+const GAP_THRESHOLD_MIN = 8500;
 const GAP_THRESHOLD_MAX = 16000;
-// Safety floor: even if char-estimate says the line ended at 500ms, assume the singer held
-// the line for at least this fraction of the interval to the next line. Prevents premature
-// "♪" pop-in on lines with short lyrics but long held notes.
-// Increased from 0.75 -> 0.82 to prevent premature pop-in on slow tracks.
-const LINE_END_INTERVAL_FLOOR_RATIO = 0.82;
+// Safety floor ratio: assume singer holds line for at most this fraction of the interval.
+const LINE_END_INTERVAL_FLOOR_RATIO = 0.78;
 const INTRO_THRESHOLD_MIN = 3000;
 const INTRO_THRESHOLD_MAX = 8000;
 
@@ -52,7 +48,7 @@ const computeTimingStats = (lyrics) => {
     const fallback = {
         msPerChar: DEFAULT_MS_PER_CHAR,
         avgLineDur: 4000,
-        gapThreshold: 7000,
+        gapThreshold: 8500,
         introThreshold: 5000,
     };
     if (!Array.isArray(lyrics) || lyrics.length < 2) return fallback;
@@ -88,7 +84,7 @@ const computeTimingStats = (lyrics) => {
     const avgLineDur = median(consecutiveDurs);
 
     // Fast songs flag pauses sooner; slow songs need longer pauses to feel idle.
-    const gapThreshold = Math.min(GAP_THRESHOLD_MAX, Math.max(GAP_THRESHOLD_MIN, avgLineDur * 2));
+    const gapThreshold = Math.min(GAP_THRESHOLD_MAX, Math.max(GAP_THRESHOLD_MIN, avgLineDur * 1.8));
     const introThreshold = Math.min(INTRO_THRESHOLD_MAX, Math.max(INTRO_THRESHOLD_MIN, avgLineDur * 1.5));
 
     return { msPerChar, avgLineDur, gapThreshold, introThreshold };
@@ -165,11 +161,8 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
 
             if (currentLine && nextLine && currentLine.startTime && nextLine.startTime) {
                 const interval = nextLine.startTime - currentLine.startTime;
-                // Primary gate: raw interval between lines must exceed the per-song gap threshold.
-                // This replaces the old (interval - estDur) check which could trigger on lines
-                // that were actually still being sung (char-count underestimating held notes).
                 const canInsert =
-                    interval > timingStats.gapThreshold &&
+                    interval >= timingStats.gapThreshold &&
                     !isNoteLineObject(currentLine) &&
                     !isNoteLineObject(nextLine);
 
@@ -177,19 +170,13 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                     const estDur = estimateLineDuration(currentLine, timingStats);
                     const text = currentLine.originalText || currentLine.text || "";
                     const len = typeof text === "string" ? text.trim().length : 0;
-                    // Dynamic safety floor ratio based on character length.
-                    // Short lines (ad-libs, held vowels like "Ooh", "Yeah", "Ah") have highly unreliable
-                    // durations and are often held much longer. We apply a stricter ratio floor.
-                    const ratio = len < 10 ? 0.90 : len < 20 ? 0.86 : LINE_END_INTERVAL_FLOOR_RATIO;
+                    const ratio = len < 10 ? 0.85 : len < 20 ? 0.78 : LINE_END_INTERVAL_FLOOR_RATIO;
 
-                    // Safety: even if char-estimate says the line ends very early, assume the
-                    // singer held it for at least `ratio` of the interval, capped at 2.0x of estimated dur
-                    // to keep the indicator functional on long instrumental breaks.
                     const lineEnd = currentLine.startTime + Math.min(
                         Math.max(estDur, interval * ratio),
-                        estDur * 2.0
+                        nextLine.startTime - 6000
                     );
-                    const insertTime = lineEnd + IDLE_GRACE_MS;
+                    const insertTime = Math.max(lineEnd + IDLE_GRACE_MS, currentLine.startTime + estDur + 1000);
                     if (nextLine.startTime - insertTime >= IDLE_MIN_VISIBLE_MS) {
                         processed.push({
                             text: "♪",
@@ -342,7 +329,8 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                         nextStartTime = lyricWithEmptyLines[currentFullIndex + 1].startTime;
                     }
 
-                    const duration = nextStartTime - startTime;
+                    const rawDuration = nextStartTime - startTime;
+                    const duration = Math.max(rawDuration, 5000);
                     const elapsed = position - startTime;
                     const progress = Math.min(Math.max(elapsed / duration, 0), 1);
 
@@ -621,7 +609,8 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
                     nextStartTime = padded[i + 1].startTime;
                 }
 
-                const duration = nextStartTime - startTime;
+                const rawDuration = nextStartTime - startTime;
+                const duration = Math.max(rawDuration, 5000);
                 const elapsed = position - startTime;
                 const progress = Math.min(Math.max(elapsed / duration, 0), 1);
 
