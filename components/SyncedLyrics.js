@@ -350,6 +350,12 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                     return null;
                 }
 
+                let lineInterval = 4000;
+                if (i < activeLines.length - 1 && activeLines[i + 1]?.startTime && startTime) {
+                    lineInterval = activeLines[i + 1].startTime - startTime;
+                }
+                const lineDurationSec = `${Math.min(0.60, Math.max(0.20, (lineInterval * 0.08) / 1000)).toFixed(2)}s`;
+
                 return react.createElement(
                     "div",
                     {
@@ -359,6 +365,7 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                             "--position-index": animationIndex,
                             "--animation-index": (animationIndex < 0 ? 0 : animationIndex) + 1,
                             "--blur-index": Math.abs(animationIndex),
+                            "--line-transition-duration": lineDurationSec,
                         },
                         dir: "auto",
                         ref,
@@ -645,6 +652,12 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
                 return null;
             }
 
+            let lineInterval = 4000;
+            if (i < activeLines.length - 1 && activeLines[i + 1]?.startTime && startTime) {
+                lineInterval = activeLines[i + 1].startTime - startTime;
+            }
+            const lineDurationSec = `${Math.min(0.60, Math.max(0.20, (lineInterval * 0.08) / 1000)).toFixed(2)}s`;
+
             return react.createElement(
                 "div",
                 {
@@ -654,6 +667,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
                         "--position-index": animationIndex,
                         "--animation-index": (animationIndex < 0 ? 0 : animationIndex) + 1,
                         "--blur-index": Math.abs(animationIndex),
+                        "--line-transition-duration": lineDurationSec,
                     },
                     dir: "auto",
                     ref,
