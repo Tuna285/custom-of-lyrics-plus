@@ -437,68 +437,18 @@ const TranslatingIndicatorRow = react.memo(
         isVisible,
         status,
         text = getText("ui.translating"),
-        hasReasoningText = false,
-        onReasoningClick,
-        isReasoningOpen = false,
     }) => {
         const showPill = isVisible || !!status;
-        // Keep brain button persistent so user can view Song Insights & Reasoning anytime!
-        const showBrain = true;
+        if (!showPill) return null;
 
         return react.createElement(
             "div",
             { className: "lyrics-translating-indicator-row" },
-            showPill &&
-                react.createElement(TranslatingIndicator, {
-                    isVisible,
-                    status,
-                    text,
-                }),
-            showBrain &&
-                react.createElement(
-                    "div",
-                    {
-                        role: "button",
-                        tabIndex: 0,
-                        className: `lyrics-reasoning-icon-btn${isReasoningOpen ? " is-open" : ""}${isVisible && !hasReasoningText ? " is-pending" : ""}`,
-                        title: getText("tooltips.viewReasoning"),
-                        "aria-label": getText("tooltips.viewReasoning"),
-                        "aria-expanded": !!isReasoningOpen,
-                        // Fire on pointerdown so Electron drag/hover overlays can't swallow the click
-                        onPointerDown: (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            try { onReasoningClick && onReasoningClick(); } catch (_) {}
-                        },
-                        onClick: (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                        },
-                        onKeyDown: (e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                try { onReasoningClick && onReasoningClick(); } catch (_) {}
-                            }
-                        },
-                    },
-                    react.createElement(
-                        "svg",
-                        {
-                            width: 16,
-                            height: 16,
-                            viewBox: "0 0 24 24",
-                            fill: "none",
-                            stroke: "currentColor",
-                            strokeWidth: 2,
-                            strokeLinecap: "round",
-                            strokeLinejoin: "round",
-                            "aria-hidden": true,
-                            style: { pointerEvents: "none" },
-                        },
-                        ...REASONING_ICON_PATHS.map((d, i) => react.createElement("path", { key: i, d }))
-                    )
-                )
+            react.createElement(TranslatingIndicator, {
+                isVisible,
+                status,
+                text,
+            })
         );
     }
 );
