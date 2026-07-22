@@ -165,7 +165,8 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                 const silentDuration = nextLine.startTime - (currentLine.startTime + estDur);
 
                 const canInsert =
-                    silentDuration >= 4500 &&
+                    interval >= timingStats.gapThreshold &&
+                    silentDuration >= 6500 &&
                     !isNoteLineObject(currentLine) &&
                     !isNoteLineObject(nextLine);
 
