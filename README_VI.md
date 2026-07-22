@@ -5,7 +5,9 @@
 
 [![Ko-fi](https://img.shields.io/badge/Donate-Ko--fi-F16061?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/gunjoutuna)
 
+<img width="800" height="800" alt="image" src="https://github.com/user-attachments/assets/32e85501-567d-4896-a7e4-bb4b098a30a6" />
 
+---
 
 > Phiên bản tùy chỉnh của **Lyrics Plus** dành cho Spicetify, tập trung vào dịch lời bài hát chất lượng cao, tối ưu cho người dùng Việt Nam. Kết nối tới mọi endpoint LLM tương thích OpenAI — Google Gemini/Gemma, OpenRouter, OpenAI, DeepSeek, Anthropic Claude, hoặc Ollama local.
 
@@ -32,8 +34,7 @@ Kết nối tới mọi endpoint LLM tương thích OpenAI (Google Gemini/Gemma,
 
 | Tiếng Nhật → Romaji | Tiếng Hàn → Romaja | Tiếng Trung → Pinyin |
 | ------------------- | ------------------ | -------------------- |
-|                     |                    |                      |
-
+|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/e9b7f1f5-0c3c-474d-8fe1-8e2e37552bfb" />|<img width="1919" height="1018" alt="image" src="https://github.com/user-attachments/assets/e8b56a5e-621e-420f-be68-ffc69e3236c1" />|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/a9e36436-9027-4fbe-a31d-2ffc27d97574" />|
 
 ### 2. Mini Lyrics trong Picture-in-Picture
 
@@ -42,6 +43,8 @@ Inject lời bài hát đồng bộ trực tiếp vào mini player Picture-in-Pi
 ### 3. Nền video động
 
 Tự động lấy MV YouTube làm nền động cho trang lyrics. Tùy chỉnh scale, dim, blur — kết hợp đẹp với chế độ trong suốt và mọi theme Spicetify.
+
+<img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/51520969-7a8f-44e5-bf70-3262e9d658c7" />
 
 ### 4. Giao diện hiện đại & Trải nghiệm tối ưu
 
@@ -62,7 +65,7 @@ Cài đặt Spicetify:
 iwr -useb https://raw.githubusercontent.com/spicetify/cli/main/install.ps1 | iex
 ```
 
-### - Cài đặt nhanh (Khuyên dùng)
+### Quick Install (Khuyên dùng)
 
 Mở **PowerShell** và chạy lệnh:
 
@@ -76,65 +79,62 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/i
 iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/uninstall.ps1 | iex
 ```
 
-### - Cài đặt thủ công
+### Cài đặt thủ công
 
-1. Tải xuống và giải nén file .zip này
-  Download
-2. Sao chép thư mục `lyrics-plus` vào thư mục CustomApps của Spicetify:
-  - **Windows:** `%LocalAppData%\spicetify\CustomApps`
-  - **MacOS/Linux:** `~/.config/spicetify/CustomApps`
-  - 
-3. Mở terminal:
-  ```bash
+1. Tải về và giải nén repository này
+2. Copy thư mục `lyrics-plus` vào thư mục CustomApps của Spicetify:
+   - **Windows:** `%LocalAppData%\spicetify\CustomApps`
+   - **MacOS/Linux:** `~/.config/spicetify/CustomApps`
+
+<img width="498" height="367" alt="image" src="https://github.com/user-attachments/assets/31a5b810-ee06-447d-91f4-1e463a601dee" />
+
+3. Chạy trong terminal:
+   ```bash
    spicetify config custom_apps lyrics-plus
    spicetify apply
-  ```
+   ```
 
 ---
 
 ## Cấu hình
 
-1. Mở Spotify, nhấp vào avatar của bạn → **Lyric Plus Translate config**
-2. Vào tab **Translation** và điền:
-  - **API Endpoint** — chọn preset (Gemini/Gemma, OpenRouter, OpenAI, DeepSeek, Claude, Ollama) hoặc dán URL OpenAI-compatible bất kỳ.
-  - **Model Name** — chọn từ dropdown gợi ý hoặc nhập tên model tùy ý.
-  - **API Key** — key của provider (lấy free tại [Google AI Studio](https://aistudio.google.com/)). Hỗ trợ tối đa 2 key luân phiên.
-  - **Response Format** — *Prompt Engineering* (chạy mọi model) hoặc *JSON Schema* (tự fallback về Prompt Engineering nếu model không hỗ trợ).
-  - **Pre-translation** — bật/tắt + chọn thời gian (số giây trước khi bài hiện tại kết thúc để bắt đầu dịch bài kế).
-3. Di chuột qua lời bài hát và nhấp icon dịch (⇄) để tùy chỉnh **Display Mode**, **Translation Style**, và **Pronoun**.
-4. *(Tùy chọn)* Nhấn `Ctrl+Shift+M` khi đang phát nhạc để bật/tắt Mini Lyrics trong Picture-in-Picture.
+1. Mở Spotify, click vào avatar của bạn → **Cấu hình Lyric Plus Translate**
+2. Chuyển sang tab **Dịch thuật** và điền:
+   - **API Endpoint** — chọn preset (Gemini/Gemma, OpenRouter, OpenAI, DeepSeek, Claude, Ollama) hoặc dán URL tùy ý tương thích OpenAI.
+   - **Tên Model** — chọn từ dropdown có sẵn hoặc tự gõ tên model.
+   - **API Key** — key của provider (lấy free tại [Google AI Studio](https://aistudio.google.com/)). Hỗ trợ tối đa 2 key để xoay vòng round-robin.
+   - **Định dạng Response** — *Prompt Engineering* (chạy trên mọi model) hoặc *JSON Schema* (tự fallback về Prompt Engineering nếu model không hỗ trợ).
+   - **Pre-translation** — bật/tắt và chọn thời gian dịch trước (bao nhiêu giây trước khi bài hiện tại kết thúc thì bắt đầu dịch bài kế tiếp).
+3. Di chuột lên lyric và click icon dịch (⇄) để tùy chỉnh **Chế độ hiển thị**, **Phong cách dịch**, và **Đại từ**.
+4. *(Tùy chọn)* Bấm `Ctrl+Shift+M` khi đang phát nhạc để bật/tắt Mini Lyrics trong Picture-in-Picture.
 
 ---
 
-## Ngôn ngữ hỗ trợ
+## Hỗ trợ ngôn ngữ
 
-### Chế độ Local (Kuromoji, Aromanize, OpenCC)
+### Chế độ Cục bộ (Kuromoji, Aromanize, OpenCC)
 
+| Ngôn ngữ gốc       | Chế độ hiển thị 1               | Chế độ hiển thị 2 |
+| ------------------ | ------------------------------- | ----------------- |
+| Tiếng Nhật (日本語) | Romaji, Hiragana, Katakana      | —                 |
+| Tiếng Hàn (한국어)   | Romaja                          | —                 |
+| Tiếng Trung (中文)  | Pinyin, Giản thể, Phồn thể      | —                 |
 
-| Ngôn ngữ nguồn   | Display Mod 1              | Display Mod 2 |
-| ---------------- | -------------------------- | ------------- |
-| Tiếng Nhật (日本語) | Romaji, Hiragana, Katakana | -             |
-| Tiếng Hàn (한국어)  | Romaja                     | -             |
-| Tiếng Trung (中文) | Pinyin, Giản thể, Phồn thể | -             |
+### Chế độ AI (LLM Translation)
 
-
-### Chế độ AI (Dịch bằng LLM)
-
-
-| Ngôn ngữ nguồn   | Display Mod 1              | Display Mod 2 |
-| ---------------- | -------------------------- | ------------- |
-| Tiếng Nhật (日本語) | Romaji (AI), bao gồm Local | Tiếng Việt    |
-| Tiếng Hàn (한국어)  | Romaja (AI), bao gồm Local | Tiếng Việt    |
-| Tiếng Trung (中文) | Pinyin (AI), bao gồm Local | Tiếng Việt    |
-| Khác             | -                          | Tiếng Việt    |
-
+| Ngôn ngữ gốc       | Chế độ hiển thị 1               | Chế độ hiển thị 2 |
+| ------------------ | ------------------------------- | ----------------- |
+| Tiếng Nhật (日本語) | Romaji (AI), gồm Chế độ cục bộ  | Tiếng Việt        |
+| Tiếng Hàn (한국어)   | Romaja (AI), gồm Chế độ cục bộ  | Tiếng Việt        |
+| Tiếng Trung (中文)  | Pinyin (AI), gồm Chế độ cục bộ  | Tiếng Việt        |
+| Ngôn ngữ khác      | —                               | Tiếng Việt        |
 
 ---
 
-## Credits
+## Tác giả & Ghi danh
 
-- Bản gốc [lyrics-plus](https://github.com/spicetify/cli/tree/main/CustomApps/lyrics-plus) bởi nhóm Spicetify
-- Dịch thuật được hỗ trợ bởi mọi LLM tương thích OpenAI (Google Gemini/Gemma, OpenRouter, OpenAI, DeepSeek, Anthropic, Ollama, ...)
+- Bản gốc [lyrics-plus](https://github.com/spicetify/cli/tree/main/CustomApps/lyrics-plus) phát triển bởi đội ngũ Spicetify
+- Dịch thuật vận hành bởi các LLM tương thích OpenAI (Google Gemini/Gemma, OpenRouter, OpenAI, DeepSeek, Anthropic, Ollama, …)
 - Phiên âm: [Kuroshiro](https://github.com/hexenq/kuroshiro), [Aromanize](https://github.com/fujaru/aromanize-js), [OpenCC](https://github.com/BYVoid/OpenCC)
 
 ---
@@ -153,4 +153,4 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 
 ---
 
-*Dự án này đang được phát triển. Vui lòng báo cáo bất kỳ lỗi cũng như đề xuất tính năng và vấn đề nào!*
+*Dự án đang trong quá trình phát triển tích cực. Nếu gặp lỗi vui lòng báo cáo tại mục Issues!*
