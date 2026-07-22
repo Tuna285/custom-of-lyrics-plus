@@ -165,8 +165,7 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                 const silentDuration = nextLine.startTime - (currentLine.startTime + estDur);
 
                 const canInsert =
-                    interval >= Math.max(10500, timingStats.gapThreshold) &&
-                    silentDuration >= 6000 &&
+                    silentDuration >= 4500 &&
                     !isNoteLineObject(currentLine) &&
                     !isNoteLineObject(nextLine);
 
@@ -454,7 +453,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
                 const interval = nextLine.startTime - currentLine.startTime;
                 // Auto-gap detector with adaptive threshold + grace period.
                 const canInsert =
-                    interval >= Math.max(10500, timingStats.gapThreshold) &&
+                    silentDuration >= 4500 &&
                     !isNoteLineObject(currentLine) &&
                     !isNoteLineObject(nextLine);
 
