@@ -612,17 +612,15 @@ const TranslationStatusOverlay = ({
     const node = react.createElement(
         "div",
         { className: "lyrics-translation-status-stack", style },
-        react.createElement(TranslatingIndicatorRow, {
+        react.createElement(TranslatingIndicatorRowCombined, {
             isVisible,
             status,
+            preTranslateChip,
+            currentUri,
+            preTranslateEnabled,
             hasReasoningText,
             onReasoningClick,
             isReasoningOpen,
-        }),
-        react.createElement(PreTranslateChip, {
-            chip: preTranslateChip,
-            currentUri,
-            enabled: !!preTranslateEnabled,
         })
     );
     return reactDOMRef.createPortal(node, document.body);
@@ -638,7 +636,6 @@ window.TranslationStatusOverlay = TranslationStatusOverlay;
  *  - Initial position: anchored just under the brain icon (top-right of lyrics area)
  */
 const REASONING_TAB_LABELS = {
-    insights: () => getText("ui.reasoningTabInsights") || "Ý nghĩa bài hát",
     translation: () => getText("ui.reasoningTabTranslation") || "Translation",
     phonetic: () => getText("ui.reasoningTabPhonetic") || "Phonetic",
 };
@@ -675,7 +672,7 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
         };
 
         const handleClear = () => {
-            setStreams({ insights: "", translation: "", phonetic: "" });
+            setStreams({ translation: "", phonetic: "" });
             setIsStreaming(false);
             setActiveTab(null);
         };
@@ -686,10 +683,7 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
 
         // Synchronize state with current global values on open
         if (window.LyricsPlus) {
-            setStreams((prev) => ({
-                insights: prev.insights || "",
-                ...(window.LyricsPlus.currentReasoning || { translation: "", phonetic: "" })
-            }));
+            setStreams(window.LyricsPlus.currentReasoning || { translation: "", phonetic: "" });
             setIsStreaming(!!window.LyricsPlus.isReasoningStreaming);
         }
 
@@ -700,84 +694,18 @@ const ReasoningWindow = ({ open, streams: propStreams, activeTab: propActiveTab,
         };
     }, [open]);
 
-    const fetchedTrackUriRef = useRef(null);
-    const isFetchingRef = useRef(false);
+    // Available tabs based on active streams
+    const availableTabs = useMemo(() => {
+        const tabs = [];
+        if (streams?.translation) tabs.push("translation");
+        if (streams?.phonetic) tabs.push("phonetic");
+        return tabs;
+    }, [streams]);
 
-    // Auto-fetch song insights via Google Search when modal opens (ONCE per track)
-    useEffect(() => {
-        if (!open) return;
-
-        const trackItem = Spicetify.Player?.data?.item || Spicetify.Player?.data?.track;
-        const trackUri = trackItem?.uri || Spicetify.Player?.data?.uri || "";
-        const artist = trackItem?.metadata?.artist_name
-                    || trackItem?.artists?.[0]?.name
-                    || (typeof Spicetify.Player?.getArtist === "function" ? Spicetify.Player.getArtist() : "")
-                    || "";
-        const title = trackItem?.metadata?.title
-                   || trackItem?.name
-                   || (typeof Spicetify.Player?.getName === "function" ? Spicetify.Player.getName() : "")
-                   || "";
-
-        const trackIdentifier = trackUri || (artist && title ? `${artist}-${title}` : "");
-
-        // Reset fetch ref if user changed tracks
-        if (trackIdentifier && fetchedTrackUriRef.current && fetchedTrackUriRef.current !== trackIdentifier) {
-            fetchedTrackUriRef.current = null;
-            isFetchingRef.current = false;
-        }
-
-        // Fetch ONCE per track
-        if (trackIdentifier && fetchedTrackUriRef.current !== trackIdentifier && !isFetchingRef.current) {
-            isFetchingRef.current = true;
-
-            let apiKeys = [];
-            try {
-                const rawKeys = (typeof ConfigUtils !== "undefined" && ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-keys"))
-                             || (CONFIG?.visual?.["gemini-api-keys"]);
-                apiKeys = JSON.parse(rawKeys || "[]");
-                if (!Array.isArray(apiKeys) || apiKeys.length === 0) {
-                    const single = (typeof ConfigUtils !== "undefined" && ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key"))
-                                || (CONFIG?.visual?.["gemini-api-key"]);
-                    if (single) apiKeys = [single];
-                }
-            } catch (e) {}
-
-            if (artist && title && apiKeys.length > 0 && window.GeminiClient?.fetchSongInsights) {
-                const lyricsState = window.lyricContainer?.state;
-                const currentLyrics = lyricsState?.currentLyrics || lyricsState?.synced || lyricsState?.unsynced || [];
-                const lyricsText = Array.isArray(currentLyrics)
-                    ? currentLyrics.map((l) => l.originalText || l.text || "").filter(Boolean).slice(0, 35).join("\n")
-                    : "";
-
-                setStreams((prev) => ({ ...prev, insights: getText("ui.insightsLoading") || "Đang dùng Google Search tra cứu ý nghĩa bài hát & từ lóng…" }));
-                window.GeminiClient.fetchSongInsights({ artist, title, lyricsText, apiKeys })
-                    .then((res) => {
-                        fetchedTrackUriRef.current = trackIdentifier;
-                        setStreams((prev) => ({ ...prev, insights: res.text }));
-                    })
-                    .catch((err) => {
-                        setStreams((prev) => ({ ...prev, insights: `Lỗi tra cứu: ${err.message}` }));
-                    })
-                    .finally(() => {
-                        isFetchingRef.current = false;
-                    });
-            } else if (apiKeys.length === 0) {
-                setStreams((prev) => ({ ...prev, insights: getText("ui.insightsKeyMissing") || "Vui lòng nhập Gemini API Key trong Settings để dùng tính năng tra cứu." }));
-                isFetchingRef.current = false;
-            } else if (!artist || !title) {
-                setStreams((prev) => ({ ...prev, insights: getText("ui.insightsNoTrack") || "Không lấy được thông tin bài hát từ Spotify." }));
-                isFetchingRef.current = false;
-            }
-        }
-    }, [open]);
-
-    // Always show all 3 tabs: insights (default), translation, phonetic
-    const availableTabs = useMemo(() => ["insights", "translation", "phonetic"], []);
-
-    // Effective active tab — fall back to insights
+    // Effective active tab
     const effectiveTab = useMemo(() => {
         if (activeTab && availableTabs.includes(activeTab)) return activeTab;
-        return "insights";
+        return availableTabs[0] || null;
     }, [activeTab, availableTabs]);
 
     // Auto-focus the first tab that gets content if no tab is active

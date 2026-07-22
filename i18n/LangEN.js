@@ -96,10 +96,6 @@ window.LANG_EN = {
       "label": "Phonetic Model",
       "desc": "LLM model for generating Romaji/Furigana. Use a light, fast model (e.g. gemini-3.5-flash-lite) to save premium quota."
     },
-    "insightsModelName": {
-      "label": "Song Insights & Search Model",
-      "desc": "LLM model used to search song background, lore, and slang via Google Search (Default: gemini-3.5-flash-lite)."
-    },
     "apiKeys": {
       "label": "Gemini API Keys",
       "desc": "Add multiple keys to auto-rotate and avoid rate limits."

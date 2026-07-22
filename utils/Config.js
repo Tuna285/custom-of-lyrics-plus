@@ -152,7 +152,6 @@ const CONFIG = {
             }
             return val;
         })(),
-        "gemini:insights-model": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:insights-model") || "gemini-3.5-flash-lite",
         "gemini:response-mode": ConfigUtils.getPersisted("lyrics-plus:visual:gemini:response-mode") || "json_schema",
         // Reasoning effort: "off" | "low" | "medium" | "high"
         // Migration from legacy boolean `gemini:disable-thinking`:
