@@ -1,1 +1,21 @@
+# OS Junk Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor & IDE Configs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node & Package Logs
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Scratch & Testing Logs
 scratch/
+*.log
+.gemini/

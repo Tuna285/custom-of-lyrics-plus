@@ -4,7 +4,7 @@ const UpdateService = {
     VERSION_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/version.json",
     RAW_BASE_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main",
     INSTALL_COMMAND: "iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/install.ps1 | iex",
-    CURRENT_VERSION: "1.7.0",
+    CURRENT_VERSION: "1.8.0",
     CHECK_INTERVAL: 0,
 
     UPDATE_FILES: [
@@ -12,9 +12,10 @@ const UpdateService = {
         "utils/Namespace.js", "utils/Utils.js", "utils/Config.js", "utils/Cache.js", "utils/Prompts.js", "utils/TranslationUtils.js",
         "i18n/I18n.js", "i18n/LangEN.js", "i18n/LangVI.js", "i18n/LangKO.js", "i18n/LangJA.js", "i18n/LangZH.js",
         "parsers/LRCParser.js",
-        "services/AdBlocker.js", "services/IDBCache.js", "services/LyricsFetcher.js", "services/GeminiClient.js", "services/Translator.js", "services/UpdateService.js",
-        "components/Components.js", "components/SyncedLyrics.js", "components/UnsyncedLyrics.js", "components/TabBar.js", "components/Settings.js", "components/OptionsMenu.js", "components/PlaybarButton.js", "components/MiniLyrics.js", "components/VideoBackground.js", "components/VideoManager.js",
+        "services/AdBlocker.js", "services/IDBCache.js", "services/LyricsFetcher.js", "services/GeminiClient.js", "services/Translator.js", "services/TranslationCoordinator.js", "services/UpdateService.js",
+        "components/Components.js", "components/SyncedLyrics.js", "components/UnsyncedLyrics.js", "components/TabBar.js", "components/Settings.js", "components/OptionsMenu.js", "components/PlaybarButton.js", "components/MiniLyrics.js", "components/VideoBackground.js", "components/VideoManager.js", "components/VideoSettingsModal.js",
         "providers/ProviderLRCLIB.js", "providers/ProviderMusixmatch.js", "providers/ProviderNetease.js", "providers/Providers.js",
+        "assets/libs/kuroshiro.min.js", "assets/libs/kuroshiro-analyzer-kuromoji.min.js", "assets/libs/aromanize.min.js", "assets/libs/opencc.min.js", "assets/libs/pinyin-pro.min.js",
         "assets/preview.gif"
     ],
 
