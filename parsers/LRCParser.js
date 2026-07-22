@@ -92,7 +92,26 @@ const LRCParser = {
         }
 
         // Sort lyrics by time to prevent order issues
-        if (synced) synced.sort((a, b) => a.startTime - b.startTime);
+        if (synced) {
+            synced.sort((a, b) => a.startTime - b.startTime);
+            // Safe clean: only clean dummy provider lines if track is not instrumental (has > 2 lines)
+            if (synced.length > 2) {
+                const cleanedSynced = synced.filter((line, i) => {
+                    if (!line || typeof line.text !== 'string') return false;
+                    const trimmed = line.text.trim();
+                    if (trimmed === "" || trimmed === "♪") {
+                        const next = synced[i + 1];
+                        if (next && (next.startTime - line.startTime) < 9000) {
+                            return false;
+                        }
+                    }
+                    return true;
+                });
+                if (cleanedSynced.length > 0) {
+                    synced = cleanedSynced;
+                }
+            }
+        }
 
         return { synced, unsynced, karaoke };
     },

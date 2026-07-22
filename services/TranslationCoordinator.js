@@ -420,12 +420,17 @@ window.LyricsPlus.TranslationCoordinator = {
 
 		// Await Cache (L1 -> L2 logic inside CacheManager)
 		const cached = await CacheManager.get(cacheKey2);
-		if (cached) {
-			if (silent) {
-				const u = lyricsState.uri;
-				queueMicrotask(() => this._maybeClearPretranslateChip(self, u));
+		if (cached && Array.isArray(cached)) {
+			if (cached.length !== lyrics.length) {
+				console.warn(`[Lyrics+] Cache length mismatch! Cached: ${cached.length}, Current lyrics: ${lyrics.length}. Invalidating stale cache.`);
+				await CacheManager.delete(cacheKey2);
+			} else {
+				if (silent) {
+					const u = lyricsState.uri;
+					queueMicrotask(() => this._maybeClearPretranslateChip(self, u));
+				}
+				return cached;
 			}
-			return cached;
 		}
 
 		// --- 3. IN-FLIGHT DEDUPLICATION ---
@@ -678,9 +683,14 @@ window.LyricsPlus.TranslationCoordinator = {
 
 		// Await Cache
 		const cached = await CacheManager.get(cacheKey);
-		if (cached) {
-			if (window.lyricsPlusDebug) console.log("[Lyrics+] getTraditionalConversion - CACHE HIT, returning cached");
-			return mergeTiming(cached);
+		if (cached && Array.isArray(cached)) {
+			if (cached.length !== lyrics.length) {
+				console.warn(`[Lyrics+] Trad cache length mismatch! Cached: ${cached.length}, Current lyrics: ${lyrics.length}. Invalidating stale cache.`);
+				await CacheManager.delete(cacheKey);
+			} else {
+				if (window.lyricsPlusDebug) console.log("[Lyrics+] getTraditionalConversion - CACHE HIT, returning cached");
+				return mergeTiming(cached);
+			}
 		}
 
 		// De-duplicate concurrent calls
