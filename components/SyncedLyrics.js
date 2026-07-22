@@ -200,8 +200,8 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                 }
                 const durationToNext = nextRealLine ? (nextRealLine.startTime - current.startTime) : 0;
 
-                // Drop short note lines (< 3000ms) so previous real lyric line holds continuously
-                if (durationToNext > 0 && durationToNext < 3000 && nextRealLine) {
+                // Drop short note lines (< 9000ms) so previous real lyric line holds continuously
+                if (durationToNext > 0 && durationToNext < 9000 && nextRealLine) {
                     continue;
                 }
 
@@ -488,6 +488,21 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
 
             // Use isNoteLineObject to properly detect notes after translation
             if (isNoteLineObject(current)) {
+                // Find next non-note line to determine duration
+                let nextRealLine = null;
+                for (let j = i + 1; j < processed.length; j++) {
+                    if (!isNoteLineObject(processed[j])) {
+                        nextRealLine = processed[j];
+                        break;
+                    }
+                }
+                const durationToNext = nextRealLine ? (nextRealLine.startTime - current.startTime) : 0;
+
+                // Drop short note lines (< 9000ms) so previous real lyric line holds continuously
+                if (durationToNext > 0 && durationToNext < 9000 && nextRealLine) {
+                    continue;
+                }
+
                 // Look-back Merge Strategy:
                 // Check if the current note should be merged with a previous note (ignoring empty lines).
                 // This handles cases where auto-generated notes and original source notes are separated by artifacts.
@@ -506,10 +521,6 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
                 }
 
                 if (lastNonEmptyIndex >= 0 && isNoteLineObject(merged[lastNonEmptyIndex])) {
-                    // 2. If the last real item was ALSO a note, merge them.
-                    // We do this by removing all intermediate empty lines (truncating the array)
-                    // and skipping the addition of the current note (continue).
-                    // This effectively extends the duration of the previous note to cover this one.
                     merged.length = lastNonEmptyIndex + 1;
                     continue; // Skip adding current note
                 }
