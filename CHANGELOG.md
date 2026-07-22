@@ -9,24 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Safe Origin Lyric Cleaning** — Integrated a 4-layer safe dummy line filtering algorithm directly in `LRCParser.js` origin parsing to eliminate provider noise lines without altering 1-to-1 array indices.
-- **Automatic Stale Cache Invalidation** — Automatically detects and purges stale IndexedDB cache entries whenever line counts mismatch (`cached.length !== lyrics.length`), preventing line-shifts and Romaji dropping.
-- **Idling Indicator Staggered Wave & Dynamic Tempo** — Implemented smooth dot scale growth ($0.4 \rightarrow 0.75$), upward rise ($\text{translateY}(-5\text{px})$), and peak glow halo at 85% with staggered drop delays (`0s`, `0.12s`, `0.24s`), plus Option B `idlingIdleWave` (+5px bounce) following primary pulse window (`calc(var(--indicator-delay) * 0.3)`).
-- **Apple Music Dynamic Line-Transition** — Added dynamic CSS variable `--line-transition-duration` computed based on line interval $D$: $\min\left(0.60, \max\left(0.20, \frac{D \times 0.08}{1000}\right)\right)\text{s}$ for silky smooth scrolling across ballad and fast-paced songs.
-- **Dynamic API Key Rotation & HTTP 429 Failover** — Added sequential Round-Robin key rotation across multi-key arrays in `GeminiClient.js` with instant HTTP 429 failover to eliminate retry delays.
+- **Clean Lyrics Origin Filtering** — Automatically filters empty dummy provider lines (`durationToNext < 9000ms`) during initial LRC parsing while strictly protecting true singing lines and instrumental tracks.
+- **Automatic Cache Invalidation** — Automatically purges stale IndexedDB cache entries when lyric line counts mismatch (`cached.length !== lyrics.length`), preventing line-shifts and missing Romaji lines.
+- **Dynamic Line Transitions & Idling Rest Animation** — Combined tempo-adaptive line transition timing (`--line-transition-duration`) with smooth 3-dot rest animations (`• • •`), upward rise, and staggered drop timing for musical rests.
+- **AI Furigana Transliteration** — Added Japanese Furigana support using HTML `<ruby>` tags powered by AI for inline kanji readings.
+- **Full-Window Settings Layout** — Added setting option allowing the configuration panel to cover the entire window.
+- **Visual Video Background Modal** — Added an intuitive modal interface with thumbnail previews for picking top 5 matching YouTube background videos and controlling blur/dim settings.
+- **Multi-Key API Rotation & Quota Failover** — Supported round-robin rotation across multiple Gemini API keys with instant failover on HTTP 429 quota errors.
 
 ### Changed
 
-- **Phonetic Model Route Optimization** — Standardized model routing: mechanical phonetic transcriptions (Romaji, Furigana, Pinyin) run on `gemini-3.5-flash-lite` while primary translations run on `gemini-3.6-flash`.
-- **Dual-Renderer Sync Alignment** — Standardized line transition timing and idling rest gating across both `SyncedLyricsPage` and `SyncedExpandedLyricsPage`.
-- **NetEase Auto-Matching & Visual Badges** — Lowered auto-matching threshold to `0.12` when track duration offset is $<8\text{s}$ and pre-fetches lyrics on search to display visual badges (`Synced`, `Unsynced`, `No Lyrics`).
-- **Video Background Soft-Captions Unloading** — Enforced continuous soft-caption unloading (`unloadModule("captions")`) and penalized subtitle videos in search ranking while softening text-shadow halos on active lines to 0.45 opacity.
+- **NetEase Search & Lyrics Matching** — Refined search logic with visual status badges (`Synced`, `Unsynced`, `No Lyrics`) and lowered matching threshold for Japanese/Korean tracks.
+- **YouTube Video Search & Captions** — Refined YouTube background video search logic and automatically disables native YouTube closed captions.
+- **Phonetic Model Routing** — Routed mechanical phonetic transcriptions (Romaji, Furigana, Pinyin) to `gemini-3.5-flash-lite` while keeping primary translations on `gemini-3.6-flash`.
 
 ### Fixed
 
-- **Tag Leakage Prevention** — Enhanced closing tag regex to strip all malformed model tags (`</17>`, `</19>`) from rendered text.
-- **Instrumental Track Safeguard** — Guaranteed single-line instrumental tracks remain untouched by provider empty-line filters.
-- **Action Bar & Toolbar Ergonomics** — Restored clean 8-button action layout (Conversion, Adjustments, NetEase, Video, Cache, File, Reset, Settings) with 16x16 SVG vector icons inheriting Spicetify theme accent colors.
+- **Prompt Engineering Tag Cleanup** — Enhanced closing tag regex to strip all variations of malformed model tags (`</17>`, `</19>`) in prompt engineering mode.
+- **Toolbar SVG Icons & Action Buttons** — Restored 16x16 SVG toolbar icons, removed deprecated unavailable buttons, and fixed theme color inheritance for Adjustment setting buttons.
 
 ## [1.7.0] - 2026-06-05
 

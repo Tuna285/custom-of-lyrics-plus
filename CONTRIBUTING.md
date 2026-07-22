@@ -48,7 +48,7 @@ lyrics-plus/
 ├── index.js                   ← Entry point: render(), LyricsContainer (React class)
 ├── manifest.json              ← Spicetify metadata + subfiles load order
 ├── style.css / variables.css  ← CSS styles
-├── version.json               ← { "version": "1.7.0", "releaseDate": "2026-06-05" }
+├── version.json               ← { "version": "1.8.0", "releaseDate": "2026-06-05" }
 ├── types.d.ts                 ← TypeScript type definitions (JSDoc reference only)
 │
 ├── utils/                     ← Core utilities (load đầu tiên)
@@ -537,7 +537,7 @@ const buttonStyle = {
 
 ```json
 {
-    "version": "1.7.0",
+    "version": "1.8.0",
     "releaseDate": "2026-06-05"
 }
 ```
@@ -546,7 +546,7 @@ const buttonStyle = {
 
 ```javascript
 // Sửa CURRENT_VERSION:
-CURRENT_VERSION: "1.7.0",
+CURRENT_VERSION: "1.8.0",
 
 // Nếu có thêm file mới, thêm vào UPDATE_FILES:
 UPDATE_FILES: [
@@ -605,13 +605,13 @@ feat: integrate NetEase provider with manual search modal
 fix(installer): sync file list in install.ps1 with manifest.json
 docs: update AGENTS.md with namespace instructions
 style(settings): remove hardcoded hex colors, use theme variables
-chore: bump version to 1.7.0
+chore: bump version to 1.8.0
 ```
 
 ### Commit message release
 
 ```
-release v1.7.0: NetEase provider, theme consistency, video blur
+release v1.8.0: NetEase provider, theme consistency, video blur
 ```
 
 Commit message release nên tóm tắt 2-4 thay đổi lớn nhất trong version đó.
