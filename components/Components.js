@@ -522,6 +522,41 @@ window.TranslatingIndicator = TranslatingIndicator;
 window.TranslatingIndicatorRow = TranslatingIndicatorRow;
 window.PreTranslateChip = PreTranslateChip;
 
+/** Combined row: main translating pill + pre-translate chip side-by-side. */
+const TranslatingIndicatorRowCombined = react.memo(
+    ({
+        isVisible,
+        status,
+        text,
+        preTranslateChip,
+        currentUri,
+        preTranslateEnabled,
+        hasReasoningText,
+        onReasoningClick,
+        isReasoningOpen,
+    }) => {
+        return react.createElement(
+            "div",
+            { className: "lyrics-translating-combined-row" },
+            react.createElement(TranslatingIndicatorRow, {
+                isVisible,
+                status,
+                text,
+                hasReasoningText,
+                onReasoningClick,
+                isReasoningOpen,
+            }),
+            react.createElement(PreTranslateChip, {
+                chip: preTranslateChip,
+                currentUri,
+                enabled: preTranslateEnabled,
+            })
+        );
+    }
+);
+
+window.TranslatingIndicatorRowCombined = TranslatingIndicatorRowCombined;
+
 /**
  * Track the bounding rect of the active lyrics container so a portal'd overlay can
  * be positioned over the lyrics-plus area (instead of floating in the viewport corner).
