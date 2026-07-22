@@ -35,7 +35,7 @@ const IDLE_GRACE_MS = 1500;
 const IDLE_MIN_VISIBLE_MS = 5000;
 // Minimum raw interval between consecutive lines before we'll even consider inserting "♪".
 // Raised to 8.5s: True musical instrumental breaks are >= 8.5s.
-const GAP_THRESHOLD_MIN = 8500;
+const GAP_THRESHOLD_MIN = 10500;
 const GAP_THRESHOLD_MAX = 16000;
 // Safety floor ratio: assume singer holds line for at most this fraction of the interval.
 const LINE_END_INTERVAL_FLOOR_RATIO = 0.78;
@@ -165,8 +165,8 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                 const silentDuration = nextLine.startTime - (currentLine.startTime + estDur);
 
                 const canInsert =
-                    interval >= timingStats.gapThreshold &&
-                    silentDuration >= 6500 &&
+                    interval >= Math.max(10500, timingStats.gapThreshold) &&
+                    silentDuration >= 6000 &&
                     !isNoteLineObject(currentLine) &&
                     !isNoteLineObject(nextLine);
 
@@ -454,7 +454,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
                 const interval = nextLine.startTime - currentLine.startTime;
                 // Auto-gap detector with adaptive threshold + grace period.
                 const canInsert =
-                    interval > timingStats.gapThreshold &&
+                    interval >= Math.max(10500, timingStats.gapThreshold) &&
                     !isNoteLineObject(currentLine) &&
                     !isNoteLineObject(nextLine);
 
