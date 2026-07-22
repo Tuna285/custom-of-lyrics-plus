@@ -653,8 +653,8 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
             }
 
             let lineInterval = 4000;
-            if (i < activeLines.length - 1 && activeLines[i + 1]?.startTime && startTime) {
-                lineInterval = activeLines[i + 1].startTime - startTime;
+            if (i < merged.length - 1 && merged[i + 1]?.startTime && startTime) {
+                lineInterval = merged[i + 1].startTime - startTime;
             }
             const lineDurationSec = `${Math.min(0.60, Math.max(0.20, (lineInterval * 0.08) / 1000)).toFixed(2)}s`;
 
