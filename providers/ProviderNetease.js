@@ -535,6 +535,10 @@ const ProviderNetease = (() => {
                 ),
 
                 // Status messages
+                status === "loading" && react.createElement("div", {
+                    style: { color: "var(--spice-button, #1db954)", fontSize: "12px", textAlign: "center", padding: "20px 0" }
+                }, "Searching NetEase…"),
+
                 status === "error" && react.createElement("div", {
                     style: { color: "#ff6b6b", fontSize: "12px", marginBottom: "10px" }
                 }, errorMsg || (getText("neteaseModal.failed") || "Search failed")),
