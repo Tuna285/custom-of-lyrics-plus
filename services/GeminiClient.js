@@ -244,37 +244,42 @@ const GeminiClient = {
     extractStreamingReasoning(buffer) {
         const s = String(buffer || "");
         const parts = [];
-        const tagRe = /<(thought|think|redacted_thinking)>([\s\S]*?)(?:<\/\1>|$)/gi;
+        const tagRe = /<(?:thought|think|redacted_thinking|reasoning)(?:\s+[^>]*)?>([\s\S]*?)(?:<\/(?:thought|think|redacted_thinking|reasoning)>|(?=[<＜【［][0-9０-９]+[>＞】］]|(?:\n|^|```[a-z]*\s*)\s*\{|(?:\n|^|```[a-z]*\s*)\s*\[\s*["\d]|(?:\n|^)\s*"(?:translations|phonetics)"\s*:|$))/gi;
         let m;
         while ((m = tagRe.exec(s)) !== null) {
-            const inner = m[2];
-            if (inner) parts.push(inner);
+            const inner = m[1];
+            if (inner && inner.trim()) parts.push(inner.trim());
         }
         // Also support Gemma 4 control tokens: <|channel>thought ... <channel|>
-        const gemmaRe = /<\|channel>thought\n?([\s\S]*?)(?:<channel\|>|$)/gi;
+        const gemmaRe = /<\|channel>thought\n?([\s\S]*?)(?:<channel\|>|(?=[<＜【［][0-9０-９]+[>＞】］]|(?:\n|^|```[a-z]*\s*)\s*\{|(?:\n|^|```[a-z]*\s*)\s*\[\s*["\d]|(?:\n|^)\s*"(?:translations|phonetics)"\s*:|$))/gi;
         while ((m = gemmaRe.exec(s)) !== null) {
             const inner = m[1];
-            if (inner) parts.push(inner);
+            if (inner && inner.trim()) parts.push(inner.trim());
         }
         return parts.join("\n\n").trim();
     },
 
     /**
      * Strip <thought>, <think>, etc. from model output; collect inner text for optional UI.
+     * Robustly handles closed and unclosed/orphaned thought blocks.
      */
     stripReasoningBlocks(raw) {
         let s = String(raw || "");
         const collected = [];
-        const patterns = [
-            /<thought>([\s\S]*?)<\/thought>/gi,
-            new RegExp("<" + "think" + ">[\\s\\S]*?<" + "/" + "think" + ">", "gi"),
-            new RegExp("<" + "redacted_thinking" + ">[\\s\\S]*?<" + "/" + "redacted_thinking" + ">", "gi"),
+
+        // 1. Match and strip standard closed reasoning blocks
+        const closedPatterns = [
+            /<thought(?:\s+[^>]*)?>([\s\S]*?)<\/thought>/gi,
+            new RegExp("<" + "think(?:\\s+[^>]*)?>([\\s\\S]*?)<" + "/" + "think>", "gi"),
+            new RegExp("<" + "redacted_thinking(?:\\s+[^>]*)?>([\\s\\S]*?)<" + "/" + "redacted_thinking>", "gi"),
+            /<reasoning(?:\s+[^>]*)?>([\s\S]*?)<\/reasoning>/gi,
             /<\|channel>thought\n?([\s\S]*?)<channel\|>/gi
         ];
+
         let prev = null;
         while (prev !== s) {
             prev = s;
-            for (const re of patterns) {
+            for (const re of closedPatterns) {
                 s = s.replace(re, (_, inner) => {
                     if (inner && String(inner).trim()) collected.push(String(inner).trim());
                     return "";
@@ -282,6 +287,23 @@ const GeminiClient = {
             }
             s = s.trim();
         }
+
+        // 2. Match and strip unclosed / truncated reasoning blocks (e.g. <thought> without </thought> before tags/JSON or EOF)
+        const unclosedPatterns = [
+            /<(?:thought|think|redacted_thinking|reasoning)(?:\s+[^>]*)?>([\s\S]*?)(?=(?:[<＜【［][0-9０-９]+[>＞】］]|(?:\n|^|```[a-z]*\s*)\s*\{|(?:\n|^|```[a-z]*\s*)\s*\[\s*["\d]|(?:\n|^)\s*"(?:translations|phonetics)"\s*:|$))/gi,
+            /<\|channel>thought\n?([\s\S]*?)(?=(?:<channel\|>|[<＜【［][0-9０-９]+[>＞】］]|(?:\n|^|```[a-z]*\s*)\s*\{|(?:\n|^|```[a-z]*\s*)\s*\[\s*["\d]|(?:\n|^)\s*"(?:translations|phonetics)"\s*:|$))/gi
+        ];
+
+        for (const re of unclosedPatterns) {
+            s = s.replace(re, (_, inner) => {
+                if (inner && String(inner).trim()) collected.push(String(inner).trim());
+                return "";
+            });
+        }
+
+        // 3. Clean up any stray/orphaned closing tags
+        s = s.replace(/<\/\s*(?:thought|think|redacted_thinking|reasoning)\s*>|<channel\|>/gi, "").trim();
+
         return { cleaned: s, reasoningContent: collected.join("\n\n") };
     },
 
@@ -289,14 +311,16 @@ const GeminiClient = {
         let raw = String(text || "").trim();
         raw = raw.replace(/```[a-z]*\n?/gim, "").replace(/```/g, "").trim();
 
-        // Priority 0: Parse compact tag format (e.g., <1>content</1>)
-        // Using a robust scan-based parser instead of strict regex matching
-        const tagRegex = /<(\d+)>/g;
+        // Priority 0: Parse compact tag format (e.g., <1>content</1>, ＜1＞content＜/1＞, 【1】content【/1】, ＜１＞content＜／１＞)
+        // Using a robust scan-based parser supporting half-width and full-width bracket tags and digits
+        const tagRegex = /[<＜【［]([0-9０-９]+)[>＞】］]/g;
         let match;
         const tags = [];
         while ((match = tagRegex.exec(raw)) !== null) {
+            const normalizedNumStr = match[1].replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 65248));
             tags.push({
-                number: parseInt(match[1], 10),
+                number: parseInt(normalizedNumStr, 10),
+                rawNumber: match[1],
                 index: match.index,
                 length: match[0].length
             });
@@ -311,28 +335,27 @@ const GeminiClient = {
                 
                 let content = raw.substring(startPos, endPos);
                 
-                // Look for standard closing tag </number>
-                const closingTagStr = `</${currentTag.number}>`;
-                const closingTagIdx = content.indexOf(closingTagStr);
-                if (closingTagIdx !== -1) {
-                    content = content.substring(0, closingTagIdx);
-                } else {
-                    // Try to match malformed closing tag like </number (missing >)
-                    const malformedIdx = content.indexOf(`</${currentTag.number}`);
-                    if (malformedIdx !== -1) {
-                        content = content.substring(0, malformedIdx);
-                    }
+                // Look for standard or full-width closing tag </number>, ＜/number＞, 【/number】, ＜／１＞, etc.
+                const fullWidthNum = String(currentTag.number).replace(/[0-9]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 65248));
+                const closingTagRe = new RegExp(`[<＜【［][\\/／](?:${currentTag.number}|${fullWidthNum})[>＞】］]?`, 'i');
+                const closeMatch = content.match(closingTagRe);
+                if (closeMatch && closeMatch.index !== undefined) {
+                    content = content.substring(0, closeMatch.index);
                 }
                 
                 // Cleanup helper regexes for any remaining garbage at the end
-                // 1. If model used opening tag as closing tag: <number>
-                const openingReg = new RegExp(`<${currentTag.number}>\\s*$`, 'i');
+                // 1. If model used opening tag as closing tag: <number>, ＜number＞, 【number】, ［number］, ＜１＞
+                const openingReg = new RegExp(`[<＜【［](?:${currentTag.number}|${fullWidthNum})[>＞】］]\\s*$`, 'i');
                 content = content.replace(openingReg, '');
                 
-                // 2. Generic malformed closing tag like </ or </digit
-                content = content.replace(/<\/\d*>?[ \t]*$/, '');
+                // 2. Generic malformed closing tag like </, ＜／, 【/, ［/ with optional digits (half or full-width)
+                content = content.replace(/[<＜【［][\/／][0-9０-９]*[>＞】］]?[ \t]*$/, '');
                 
-                result[currentTag.number - 1] = content.trim();
+                const trimmed = content.trim();
+                const targetIdx = currentTag.number - 1;
+                if (targetIdx >= 0 && (result[targetIdx] === undefined || trimmed !== '')) {
+                    result[targetIdx] = trimmed;
+                }
             }
 
             // Fill any gaps with empty strings
@@ -346,18 +369,21 @@ const GeminiClient = {
             }
         }
 
-        // Priority 1: Parse numbered list format (e.g., "1. line1\n2. line2")
-        const hasNumberedLines = /^\d+\.\s*/m.test(raw);
+        // Priority 1: Parse numbered list format (e.g., "1. line1\n2. line2", "１. line1\n２. line2")
+        const hasNumberedLines = /^[0-9０-９]+\.\s*/m.test(raw);
         if (hasNumberedLines) {
             const result = [];
             const lines = raw.split('\n');
             
             for (const line of lines) {
-                const match = line.match(/^(\d+)\.\s*(.*)/s);
+                const match = line.match(/^([0-9０-９]+)\.\s*(.*)/s);
                 if (match) {
-                    const idx = parseInt(match[1], 10) - 1;
+                    const normalizedNumStr = match[1].replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 65248));
+                    const idx = parseInt(normalizedNumStr, 10) - 1;
                     // Handle empty lines (e.g., "5. " or "5.")
-                    result[idx] = match[2].trim();
+                    if (idx >= 0) {
+                        result[idx] = match[2].trim();
+                    }
                 }
             }
             
@@ -479,7 +505,15 @@ const GeminiClient = {
 
         // Priority 3: Fallback - split by newlines
         DebugLogger.warn("Structured parse failed, using line split fallback...");
-        const rawLines = raw.split('\n').filter(l => l.trim());
+        const reasoningLeakRe = /(?:<thought|<think|<\/thought|<\/think|<reasoning|<\/reasoning|<\|channel>thought|<channel\|>|initiating|refining|analysis|analyzing|vietnamese is the target|translation strategy|pronoun locking|thinking process|reasoning:)/i;
+        if (reasoningLeakRe.test(raw)) {
+            DebugLogger.warn("Leaked reasoning detected in fallback split, triggering retry/failover...");
+            throw new Error("Format validation failed: output contains leaked reasoning in fallback split");
+        }
+        const rawLines = raw.split('\n').filter(l => l.trim() && !reasoningLeakRe.test(l));
+        if (rawLines.length === 0) {
+            throw new Error("Format validation failed: empty output after removing invalid content");
+        }
         return { vi: rawLines, phonetic: rawLines.join('\n'), isFallbackSplit: true };
     },
 
@@ -842,21 +876,34 @@ const GeminiClient = {
             if (contentBuf.length === lastContentLen) return;
             lastContentLen = contentBuf.length;
 
-            // Only treat a *second* `<1>` as Pass-3 full redraft AFTER line 2 has started (`<2>`).
-            // (1) Reasoning in the content channel often has `<1>example</1>` then later `<1>real`
-            //     — a lone first `</1>` is not enough. (2) Gemma 4 thinking models interleave prose
-            //     and tags; counting two raw `<1>` caused false aborts → empty parse → fetchWithRetry
-            //     loops that looked like infinite "thinking restarts".
-            const first = contentBuf.indexOf("<1>");
-            if (first === -1) return;
-            const firstClose = contentBuf.indexOf("</1>", first);
-            if (firstClose === -1) return;
-            const secondLineOpen = contentBuf.indexOf("<2>", firstClose);
-            if (secondLineOpen === -1) return;
-            const secondOpen = contentBuf.indexOf("<1>", secondLineOpen);
-            if (secondOpen === -1) return;
+            // Only treat a *second* opening tag for line 1 (e.g. <1>, ＜1＞, 【1】, ＜１＞) as Pass-3 full redraft
+            // AFTER line 2 has started (<2>, ＜2＞, 【2】, ＜２＞).
+            // We require the line 1 tag to be at a tag/line boundary to avoid false aborts on numbers or ruby tags in lyrics.
+            const tag1Re = /(?:^|\n)\s*([<＜【［][1１][>＞】］])/;
+            const match1 = contentBuf.match(tag1Re);
+            if (!match1) return;
+            const firstOpenIdx = match1.index + (match1[0].length - match1[1].length);
 
-            contentBuf = contentBuf.slice(0, secondOpen);
+            const close1Match = contentBuf.slice(firstOpenIdx).match(/[<＜【［][\/／][1１][>＞】］]/);
+            if (!close1Match) return;
+            const firstCloseIdx = firstOpenIdx + close1Match.index + close1Match[0].length;
+
+            const match2 = contentBuf.slice(firstCloseIdx).match(/(?:^|\n|[<＜【［][\/／][0-9０-９]+[>＞】］]\s*)\s*([<＜【［][2２][>＞】］])/);
+            if (!match2) return;
+            const line2OpenIdx = firstCloseIdx + match2.index + (match2[0].length - match2[1].length);
+
+            // Search for a second line-1 tag strictly after a closing tag or at the start of a newline after line 2 started
+            const rest = contentBuf.slice(line2OpenIdx);
+            const redraftMatch = rest.match(/(?:^|\n|[<＜【［][\/／][0-9０-９]+[>＞】］]\s*\n?)\s*([<＜【［][1１][>＞】］])/);
+            if (!redraftMatch) return;
+            const secondOpenIdx = line2OpenIdx + redraftMatch.index + (redraftMatch[0].length - redraftMatch[1].length);
+
+            // Check that after secondOpenIdx, there is confirmation of redraft (closing </1> or subsequent tag <2>)
+            const afterRedraft = contentBuf.slice(secondOpenIdx);
+            const isConfirmedRedraft = /[<＜【［][\/／][1１][>＞】］]/.test(afterRedraft) || /[<＜【［][2２][>＞】］]/.test(afterRedraft);
+            if (!isConfirmedRedraft) return;
+
+            contentBuf = contentBuf.slice(0, secondOpenIdx);
             earlyAbortReason = "content-redraft";
             // Reader cancel is done in the SSE loop (await reader.cancel()) so we don't
             // abort the whole request — that produced AbortError noise and felt like blocking.

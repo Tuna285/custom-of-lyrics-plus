@@ -214,224 +214,76 @@ const VideoManager = {
     },
 
     /**
-     * Search YouTube directly by scraping the search results page.
-     * 100% serverless, CORS-bypassed in Spotify client, bypasses broken public API instances.
+     * Search YouTube via InnerTube TVHTML5 Client API (SmartTube / TVHTML5 Client)
      * @private
      * @param {string} query - Cleaned search query
      * @returns {Promise<Array<{videoId: string, title: string, author: string, lengthSeconds: number}>>}
      */
-    async _searchDirectYoutube(query) {
-        const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-        console.log(`[VideoManager] Searching YouTube directly: ${url}`);
-        
+    async _searchYoutubeTVHTML5(query) {
         try {
-            let html = null;
+            const apiKey = "AIzaSyAO_FJ2SlvU8Q4UYNuLic2MeElzYsS180";
+            const targetUrl = `https://www.youtube.com/youtubei/v1/search?key=${apiKey}`;
+            
+            // Allow user-configured CORS proxy or fallback to public proxies to bypass cors-proxy.spicetify.app 403 blocks
+            const configuredProxy = localStorage.getItem("spicetify:corsProxyTemplate");
+            const proxyTemplates = configuredProxy 
+                ? [configuredProxy]
+                : [
+                    "https://corsproxy.io/?{url}",
+                    "https://api.allorigins.win/raw?url={url}",
+                    "{url}"
+                ];
+
+            const body = {
+                context: {
+                    client: {
+                        clientName: "TVHTML5",
+                        clientVersion: "7.20241118.00.00",
+                        hl: "en",
+                        gl: "US"
+                    }
+                },
+                query: query
+            };
             const headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept-Language": "en-US,en;q=0.9"
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
             };
 
-            // Try CosmosAsync first to bypass CORS
-            if (window.Spicetify?.CosmosAsync?.get) {
+            for (const template of proxyTemplates) {
+                const requestUrl = template.replace("{url}", encodeURIComponent(targetUrl)).replace("{url_raw}", targetUrl);
                 try {
-                    const timeoutPromise = new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error("CosmosAsync timeout")), 8000)
-                    );
-                    const fetchPromise = window.Spicetify.CosmosAsync.get(url, null, headers);
-                    const data = await Promise.race([fetchPromise, timeoutPromise]);
-                    html = typeof data === "string" ? data : JSON.stringify(data);
-                } catch (cosmosErr) {
-                    console.warn("[VideoManager] CosmosAsync direct search failed, trying fetch fallback...", cosmosErr.message);
-                }
-            }
+                    let rawData = null;
+                    if (window.Spicetify?.CosmosAsync?.post) {
+                        const res = await window.Spicetify.CosmosAsync.post(requestUrl, body, headers);
+                        rawData = typeof res === "string" ? res : JSON.stringify(res);
+                    }
 
-            // Fallback to fetch (which will likely fail due to CORS in Spotify UI, but kept as absolute fallback)
-            if (!html) {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
-                
-                const response = await fetch(url, {
-                    headers,
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-                
-                if (!response.ok) {
-                    console.warn(`[VideoManager] Direct YouTube search returned status: ${response.status}`);
-                    return [];
-                }
-                
-                html = await response.text();
-            }
-            
-            // Extract ytInitialData JSON object containing search result metadata
-            const jsonRegex = /var\s+ytInitialData\s*=\s*({[\s\S]*?});/;
-            const match = html.match(jsonRegex);
-            
-            if (match) {
-                try {
-                    const jsonStr = match[1];
-                    const data = JSON.parse(jsonStr);
-                    const contents = data.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents;
-                    
-                    if (contents) {
-                        const itemSection = contents.find(c => c.itemSectionRenderer);
-                        const results = itemSection?.itemSectionRenderer?.contents || [];
-                        
-                        const candidates = [];
-                        for (const result of results) {
-                            if (result.videoRenderer) {
-                                const video = result.videoRenderer;
-                                const videoId = video.videoId;
-                                const title = video.title?.runs?.[0]?.text;
-                                const author = video.ownerText?.runs?.[0]?.text || video.longBylineText?.runs?.[0]?.text || "";
-                                const durationStr = video.lengthText?.simpleText || "";
-                                const lengthSeconds = this._parseDurationStringToSeconds(durationStr);
-                                
-                                if (videoId && title) {
-                                    candidates.push({ videoId, title, author, lengthSeconds });
-                                }
-                            }
-                        }
-                        if (candidates.length > 0) {
-                            console.log(`[VideoManager] Direct search returned ${candidates.length} candidates.`);
-                            return candidates;
+                    if (rawData && !rawData.includes("403 Forbidden") && !rawData.includes("<!DOCTYPE")) {
+                        const watchMatches = [...rawData.matchAll(/"videoId"\s*:\s*"([a-zA-Z0-9_-]{11})"/g)];
+                        if (watchMatches.length > 0) {
+                            const videoIds = [...new Set(watchMatches.map(m => m[1]))];
+                            console.log(`[VideoManager] TVHTML5 InnerTube search via proxy (${requestUrl}) returned ${videoIds.length} YouTube videos.`);
+                            return videoIds.map(id => ({
+                                videoId: id,
+                                title: query,
+                                author: "",
+                                lengthSeconds: 0
+                            }));
                         }
                     }
-                } catch (jsonErr) {
-                    console.warn("[VideoManager] Direct search JSON parse failed, trying HTML regex fallback...", jsonErr);
+                } catch (proxyErr) {
+                    console.warn(`[VideoManager] TVHTML5 search failed on proxy (${requestUrl}):`, proxyErr.message);
                 }
             }
-            
-            // Fallback: search for video URLs directly in the raw HTML string
-            const watchRegex = /\/watch\?v=([a-zA-Z0-9_-]{11})/g;
-            const matches = [...html.matchAll(watchRegex)];
-            if (matches.length > 0) {
-                const videoIds = [...new Set(matches.map(m => m[1]))];
-                console.log(`[VideoManager] Regex fallback matched ${videoIds.length} video IDs.`);
-                return videoIds.map(id => ({ videoId: id, title: query, author: "", lengthSeconds: 0 }));
-            }
         } catch (e) {
-            console.warn("[VideoManager] Direct YouTube search failed:", e.message);
+            console.warn("[VideoManager] TVHTML5 YouTube search failed:", e.message);
         }
         return [];
     },
 
     /**
-     * Get active Invidious instances dynamically from api.invidious.io
-     * @private
-     * @returns {Promise<string[]>}
-     */
-    async _getDynamicInvidiousInstances() {
-        try {
-            console.log("[VideoManager] Fetching dynamic Invidious instances...");
-            const response = await fetch("https://api.invidious.io/instances.json");
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            const data = await response.json();
-            const entries = Array.isArray(data) ? data : Object.entries(data);
-            const candidates = [];
-            
-            for (const item of entries) {
-                let domain, details;
-                if (Array.isArray(item)) {
-                    domain = item[0];
-                    details = item[1];
-                } else {
-                    domain = item.domain || item.uri;
-                    details = item;
-                }
-                
-                if (details.uri && details.type === "https" && details.monitor?.down === false) {
-                    candidates.push(details.uri);
-                }
-            }
-            
-            console.log(`[VideoManager] Resolved ${candidates.length} healthy Invidious instances.`);
-            return candidates;
-        } catch (e) {
-            console.warn("[VideoManager] Failed to fetch dynamic Invidious instances:", e.message);
-            return [
-                "https://inv.thepixora.com",
-                "https://yt.chocolatemoo53.com",
-                "https://invidious.flokinet.to",
-                "https://yewtu.be"
-            ];
-        }
-    },
-
-    /**
-     * Search YouTube via public Invidious instances concurrently (CORS-enabled proxies)
-     * @private
-     * @param {string} query - Cleaned search query
-     * @param {string} [trackUri] - Spotify track URI
-     * @param {Object} [trackInfo] - Metadata for scoring
-     * @returns {Promise<Array<{videoId: string, title: string, author: string, lengthSeconds: number}>>}
-     */
-    async _searchInvidiousConcurrent(query, trackUri = null, trackInfo = null) {
-        const instances = await this._getDynamicInvidiousInstances();
-        const toTest = instances.slice(0, 4); // Run top 4 in parallel
-        
-        const fetchFromInstance = async (instance) => {
-            const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video`;
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
-            
-            try {
-                const response = await fetch(url, {
-                    headers: { "Accept": "application/json" },
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-                
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const data = await response.json();
-                if (!Array.isArray(data)) throw new Error("Invalid response format");
-                
-                const videos = data
-                    .filter(item => item.type === "video" && item.videoId)
-                    .map(item => ({
-                        videoId: item.videoId,
-                        title: item.title,
-                        author: item.author || "",
-                        lengthSeconds: Number(item.lengthSeconds) || 0
-                    }));
-                
-                if (videos.length === 0) throw new Error("No videos found");
-                return videos;
-            } catch (err) {
-                clearTimeout(timeoutId);
-                throw err;
-            }
-        };
-
-        const promiseAny = Promise.any ? Promise.any.bind(Promise) : async (promises) => {
-            return new Promise((resolve, reject) => {
-                let rejectedCount = 0;
-                const errors = [];
-                promises.forEach((p, idx) => {
-                    Promise.resolve(p).then(resolve).catch(err => {
-                        errors[idx] = err;
-                        rejectedCount++;
-                        if (rejectedCount === promises.length) {
-                            reject(new Error("All promises rejected: " + errors.map(e => e.message).join(", ")));
-                        }
-                    });
-                });
-            });
-        };
-
-        try {
-            const candidates = await promiseAny(toTest.map(fetchFromInstance));
-            return candidates;
-        } catch (e) {
-            console.warn("[VideoManager] Concurrent Invidious search failed on all instances:", e.message);
-            return [];
-        }
-    },
-
-    /**
-     * Search YouTube via public Invidious instances, returning multiple candidates (used by settings panel)
+     * Search YouTube videos, returning multiple candidates (used by settings panel)
      * @param {string} query - Cleaned search query
      * @param {string} [trackUri] - Spotify track URI
      * @param {Object} [trackInfo] - Track metadata
@@ -452,30 +304,12 @@ const VideoManager = {
             return this._lastSearchResults;
         }
 
-        // Try direct YouTube search first (uses user's IP, avoids geoblocks on cloud servers)
-        let candidates = await this._searchDirectYoutube(cleanQuery);
-        
-        // Fallback to Invidious if direct search returned nothing
-        if (!candidates || candidates.length === 0) {
-            console.log("[VideoManager] Direct search failed in searchMultipleVideos, falling back to Invidious...");
-            candidates = await this._searchInvidiousConcurrent(cleanQuery, trackUri, trackInfo);
-        }
-        
+        // Try YouTube TVHTML5 InnerTube search
+        const candidates = await this._searchYoutubeTVHTML5(cleanQuery);
         if (candidates && candidates.length > 0) {
-            // Get blacklist to exclude broken videos
             const blacklist = await this.getBlacklist(trackUri);
-            
-            // Filter out blacklisted candidates but PRESERVE YouTube's native search ranking/order!
             const filtered = candidates.filter(video => !blacklist.includes(video.videoId));
-
-            // Take the top 7 candidates in their native YouTube ranking order (instead of re-sorting by our heuristic)
-            const top7 = filtered.slice(0, 7).map(({ videoId, title, author, lengthSeconds }) => ({
-                videoId,
-                title,
-                author,
-                lengthSeconds
-            }));
-
+            const top7 = filtered.slice(0, 7);
             if (trackUri) {
                 this._lastSearchUri = trackUri;
                 this._lastSearchQuery = cleanQuery;
@@ -487,7 +321,7 @@ const VideoManager = {
     },
 
     /**
-     * Fetch video background for a track using a dual-layer client-only search workflow with metadata scoring
+     * Fetch video background for a track using YouTube TVHTML5 Client
      * @param {Object} trackInfo - { title, artist, duration, uri, image }
      * @param {Function} onRetry - Deprecated/Not used in client-only search
      * @returns {Promise<Object|null>} - Video data or null
@@ -507,25 +341,21 @@ const VideoManager = {
         
         let abortSignal;
         if (!isSilent) {
-            // Abort any pending requests from previous track
             if (this._retryAbortController) {
                 this._retryAbortController.abort();
             }
             this._retryAbortController = new AbortController();
             abortSignal = this._retryAbortController.signal;
             
-            // Clear stale cache when switching tracks
             if (this._lastFetchUri !== trackInfo.uri) {
                 this._currentVideo = null;
             }
             this._lastFetchUri = trackInfo.uri;
         } else {
-            // For silent pre-fetch, use a separate local abort controller to avoid interfering with current track
             const localAbort = new AbortController();
             abortSignal = localAbort.signal;
         }
 
-        // Fetch blacklist to exclude broken videos
         const blacklist = await this.getBlacklist(trackInfo.uri);
 
         // Check for manual video override FIRST
@@ -565,50 +395,27 @@ const VideoManager = {
         }
 
         const query = this._cleanQuery(trackInfo.artist || "", trackInfo.title || "");
-        console.log(`[VideoManager] Searching video background (${isSilent ? "silent" : "active"}) for: ${query}`);
+        console.log(`[VideoManager] Searching YouTube video background (${isSilent ? "silent" : "active"}) for: ${query}`);
         
         try {
-            // Try Direct YouTube Scrape (highly accurate, fast, domestic IP bypasses bot bans)
-            let candidates = await this._searchDirectYoutube(query);
-            let source = "youtube_direct";
+            // Try YouTube TVHTML5 InnerTube Search
+            let candidates = await this._searchYoutubeTVHTML5(query);
+            let source = "youtube_tvhtml5";
             
-            // Check if aborted after fetch
             if (abortSignal.aborted || (!isSilent && this._lastFetchUri !== trackInfo.uri)) {
                 console.log(`[VideoManager] Ignored stale response for: ${trackInfo.title}`);
                 return null;
             }
 
             let bestVideo = null;
-            const artist = trackInfo.artist || "";
-            const title = trackInfo.title || "";
-            const targetDurationSec = trackInfo.duration ? trackInfo.duration / 1000 : 0;
-
             if (candidates && candidates.length > 0) {
-                // Filter out blacklisted candidates
                 const filtered = candidates.filter(c => !blacklist.includes(c.videoId));
-                
                 if (filtered.length > 0) {
-                    // Directly select the top 1 YouTube search result (respecting YouTube's native ranking)
                     bestVideo = filtered[0];
                 }
             }
 
-            // Fallback to Invidious if direct search returned nothing
-            if (!bestVideo) {
-                console.log("[VideoManager] Direct search returned no candidates, attempting Invidious fallback...");
-                const invidiousCandidates = await this._searchInvidiousConcurrent(query, trackInfo.uri, trackInfo);
-                
-                if (invidiousCandidates && invidiousCandidates.length > 0) {
-                    // Filter out blacklisted candidates
-                    const filteredInvidious = invidiousCandidates.filter(c => !blacklist.includes(c.videoId));
-                    
-                    if (filteredInvidious.length > 0) {
-                        // Directly select the top 1 Invidious search result
-                        bestVideo = filteredInvidious[0];
-                        source = "invidious";
-                    }
-                }
-            }
+
 
             if (bestVideo && bestVideo.videoId) {
                 const videoId = bestVideo.videoId;

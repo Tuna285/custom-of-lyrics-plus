@@ -1,0 +1,828 @@
+{
+  "communities": {
+    "0": [
+      "assets_libs_kuroshiro_analyzer_kuromoji_min",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_basename",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_browserdictionaryloader",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_bytebuffer",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_c",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_characterclass",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_characterdefinition",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_characterdefinitionbuilder",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_cleanupnexttick",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_connectioncosts",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_connectioncostsbuilder",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_defaultcleartimeout",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_defaultsettimout",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_dictionarybuilder",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_dictionaryloader",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_drainqueue",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_dynamicdictionaries",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_et",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_ht",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_interoprequiredefault",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_invokedefinitionmap",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_ipadicformatter",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_item",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_ln",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_noop",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_normalizearray",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_rr",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_runcleartimeout",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_runtimeout",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_surrogateawarestring",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_timeout",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_tokeninfodictionary",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_tokenizer",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_tokenizerbuilder",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_tt",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_unknowndictionary",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_viterbibuilder",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_viterbilattice",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_viterbinode",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_viterbisearcher",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_w",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_wr",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_wt",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_xr",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_yt"
+    ],
+    "1": [
+      "components_optionsmenu",
+      "components_optionsmenu_adjustmentsmenu",
+      "components_optionsmenu_getgeminipronounoptions",
+      "components_optionsmenu_getgeministyleoptions",
+      "components_optionsmenu_getstaticoptions",
+      "components_optionsmenu_icons",
+      "components_optionsmenu_openoptionsmodal",
+      "components_optionsmenu_optionsmenu",
+      "components_optionsmenu_optionsmenuitem",
+      "components_optionsmenu_optionsmenuitemicon",
+      "components_optionsmenu_settingrowdescription",
+      "components_optionsmenu_translationmenu",
+      "components_settings",
+      "components_settings_buttonsvg",
+      "components_settings_cachebutton",
+      "components_settings_collapsiblesection",
+      "components_settings_configadjust",
+      "components_settings_configadjust_adjust",
+      "components_settings_configbutton",
+      "components_settings_configcolor",
+      "components_settings_configcombobox",
+      "components_settings_configdynamickeys",
+      "components_settings_confighelper",
+      "components_settings_confighotkey",
+      "components_settings_confighotkey_finishrecord",
+      "components_settings_confighotkey_record",
+      "components_settings_configinput",
+      "components_settings_configrange",
+      "components_settings_configselection",
+      "components_settings_configslider",
+      "components_settings_corsproxytemplate",
+      "components_settings_displaynames",
+      "components_settings_languagecodes",
+      "components_settings_languageoptions",
+      "components_settings_openconfig",
+      "components_settings_optionlist",
+      "components_settings_refreshtokenbutton",
+      "components_settings_serviceaction",
+      "components_settings_servicelist",
+      "components_settings_serviceoption",
+      "components_settings_swapbutton",
+      "components_settings_ui_color_defaults"
+    ],
+    "2": [
+      "manifest_subfiles",
+      "ref_assets_libs_aromanize_min_js",
+      "ref_assets_libs_kuroshiro_analyzer_kuromoji_min_js",
+      "ref_assets_libs_kuroshiro_min_js",
+      "ref_assets_libs_opencc_min_js",
+      "ref_assets_libs_pinyin_pro_min_js",
+      "ref_components_components_js",
+      "ref_components_minilyrics_js",
+      "ref_components_optionsmenu_js",
+      "ref_components_playbarbutton_js",
+      "ref_components_settings_js",
+      "ref_components_syncedlyrics_js",
+      "ref_components_tabbar_js",
+      "ref_components_videobackground_js",
+      "ref_components_videomanager_js",
+      "ref_components_videosettingsmodal_js",
+      "ref_i18n_i18n_js",
+      "ref_i18n_langen_js",
+      "ref_i18n_langja_js",
+      "ref_i18n_langko_js",
+      "ref_i18n_langvi_js",
+      "ref_i18n_langzh_js",
+      "ref_parsers_lrcparser_js",
+      "ref_providers_providerlrclib_js",
+      "ref_providers_providermusixmatch_js",
+      "ref_providers_providers_js",
+      "ref_services_adblocker_js",
+      "ref_services_geminiclient_js",
+      "ref_services_idbcache_js",
+      "ref_services_lyricsfetcher_js",
+      "ref_services_translationcoordinator_js",
+      "ref_services_translator_js",
+      "ref_services_updateservice_js",
+      "ref_utils_cache_js",
+      "ref_utils_config_js",
+      "ref_utils_namespace_js",
+      "ref_utils_prompts_js",
+      "ref_utils_translationutils_js",
+      "ref_utils_utils_js"
+    ],
+    "3": [
+      "index_lyricscontainer",
+      "index_lyricscontainer_componentdidcatch",
+      "index_lyricscontainer_componentdidmount",
+      "index_lyricscontainer_componentwillunmount",
+      "index_lyricscontainer_constructor",
+      "index_lyricscontainer_deletelocallyrics",
+      "index_lyricscontainer_fetchcolors",
+      "index_lyricscontainer_fetchlyrics",
+      "index_lyricscontainer_fetchtempo",
+      "index_lyricscontainer_fetchvideobackground",
+      "index_lyricscontainer_infofromtrack",
+      "index_lyricscontainer_initmoustrap",
+      "index_lyricscontainer_lyricssaved",
+      "index_lyricscontainer_lyricssource",
+      "index_lyricscontainer_onfontsizechange",
+      "index_lyricscontainer_onqueuechange",
+      "index_lyricscontainer_onversionchange",
+      "index_lyricscontainer_onversionchange2",
+      "index_lyricscontainer_openvideosettingsmodal",
+      "index_lyricscontainer_processlyricsfromfile",
+      "index_lyricscontainer_providelanguagecode",
+      "index_lyricscontainer_reattachtiming",
+      "index_lyricscontainer_refreshmusixmatchtranslation",
+      "index_lyricscontainer_render",
+      "index_lyricscontainer_resetdelay",
+      "index_lyricscontainer_resettranslationcache",
+      "index_lyricscontainer_savelocallyrics",
+      "index_lyricscontainer_setcurrentlyrics",
+      "index_lyricscontainer_togglefullscreen",
+      "index_lyricscontainer_togglereasoning",
+      "index_lyricscontainer_translatelyrics",
+      "index_lyricscontainer_tryservices",
+      "index_lyricscontainer_updatevisualonconfigchange"
+    ],
+    "4": [
+      "assets_libs_kuroshiro_min",
+      "assets_libs_kuroshiro_min_a",
+      "assets_libs_kuroshiro_min_arrayliketoarray",
+      "assets_libs_kuroshiro_min_arraywithoutholes",
+      "assets_libs_kuroshiro_min_asyncgeneratorstep",
+      "assets_libs_kuroshiro_min_asynctogenerator",
+      "assets_libs_kuroshiro_min_asynctogenerator_o",
+      "assets_libs_kuroshiro_min_asynctogenerator_u",
+      "assets_libs_kuroshiro_min_classcallcheck",
+      "assets_libs_kuroshiro_min_createclass",
+      "assets_libs_kuroshiro_min_d",
+      "assets_libs_kuroshiro_min_defineproperties",
+      "assets_libs_kuroshiro_min_e",
+      "assets_libs_kuroshiro_min_f",
+      "assets_libs_kuroshiro_min_g",
+      "assets_libs_kuroshiro_min_h",
+      "assets_libs_kuroshiro_min_interoprequiredefault",
+      "assets_libs_kuroshiro_min_iterabletoarray",
+      "assets_libs_kuroshiro_min_j",
+      "assets_libs_kuroshiro_min_k",
+      "assets_libs_kuroshiro_min_m",
+      "assets_libs_kuroshiro_min_n",
+      "assets_libs_kuroshiro_min_noniterablespread",
+      "assets_libs_kuroshiro_min_o",
+      "assets_libs_kuroshiro_min_r",
+      "assets_libs_kuroshiro_min_r_o",
+      "assets_libs_kuroshiro_min_toconsumablearray",
+      "assets_libs_kuroshiro_min_typeof",
+      "assets_libs_kuroshiro_min_u",
+      "assets_libs_kuroshiro_min_unsupportediterabletoarray"
+    ],
+    "5": [
+      "components_minilyrics",
+      "components_minilyrics_checkforpipwindow",
+      "components_minilyrics_cleanuppip",
+      "components_minilyrics_createlyricspanel",
+      "components_minilyrics_escapehtml",
+      "components_minilyrics_findactivelineindex",
+      "components_minilyrics_findqueueindocument",
+      "components_minilyrics_getlinedisplaytexts",
+      "components_minilyrics_initpipdetection",
+      "components_minilyrics_injectstyles",
+      "components_minilyrics_ishorizontalmode",
+      "components_minilyrics_isnoteline",
+      "components_minilyrics_maintainlyricsstate",
+      "components_minilyrics_onpipwindowfound",
+      "components_minilyrics_parsefurigana",
+      "components_minilyrics_rebuildlyricslines",
+      "components_minilyrics_renderempty",
+      "components_minilyrics_saveconfig",
+      "components_minilyrics_startpippolling",
+      "components_minilyrics_startupdateloop",
+      "components_minilyrics_stoppippolling",
+      "components_minilyrics_stopupdateloop",
+      "components_minilyrics_striphtml",
+      "components_minilyrics_tryinjectsettingstoggle",
+      "components_minilyrics_updatehorizontallyrics",
+      "components_minilyrics_updatelyrics",
+      "components_minilyrics_watchforsettingspanel"
+    ],
+    "6": [
+      "components_components",
+      "components_components_componentdidmount",
+      "components_components_componentdidmount_loopthroughcallback",
+      "components_components_componentdidmount_togglecallback",
+      "components_components_componentdidmount_unfocuscallback",
+      "components_components_componentwillunmount",
+      "components_components_constructor",
+      "components_components_creditfooter",
+      "components_components_emptyline",
+      "components_components_getnodefrominput",
+      "components_components_idlingindicator",
+      "components_components_isinviewport",
+      "components_components_isnoteline",
+      "components_components_loadingicon",
+      "components_components_pretranslatechip",
+      "components_components_reasoning_icon_paths",
+      "components_components_reasoning_tab_labels",
+      "components_components_reasoningwindow",
+      "components_components_render",
+      "components_components_translatingindicator",
+      "components_components_translatingindicatorrow",
+      "components_components_translatingindicatorrowcombined",
+      "components_components_translationstatusoverlay",
+      "components_components_uselyricscontainerrect",
+      "components_components_usetrackposition",
+      "components_components_versionselector"
+    ],
+    "7": [
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_ar",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_br",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_bt",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_classcallcheck",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_cn",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_d",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_e",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_en",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_fn",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_hr",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_ir",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_jr",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_jt",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_kn",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_kt",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_mr",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_or",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_pr",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_qr",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_rt",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_sn",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_sn_a",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_v",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_vr",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_vt_c",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_y"
+    ],
+    "8": [
+      "types_d",
+      "types_d_appconfig",
+      "types_d_cacheentry",
+      "types_d_colorstate",
+      "types_d_displaytexts",
+      "types_d_icachemanager",
+      "types_d_icachemanager_clear",
+      "types_d_icachemanager_delete",
+      "types_d_icachemanager_get",
+      "types_d_icachemanager_set",
+      "types_d_karaokeword",
+      "types_d_lyricline",
+      "types_d_lyricsdata",
+      "types_d_providerconfig",
+      "types_d_providerfunction",
+      "types_d_providersmap",
+      "types_d_trackinfo",
+      "types_d_translationstatus",
+      "types_d_videoinfo",
+      "types_d_visualconfig",
+      "types_d_window"
+    ],
+    "9": [
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_an",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_cr",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_dr",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_i",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_ir_u",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_jn",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_on",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_on_o",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_pt",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_pt_i",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_pt_o",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_qt",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_r",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_r_o",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_tr",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_u",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_ut",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_ut_c",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_ut_o",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_zt"
+    ],
+    "10": [
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_a",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_b",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_b_g",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_dt",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_dt_c",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_f",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_filter",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_fr",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_gr",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_l",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_lr",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_mt",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_p",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_s",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_t",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_un"
+    ],
+    "11": [
+      "services_translator",
+      "services_translator_translator",
+      "services_translator_translator_applykuromojifix",
+      "services_translator_translator_awaitfinished",
+      "services_translator_translator_callgemini",
+      "services_translator_translator_constructor",
+      "services_translator_translator_convertchinese",
+      "services_translator_translator_converttopinyin",
+      "services_translator_translator_converttoromaja",
+      "services_translator_translator_createtranslator",
+      "services_translator_translator_extractgeminijson",
+      "services_translator_translator_initializeasync",
+      "services_translator_translator_loadpinyinpro",
+      "services_translator_translator_normalizeromajistring",
+      "services_translator_translator_promote",
+      "services_translator_translator_romajifytext",
+      "services_translator_translator_waitforglobals"
+    ],
+    "12": [
+      "services_translationcoordinator",
+      "services_translationcoordinator_deletelocallyrics",
+      "services_translationcoordinator_formatduration",
+      "services_translationcoordinator_getgeminitranslation",
+      "services_translationcoordinator_gettraditionalconversion",
+      "services_translationcoordinator_lyricssource",
+      "services_translationcoordinator_maybeclearpretranslatechip",
+      "services_translationcoordinator_processlyricsfromfile",
+      "services_translationcoordinator_providelanguagecode",
+      "services_translationcoordinator_rationale_241",
+      "services_translationcoordinator_reattachtiming",
+      "services_translationcoordinator_resettranslationcache",
+      "services_translationcoordinator_savelocallyrics",
+      "services_translationcoordinator_translatelyrics",
+      "services_translationcoordinator_trypretranslatenext"
+    ],
+    "13": [
+      "services_geminiclient",
+      "services_geminiclient_geminiclient",
+      "services_geminiclient_geminiqueuephonetic",
+      "services_geminiclient_geminiqueuetranslation",
+      "services_geminiclient_rationale_580",
+      "services_geminiclient_requestqueue",
+      "services_geminiclient_requestqueue_add",
+      "services_geminiclient_requestqueue_cancel",
+      "services_geminiclient_requestqueue_cancelall",
+      "services_geminiclient_requestqueue_constructor",
+      "services_geminiclient_requestqueue_process",
+      "services_geminiclient_requestqueue_promote",
+      "services_geminiclient_requestqueue_status"
+    ],
+    "14": [
+      "utils_prompts",
+      "utils_prompts_buildphonetictaskthinkingrules",
+      "utils_prompts_buildpronounsection",
+      "utils_prompts_buildtaskthinkingrules",
+      "utils_prompts_buildtranslationflowpunctuation",
+      "utils_prompts_buildtranslationguardrails",
+      "utils_prompts_buildtranslationoutputjsonblock",
+      "utils_prompts_buildtranslationoutputtagsblock",
+      "utils_prompts_buildtranslationsystemprompt",
+      "utils_prompts_prompts",
+      "utils_prompts_pronoun_modes",
+      "utils_prompts_style_instructions",
+      "utils_prompts_translation_styles"
+    ],
+    "15": [
+      "assets_libs_pinyin_pro_min",
+      "assets_libs_pinyin_pro_min_buildfailpointer",
+      "assets_libs_pinyin_pro_min_buildtrie",
+      "assets_libs_pinyin_pro_min_constructor",
+      "assets_libs_pinyin_pro_min_filter",
+      "assets_libs_pinyin_pro_min_m",
+      "assets_libs_pinyin_pro_min_m_constructor",
+      "assets_libs_pinyin_pro_min_p",
+      "assets_libs_pinyin_pro_min_reset",
+      "assets_libs_pinyin_pro_min_search",
+      "assets_libs_pinyin_pro_min_w"
+    ],
+    "16": [
+      "components_tabbar",
+      "components_tabbar_getreactdom",
+      "components_tabbar_tabbar",
+      "components_tabbar_tabbarcontext",
+      "components_tabbar_tabbaritem",
+      "components_tabbar_tabbaritem_onlock",
+      "components_tabbar_tabbaritem_onselect",
+      "components_tabbar_tabbaritem_render",
+      "components_tabbar_tabbarmore",
+      "components_tabbar_topbarcontent"
+    ],
+    "17": [
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_at",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_dn",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_dt_a",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_h",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_hn",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_ot",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_pn",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_sn_f",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_vt"
+    ],
+    "18": [
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_bn",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_gn",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_mn",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_q",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_rn",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_sr",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_vn",
+      "assets_libs_kuroshiro_analyzer_kuromoji_min_xt"
+    ],
+    "19": [
+      "assets_libs_opencc_min",
+      "assets_libs_opencc_min_o",
+      "assets_libs_opencc_min_t",
+      "assets_libs_opencc_min_t_addword",
+      "assets_libs_opencc_min_t_constructor",
+      "assets_libs_opencc_min_t_convert",
+      "assets_libs_opencc_min_t_loaddict",
+      "assets_libs_opencc_min_t_loaddictgroup"
+    ],
+    "20": [
+      "components_components_karaokeline",
+      "components_syncedlyrics",
+      "components_syncedlyrics_computetimingstats",
+      "components_syncedlyrics_estimatelineduration",
+      "components_syncedlyrics_isnotelineobject",
+      "components_syncedlyrics_isreallynote",
+      "components_syncedlyrics_syncedexpandedlyricspage",
+      "components_syncedlyrics_syncedlyricspage"
+    ],
+    "21": [
+      "index",
+      "index_fontsizelimit",
+      "index_getconfig",
+      "index_render",
+      "index_resolvetranslationsource",
+      "index_syncconfigwithlocalstorage",
+      "index_thresholdsizelimit",
+      "react"
+    ],
+    "22": [
+      "manifest",
+      "manifest_active_icon",
+      "manifest_authors",
+      "manifest_description",
+      "manifest_icon",
+      "manifest_name",
+      "manifest_preview",
+      "manifest_readme"
+    ],
+    "23": [
+      "services_adblocker",
+      "services_adblocker_addeventlistener",
+      "services_adblocker_close",
+      "services_adblocker_dispatchevent",
+      "services_adblocker_removeeventlistener",
+      "services_adblocker_send",
+      "services_adblocker_set",
+      "services_adblocker_xmlhttprequest_send"
+    ],
+    "24": [
+      "manifest_tags",
+      "ref_ai",
+      "ref_lyrics",
+      "ref_phonetics",
+      "ref_spicetify",
+      "ref_translation",
+      "ref_vietnamese"
+    ],
+    "25": [
+      "utils_config",
+      "utils_config_cache",
+      "utils_config_config",
+      "utils_config_configutils",
+      "utils_config_debuglogger",
+      "utils_config_emptystate"
+    ],
+    "26": [
+      "components_playbarbutton",
+      "components_playbarbutton_removeplaybarbutton",
+      "components_playbarbutton_setplaybarbutton"
+    ],
+    "27": [
+      "utils_utils",
+      "utils_utils_dbmanager",
+      "utils_utils_utils"
+    ],
+    "28": [
+      "components_videobackground",
+      "components_videobackground_videobackground"
+    ],
+    "29": [
+      "components_videomanager",
+      "components_videomanager_videomanager"
+    ],
+    "30": [
+      "parsers_lrcparser",
+      "parsers_lrcparser_lrcparser"
+    ],
+    "31": [
+      "providers_providerlrclib",
+      "providers_providerlrclib_providerlrclib"
+    ],
+    "32": [
+      "providers_providermusixmatch",
+      "providers_providermusixmatch_providermusixmatch"
+    ],
+    "33": [
+      "providers_providernetease",
+      "providers_providernetease_providernetease"
+    ],
+    "34": [
+      "providers_providers",
+      "providers_providers_providers"
+    ],
+    "35": [
+      "services_idbcache",
+      "services_idbcache_idbcache"
+    ],
+    "36": [
+      "services_lyricsfetcher",
+      "services_lyricsfetcher_lyricsfetcher"
+    ],
+    "37": [
+      "services_updateservice",
+      "services_updateservice_updateservice"
+    ],
+    "38": [
+      "utils_cache",
+      "utils_cache_cachemanager"
+    ],
+    "39": [
+      "utils_translationutils",
+      "utils_translationutils_translationutils"
+    ],
+    "40": [
+      "assets_libs_aromanize_min"
+    ],
+    "41": [
+      "components_unsyncedlyrics"
+    ],
+    "42": [
+      "components_videosettingsmodal"
+    ],
+    "43": [
+      "i18n_i18n"
+    ],
+    "44": [
+      "i18n_langen"
+    ],
+    "45": [
+      "i18n_langja"
+    ],
+    "46": [
+      "i18n_langko"
+    ],
+    "47": [
+      "i18n_langvi"
+    ],
+    "48": [
+      "i18n_langzh"
+    ],
+    "49": [
+      "install"
+    ],
+    "50": [
+      "services_adblocker_xmlhttprequest_open"
+    ],
+    "51": [
+      "uninstall"
+    ],
+    "52": [
+      "utils_namespace"
+    ]
+  },
+  "cohesion": {
+    "0": 0.048484848484848485,
+    "1": 0.0859465737514518,
+    "2": 0.05128205128205128,
+    "3": 0.11174242424242424,
+    "4": 0.11954022988505747,
+    "5": 0.18518518518518517,
+    "6": 0.08,
+    "7": 0.15384615384615385,
+    "8": 0.1,
+    "9": 0.20526315789473684,
+    "10": 0.18333333333333332,
+    "11": 0.19117647058823528,
+    "12": 0.26666666666666666,
+    "13": 0.16666666666666666,
+    "14": 0.23076923076923078,
+    "15": 0.21818181818181817,
+    "16": 0.26666666666666666,
+    "17": 0.2777777777777778,
+    "18": 0.2857142857142857,
+    "19": 0.39285714285714285,
+    "20": 0.6071428571428571,
+    "21": 0.2857142857142857,
+    "22": 0.25,
+    "23": 0.25,
+    "24": 0.2857142857142857,
+    "25": 0.3333333333333333,
+    "26": 0.6666666666666666,
+    "27": 0.6666666666666666,
+    "28": 1.0,
+    "29": 1.0,
+    "30": 1.0,
+    "31": 1.0,
+    "32": 1.0,
+    "33": 1.0,
+    "34": 1.0,
+    "35": 1.0,
+    "36": 1.0,
+    "37": 1.0,
+    "38": 1.0,
+    "39": 1.0,
+    "40": 1.0,
+    "41": 1.0,
+    "42": 1.0,
+    "43": 1.0,
+    "44": 1.0,
+    "45": 1.0,
+    "46": 1.0,
+    "47": 1.0,
+    "48": 1.0,
+    "49": 1.0,
+    "50": 1.0,
+    "51": 1.0,
+    "52": 1.0
+  },
+  "gods": [
+    {
+      "id": "manifest_subfiles",
+      "label": "subfiles",
+      "degree": 39
+    },
+    {
+      "id": "assets_libs_kuroshiro_analyzer_kuromoji_min_t",
+      "label": "t()",
+      "degree": 35
+    },
+    {
+      "id": "assets_libs_kuroshiro_analyzer_kuromoji_min_e",
+      "label": "e()",
+      "degree": 35
+    },
+    {
+      "id": "index_lyricscontainer",
+      "label": "LyricsContainer",
+      "degree": 33
+    },
+    {
+      "id": "assets_libs_kuroshiro_analyzer_kuromoji_min_y",
+      "label": "y()",
+      "degree": 33
+    },
+    {
+      "id": "assets_libs_kuroshiro_analyzer_kuromoji_min_r",
+      "label": "r()",
+      "degree": 24
+    },
+    {
+      "id": "services_translator_translator",
+      "label": "Translator",
+      "degree": 16
+    },
+    {
+      "id": "components_settings_confighelper",
+      "label": "ConfigHelper()",
+      "degree": 15
+    },
+    {
+      "id": "assets_libs_kuroshiro_analyzer_kuromoji_min_ir_u",
+      "label": "u()",
+      "degree": 15
+    },
+    {
+      "id": "assets_libs_kuroshiro_analyzer_kuromoji_min_sn",
+      "label": "Sn()",
+      "degree": 11
+    }
+  ],
+  "surprises": [
+    {
+      "source": "t()",
+      "target": "O()",
+      "source_files": [
+        "assets/libs/kuroshiro-analyzer-kuromoji.min.js",
+        "assets/libs/kuroshiro.min.js"
+      ],
+      "confidence": "INFERRED",
+      "relation": "indirect_call",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    },
+    {
+      "source": "p()",
+      "target": "e()",
+      "source_files": [
+        "assets/libs/pinyin-pro.min.js",
+        "assets/libs/kuroshiro-analyzer-kuromoji.min.js"
+      ],
+      "confidence": "INFERRED",
+      "relation": "indirect_call",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    },
+    {
+      "source": "f()",
+      "target": "e()",
+      "source_files": [
+        "assets/libs/kuroshiro.min.js",
+        "assets/libs/kuroshiro-analyzer-kuromoji.min.js"
+      ],
+      "confidence": "INFERRED",
+      "relation": "indirect_call",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    },
+    {
+      "source": "o()",
+      "target": "e()",
+      "source_files": [
+        "assets/libs/kuroshiro.min.js",
+        "assets/libs/kuroshiro-analyzer-kuromoji.min.js"
+      ],
+      "confidence": "INFERRED",
+      "relation": "indirect_call",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    },
+    {
+      "source": "openOptionsModal()",
+      "target": "OptionList()",
+      "source_files": [
+        "components/OptionsMenu.js",
+        "components/Settings.js"
+      ],
+      "confidence": "INFERRED",
+      "relation": "indirect_call",
+      "why": "inferred connection - not explicitly stated in source"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `e()` connect `e` to `kuroshiro-analyzer-kuromoji.min.js`, `kuroshiro.min.js`, `r`, `t`, `pinyin-pro.min.js`, `at`?",
+      "why": "High betweenness centrality (0.030) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `t()` connect `t` to `kuroshiro-analyzer-kuromoji.min.js`, `kuroshiro.min.js`, `e`, `r`, `at`, `q`?",
+      "why": "High betweenness centrality (0.015) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `LyricsContainer` connect `LyricsContainer` to `index.js`?",
+      "why": "High betweenness centrality (0.015) - this node is a cross-community bridge."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 4 inferred relationships involving `t()` (e.g. with `r()` and `o()`) actually correct?",
+      "why": "`t()` has 4 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 6 inferred relationships involving `e()` (e.g. with `at()` and `o()`) actually correct?",
+      "why": "`e()` has 6 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "isolated_nodes",
+      "question": "What connects `AppConfig`, `ColorState`, `DisplayTexts` to the rest of the system?",
+      "why": "112 weakly-connected nodes found - possible documentation gaps or missing edges."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `kuroshiro-analyzer-kuromoji.min.js` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.048484848484848485 - nodes in this community are weakly interconnected."
+    }
+  ]
+}

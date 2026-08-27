@@ -1064,7 +1064,9 @@ window.LyricsPlus.TranslationCoordinator = {
 			});
 		}
 
-		const currentMode = self.getCurrentMode();
+		const currentMode = self.state?.mode !== -1 && self.state?.mode !== undefined
+			? self.state.mode
+			: (self.state?.synced ? 1 : (self.state?.unsynced ? 2 : (self.state?.karaoke ? 0 : -1)));
 		this.lyricsSource(self, self.state, currentMode);
 
 		if (!showProgress) {

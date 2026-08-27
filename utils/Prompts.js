@@ -37,7 +37,12 @@ CORE PRINCIPLE: Prioritize Emotional Impact, Poetic Flow, and Singability over d
    - Once the subject-object relationship is established, omit explicit pronouns where natural to let the actions and emotions flow.
    - Use poetic word order/inversion (e.g., "Nơi này lạnh giá" -> "Lạnh lẽo nơi đây") to enhance lyricism.
 
-3) Metaphors & Imagery Transcreation:
+3) CJK & J-Pop Narrative, Grammar & Enjambment:
+   - Identify character dynamics and persona (Boku/Kimi -> Tớ-Cậu / Anh-Em; Watashi/Anata -> Em-Anh / Tôi-Cậu; Ore/Omae -> Anh-Em / Tao-Mày). Maintain locked persona throughout.
+   - Japanese/Korean modify nouns before the noun (連体修飾) and often spread one sentence across multiple lines (enjambment). Understand the full thought across line breaks and adapt into natural Vietnamese line-by-line flow without disjointed or nonsensical fragments.
+   - Accurately decode cultural subtext and imagery (seasonal motifs, fleeting youth, unexpressed feelings) rather than literal dictionary translation.
+
+4) Metaphors & Imagery Transcreation:
    - Never translate foreign idioms literally if they lose meaning.
    - "Plastic love/voice" -> "Tình giả dối" / "Thanh âm vô hồn"
    - "Same temperature" -> "Hơi ấm tương đồng" / "Nhịp đập đồng điệu"
@@ -60,16 +65,32 @@ CORE PRINCIPLE: Prioritize Emotional Impact, Poetic Flow, and Singability over d
     },
 
     "youth_story": {
-        role: `You are a Storyteller for Anime/Indie music. Your goal is to translate a "Coming-of-age" story.`,
-        style: `STRATEGY: "SLICE OF LIFE"
-1) Tone: Youthful, direct, sincere, and slightly nostalgic.
-   - Avoid heavy/obscure Sino-Vietnamese (Hán Việt). Common ones everyday speakers use are fine.
-   - Examples (keep): "Thanh xuân", "Rực rỡ", "Ngốc nghếch".
-   - Examples (avoid as too heavy): "U hoài", "Thiên thu", "Ái tình", "Sầu bi".
+        role: `You are a Storyteller & Lyricist specializing in Anime, J-Pop, and Youth/Coming-of-Age music. Your goal is to transcreate the lyrics into vibrant, heartfelt Vietnamese that captures the youthful narrative and emotional subtext.`,
+        style: `STRATEGY: "YOUTH NARRATIVE & CULTURAL SUBTEXT"
+1) Tone & Persona:
+   - Youthful, sincere, introspective, and nostalgic.
+   - Japanese Pronoun Anchoring: Recognize character relationships from pronouns:
+     * 僕 (Boku) / 君 (Kimi): Gentle, introspective youth/friendship/innocent romance -> Translate as "Tớ - Cậu" (or "Anh - Em" for clear romance).
+     * 私 (Watashi) / あなた (Anata): Mature, polite or female perspective -> "Em - Anh" or "Tôi - Cậu".
+     * 俺 (Ore) / お前 (Omae): Direct, bold youth/rivalry -> "Anh - Em", "Tao - Mày" or "Tôi - Cậu".
+   - Maintain absolute consistency in pronoun persona across the entire track.
 
-2) Imagery:
-   - Preserve specific nouns (School, Train, Sunset, Uniform) as they are core to the genre.
-   - Example: "After school" -> "Tan trường", "On the way home" -> "Đường về".`,
+2) Enjambment & Relative Clauses (Mệnh đề bổ nghĩa & Câu vắt dòng):
+   - Japanese often places long modifying clauses before nouns (連体修飾) and splits a single grammatical sentence across 2 or more lyric lines.
+   - Grasp the entire sentence meaning before translating each line. Ensure natural Vietnamese clause ordering without producing dangling, incomplete, or grammatically severed phrases.
+
+3) J-Pop Metaphors & Cultural Subtext:
+   - Decode cultural motifs naturally:
+     * 桜 (sakura/cherry blossom) -> season of graduation, youth parting, new beginnings.
+     * 花火 (hanabi/fireworks) -> fleeting summer youth, ephemeral romance.
+     * 青い (aoi/blue) -> innocence, youth, inexperience.
+     * 茜色 (akane-iro/madder red dusk) -> nostalgic sunset, yearning.
+     * 雨 (ame/rain) -> unspoken sorrow, solitude, tears.
+   - Transcreate onomatopoeia/mimetic words (Gitaigo/Giongo) into vivid, musical Vietnamese verbs/adjectives (e.g. ぎゅっと -> ôm chặt/siết nhẹ, ふわり -> nhẹ trôi/bồng bềnh, ドキドキ -> xốn xang/thổn thức, ざらざら -> thô ráp/xót xa) rather than clumsy literal descriptions.
+
+4) Vocabulary Balance:
+   - Use accessible, emotional pure-Vietnamese and common musical terms ("thanh xuân", "rực rỡ", "ngốc nghếch").
+   - Avoid heavy, archaic, or stiff Sino-Vietnamese (avoid: "u hoài", "thiên thu", "ái tình", "sầu bi").`,
         pronounSuggestion: "Tớ - Cậu"
     },
 
@@ -166,9 +187,13 @@ function buildPronounSection(pronounKey, styleObj) {
         return `
 PRONOUN MODE: ANALYZE & LOCK
 
-STEP 1 — ANALYZE CONTEXT:
-Scan lyrics to determine relationship: Lovers? Friends? Family? Rivals?
-Look for clues: "Aishiteru/Love" (Romance) vs "Tomodachi/Friend" (Platonic).
+STEP 1 — ANALYZE CONTEXT & PERSONA:
+Scan lyrics to determine relationship and narrative tone: Lovers? Friends? Youth/Coming-of-age? Solitary reflection?
+Look for clues:
+- Japanese: 僕 (Boku) / 君 (Kimi) → Youthful romance / Friendship ("Tớ - Cậu" or "Anh - Em").
+- Japanese: 私 (Watashi) / あなた (Anata) → Mature romance / Female POV ("Em - Anh" or "Tôi - Cậu").
+- Japanese: 俺 (Ore) / お前 (Omae) → Assertive / Informal ("Anh - Em" or "Tao - Mày" or "Tôi - Cậu").
+- Universal: "Aishiteru/Love/Saranghae" (Romance) vs "Tomodachi/Chingu/Friend" (Platonic).
 
 STEP 2 — SELECT & LOCK:
 Pick ONE pronoun pair and STICK TO IT for the entire song:
@@ -180,6 +205,7 @@ Pick ONE pronoun pair and STICK TO IT for the entire song:
 STEP 3 — AVOID "ROBOTIC" PHRASING:
 - AVOID "Tôi - Bạn" unless strictly formal. It sounds unnatural in Vietnamese music.
 - If ambiguous, lean towards "Anh - Em" or "Tớ - Cậu" over "Tôi - Bạn".
+- Keep the pronoun pair consistent across all lines.
 
 `;
     }
@@ -215,21 +241,27 @@ function buildTranslationGuardrails() {
 4) Prefer nuanced verbs/nouns over adding descriptors.
 5) Idioms & interjections ONLY: translate the function minimally (no extra emotion words).
 6) No explanations. No parentheses like "(meaning: ...)".
-7) MODERN V-POP WORD CHOICE — when the source calls for common "soft/gentle/quiet/overused" concepts, use everyday V-pop vocabulary, NOT archaic/stiff substitutes or overused AI clichés. Required substitutions:
-   - "khẽ khàng" → use "nhẹ nhàng" (default), or "khẽ", "thì thầm", "se sẽ" by context
-   - "chao nghiêng" → use "nghiêng ngả", "chao đảo", "lung lay", or "lắc lư" by context
-   - "nỉ non" → use "thì thầm", "rì rào", "vọng lại"
-   - "thiên thu" / "vạn kiếp" → use "mãi mãi", "vĩnh viễn" (unless classical mode explicitly picked)
-   - "ái tình" → use "tình yêu" (unless classical mode)
-   - "nàng" / "chàng" as default pronoun → follow the locked pronoun pair (Anh-Em / Tớ-Cậu / etc.)
-   - "ngập tràn" → use "tràn đầy", "đong đầy", "chứa chan", or "đầy" (avoid overusing "ngập tràn")
-   - "đắm chìm" / "chìm đắm" → use "hòa mình", "say đắm", or "lạc vào" (avoid overusing "đắm chìm")
-   - "hoài niệm" → use "nhớ về", "ký ức", or "kỷ niệm xưa"
-   - "tô điểm" / "hòa quyện" → use natural, simpler V-pop phrasings
-   - "thấu suốt" / "thấu triệt" → use natural, softer pure-Vietnamese alternatives: "thấu hiểu", "hiểu thấu", "hiểu rõ", "nhận ra" (never use "thấu suốt" in romantic/pop songs)
-   - Stiff single-syllable word splitting: Avoid splitting standard compound words into stiff single-syllable units (e.g., do not use a lone "thấu", "phương", or "tình" if it sounds unnatural or cut off; use full natural compounds like "thấu hiểu", "phương trời", "tình yêu").
-   "khẽ khàng" and "chao nghiêng" in particular are known LLM tics — actively avoid them.
-8) NO POETIC-WORD REPETITION — EXCEPT for direct, verbatim repeated lines (like a chorus, hook, or refrain, which MUST be translated consistently and repeated exactly), any Hán-Việt / thi vị word (vấn vương, bâng khuâng, xao xuyến, mơ màng, man mác, da diết, ngọt lịm, dịu êm, mộng mị, u hoài, nhẹ nhàng, đắm chìm, ngập tràn, hoài niệm...) may appear AT MOST ONCE per song in non-identical lines. If the source repeats a motif in different/non-identical lines, vary the Vietnamese word each time. Same-word repetition across different lines is the main thing that makes auto-translated lyrics sound artificial.
+7) MODERN V-POP WORD CHOICE & REGISTER LAW — use everyday lyrical V-pop vocabulary, NOT archaic, textbook, or overused AI clichés:
+   - COGNITIVE VERBS & PERCEPTION (ANTI-REGISTER CLASH): For human perception, awareness, and emotional actions (biết, hiểu, nhận, thấy, nhìn, nghe, nhớ...), ALWAYS use natural Vietnamese phrasing with result complements: [Pure Vietnamese Verb] + [ra / được / thấy / rõ / thấu] (e.g., "hiểu ra", "nhận ra", "thấy rõ", "biết được", "thấu hiểu"). NEVER use stiff, archaic, or pseudo-philosophical 2-syllable Sino-Vietnamese compounds (e.g., NEVER use "thấu tỏ", "thấu triệt", "thấu suốt", "minh định", "đốn ngộ", "tri tường", "minh triệt" in song lyrics).
+   - EQUAL REGISTER & ANTI-SINO ESCALATION: Match the everyday register of the source text 1-to-1. When the source Japanese/Korean/Chinese uses basic everyday conversational vocabulary (e.g., 知る/見る/思う/分かる), the Vietnamese translation MUST use everyday conversational vocabulary (biết, thấy, nhìn, nghĩ, nhớ, hiểu), NEVER artificially escalating them to high-tier Sino-Vietnamese terms.
+   - CONVERSATIONAL SINGABILITY TEST: All lyrics must sound like modern lyrical Vietnamese that a singer in a pop/indie track would actually sing in real life, not like a translated martial arts/wuxia novel or philosophical essay.
+   - Specific cliché replacements:
+     - "khẽ khàng" → use "nhẹ nhàng" (default), or "khẽ", "thì thầm", "se sẽ" by context
+     - "chao nghiêng" → use "nghiêng ngả", "chao đảo", "lung lay", or "lắc lư" by context
+     - "nỉ non" → use "thì thầm", "rì rào", "vọng lại"
+     - "thiên thu" / "vạn kiếp" → use "mãi mãi", "vĩnh viễn" (unless classical mode explicitly picked)
+     - "ái tình" → use "tình yêu" (unless classical mode)
+     - "nàng" / "chàng" as default pronoun → follow the locked pronoun pair (Anh-Em / Tớ-Cậu / etc.)
+     - "ngập tràn" → use "tràn đầy", "đong đầy", "chứa chan", or "đầy" (avoid overusing "ngập tràn")
+     - "đắm chìm" / "chìm đắm" → use "hòa mình", "say đắm", or "lạc vào" (avoid overusing "đắm chìm")
+     - "hoài niệm" → use "nhớ về", "ký ức", or "kỷ niệm xưa"
+     - "tô điểm" / "hòa quyện" → use natural, simpler V-pop phrasings
+     - Stiff single-syllable word splitting: Avoid splitting standard compound words into stiff single-syllable units (e.g., do not use a lone "thấu", "phương", or "tình" if it sounds unnatural or cut off; use full natural compounds like "thấu hiểu", "phương trời", "tình yêu").
+8) NATURAL FLOW & MOTIF REPETITION CONTROL:
+   - Verbatim repeated lines (chorus, hook, refrain) MUST be translated consistently and repeated identically.
+   - For non-identical lines: Prioritize natural emotional flow (Natural Flow) over mechanical synonym-hunting. Core emotional motifs and thematic keywords of J-Pop/CJK (such as 想い omoi / tâm tư-nỗi niềm, 心 kokoro / trái tim-cõi lòng, 優しい yasashii / dịu dàng-ấm áp, 世界 sekai / thế giới-nơi này, 夢 yume / giấc mơ...) MAY be reused across different stanzas when the song's emotional arc genuinely requires it.
+   - Do NOT use obscure, unnatural Sino-Vietnamese synonyms just to avoid repeating a word.
+   - Prohibit lazy same-word repetition across 2 consecutive lines (2 dòng liên tiếp liền kề) unless the original lyrics do so.
 9) CRITICAL: Every single line MUST be fully translated into Vietnamese. Under no circumstances should you copy or output the original foreign text (Japanese, Korean, Chinese, etc.) for any line. Outputting original, untranslated lines is an absolute failure.`;
 }
 
@@ -240,7 +272,7 @@ function buildTranslationGuardrails() {
 function buildTranslationFlowPunctuation() {
     return `FLOW & PUNCTUATION:
 1) Use natural Vietnamese phrasing.
-2) If a sentence continues to the next line, do NOT end the current line with a comma.
+2) If a sentence continues to the next line (Enjambment), do NOT end the current line with a comma, and ensure the translated continuation connects smoothly in Vietnamese.
 3) Map emotional interjections (嗚呼, 呜呼, 아) to "Ah". Do not use "Ôi"/"Than ôi". Keep vocal sounds (Yeah, La la, Oh, Ah) unchanged.
 4) You may reorder phrases WITHIN a line for natural Vietnamese word order, but preserve meaning.`;
 }
@@ -287,10 +319,10 @@ ${hygiene}
 
 REASONING GUIDE:
 Use your reasoning space to perform an in-depth translation design and thorough self-audit:
-1. **Thematic & Slang Analysis:** Analyze the song's musical style, era, subtext, modern slang, and emotional narrative. Identify cultural reference points or metaphors and decode their true non-literal meaning before drafting the translation.
-2. **Grammar & Tone Integration:** Map sentence structures and inversion strategies. Pick matching pronouns and refine V-Pop phrasing.
+1. **Thematic, Subtext & Mimetic Analysis:** Analyze the song's musical style, era, subtext, and emotional narrative. Identify cultural reference points, idioms, enjambments, and mimetic/onomatopoeic words (擬態語 Gitaigo / Giongo like dokidoki, fuwari, gyutto, zarazara) and decode their true contextual meaning before drafting the translation.
+2. **Grammar & Tone Integration:** Map sentence structures and inversion strategies. Pick matching pronouns (Boku/Kimi, Watashi/Anata) and refine V-Pop phrasing.
 3. **Melodic Singability & Rhythm Audit:** Ensure every translated line matches the original tempo, syllable pacing, and vowel-flow.
-4. **Vocabulary & Repetition Check:** Review and eliminate cliché words, unnecessary subject pronouns, and repetitive poetic terms. Check that no poetic Hán-Việt term appears more than once per song.
+4. **Vocabulary, Register & Conversational Check:** Review and eliminate archaic/stiff Sino-Vietnamese terms (e.g. "thấu tỏ", "thấu triệt"), ensure perception verbs use natural pure Vietnamese ("hiểu ra", "nhận ra", "thấy rõ"), eliminate cliché words, and ensure all lines pass the conversational V-Pop singability test.
 
 *Constraint:* Keep reasoning to a general, high-level overview. Absolutely DO NOT list lines, write out draft translations, or draft specific line translations inside the reasoning block.`;
     }
@@ -302,9 +334,9 @@ ${hygiene}
 REASONING GUIDE:
 Use your reasoning space to plan the translation:
 1. **Genre & Mood:** Identify the style and emotional theme of the track.
-2. **Pronoun Locking:** Choose and maintain the perfect pronoun pair based on the song's relationship context.
-3. **Metaphor & Slang Strategy:** Identify complex idioms, cultural metaphors, or modern slang. Use this thinking space to analyze their true non-literal meaning and plan their natural, poetic Vietnamese transcreation instead of translating literally word-by-word.
-4. **Syllable Control:** Ensure translated lines fit the rhythm and are singable.
+2. **Pronoun & Persona Locking:** Choose and maintain the perfect pronoun pair based on the song's relationship context (Boku/Kimi, Watashi/Anata, etc.).
+3. **Metaphor, Gitaigo & Slang Strategy:** Identify complex idioms, cultural metaphors, enjambments, or mimetic words (Gitaigo). Use this thinking space to analyze their true non-literal meaning and plan their natural, poetic Vietnamese transcreation instead of translating literally word-by-word.
+4. **Syllable & Register Control:** Ensure translated lines fit the rhythm, use natural pure-Vietnamese perception verbs ("hiểu ra", "nhận ra" instead of archaic terms), and sound singable.
 
 *Constraint:* Keep reasoning to a general, high-level overview. Absolutely DO NOT list lines, write out draft translations, or draft specific line translations inside the reasoning block.`;
     }
@@ -316,9 +348,9 @@ ${hygiene}
 REASONING GUIDE:
 Use your thinking space to perform a quick, focused translation planning:
 1. **Genre & Mood:** Identify the song's musical style and overall emotional theme.
-2. **Pronoun Check:** Select the appropriate pronoun pair based on the narrative context.
-3. **Metaphor & Slang Strategy:** Identify complex idioms, cultural metaphors, or modern slang. Use this thinking space to analyze their true non-literal meaning and plan their natural, poetic Vietnamese transcreation instead of translating literally word-by-word.
-4. **Flow & Length:** Ensure the syllable count and pace of the Vietnamese draft feel natural and singable alongside the source lines.
+2. **Pronoun & Persona Check:** Select the appropriate pronoun pair based on the narrative context (Boku/Kimi, Watashi/Anata, etc.).
+3. **Metaphor, Gitaigo & Slang Strategy:** Identify complex idioms, cultural metaphors, enjambments, or mimetic words (Gitaigo). Use this thinking space to analyze their true non-literal meaning and plan their natural, poetic Vietnamese transcreation instead of translating literally word-by-word.
+4. **Flow, Register & Singability:** Ensure the syllable count and pace feel natural, use everyday conversational phrasing ("hiểu ra", "thấy rõ"), and avoid archaic Sino-Vietnamese tics.
 
 *Constraint:* Keep reasoning to a general, high-level overview. Absolutely DO NOT list lines, write out draft translations, or draft specific line translations inside the reasoning block.`;
 }
@@ -705,3 +737,5 @@ Output: JSON with key "phonetics" containing array of ${lineCount} romanized str
         };
     }
 };
+
+window.Prompts = Prompts;

@@ -31,9 +31,9 @@ const LRCParser = {
         const unsynced = [];
 
         const isSynced = lines.some(line => syncedTimestamp.test(line));
-        const synced = isSynced ? [] : null;
+        let synced = isSynced ? [] : null;
         const isKaraoke = lines.some(line => karaokeTimestamp.test(line));
-        const karaoke = isKaraoke ? [] : null;
+        let karaoke = isKaraoke ? [] : null;
 
         // Shared regex for cleaning timestamps from text
         const TIMESTAMP_CLEAN_RE = /\[\d{1,3}:\d{1,3}[:.]\d+\]/g;
@@ -79,7 +79,7 @@ const LRCParser = {
             }
             if (isKaraoke && time) {
                 const nextTime = lines[i + 1]?.match(syncedTimestamp)?.[1];
-                const endTime = nextTime || Spicetify.Player.getDuration() ? Utils.formatTime(Spicetify.Player.getDuration()) : "0:00"; 
+                const endTime = nextTime || (Spicetify.Player.getDuration() ? Utils.formatTime(Spicetify.Player.getDuration()) : "0:00");
                 // Note: Utils.formatTime dependency needs attention. 
                 // Either pass it in or duplicate a simple helper here to keep this pure.
                 // Decdision: Duplicate simple helper to keep module pure.
@@ -113,7 +113,11 @@ const LRCParser = {
             }
         }
 
-        return { synced, unsynced, karaoke };
+        return {
+            synced: (synced && synced.length > 0) ? synced : null,
+            unsynced,
+            karaoke: (karaoke && karaoke.length > 0) ? karaoke : null
+        };
     },
 
     /**

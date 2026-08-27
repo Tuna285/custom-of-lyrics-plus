@@ -78,6 +78,16 @@ Synced lyrics are rendered by **TWO separate components**:
 
 ---
 
+### E. Karaoke Deprecation & Frozen Status Invariant
+* **Scope & Intent:** This repository focuses **100% on AI Translation (Gemini), Phonetics (Furigana/Romaji/Pinyin), PiP MiniLyrics, and Video Background**.
+* **Legacy Artifacts:** All karaoke references (`KARAOKE = 0`, `isKara`, `KaraokeLine`, `parseKaraokeLine`, `getKaraoke`) are **frozen legacy code** from the upstream `lyrics-plus` fork.
+* **CRITICAL INVARIANT FOR ALL AGENTS / CONTRIBUTORS:**
+  * **DO NOT** refactor, modify, optimize, or develop features for Karaoke.
+  * **DO NOT** remove or re-index `CONFIG.modes = ["karaoke", "synced", "unsynced", "genius"]` — downstream code, IndexedDB cache schemas, and tab navigation depend strictly on exact index positions (`1: synced`, `2: unsynced`, `3: genius`).
+  * Treat all Karaoke code as completely frozen and passive.
+
+---
+
 ## 3. Development Commands & Workflow
 
 ```powershell

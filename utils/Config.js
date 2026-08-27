@@ -213,7 +213,7 @@ const CONFIG = {
         },
     },
     providersOrder: localStorage.getItem("lyrics-plus:services-order"),
-    modes: ["synced", "unsynced"],
+    modes: ["karaoke", "synced", "unsynced", "genius"],
     locked: localStorage.getItem("lyrics-plus:lock-mode") || "-1",
 };
 
