@@ -224,7 +224,6 @@ const VideoManager = {
             const apiKey = "AIzaSyAO_FJ2SlvU8Q4UYNuLic2MeElzYsS180";
             const targetUrl = `https://www.youtube.com/youtubei/v1/search?key=${apiKey}`;
             
-            // Allow user-configured CORS proxy or fallback to public proxies to bypass cors-proxy.spicetify.app 403 blocks
             const configuredProxy = localStorage.getItem("spicetify:corsProxyTemplate");
             const proxyTemplates = configuredProxy 
                 ? [configuredProxy]
@@ -254,17 +253,32 @@ const VideoManager = {
                 const requestUrl = template.replace("{url}", encodeURIComponent(targetUrl)).replace("{url_raw}", targetUrl);
                 try {
                     let rawData = null;
-                    if (window.Spicetify?.CosmosAsync?.post) {
-                        const res = await window.Spicetify.CosmosAsync.post(requestUrl, body, headers);
-                        rawData = typeof res === "string" ? res : JSON.stringify(res);
+                    try {
+                        const res = await fetch(requestUrl, {
+                            method: "POST",
+                            headers: headers,
+                            body: JSON.stringify(body)
+                        });
+                        if (res.ok) {
+                            rawData = await res.text();
+                        }
+                    } catch (_) {}
+
+                    if (!rawData && window.Spicetify?.CosmosAsync?.post) {
+                        try {
+                            const res = await window.Spicetify.CosmosAsync.post(requestUrl, body, headers);
+                            rawData = typeof res === "string" ? res : JSON.stringify(res);
+                        } catch (_) {}
                     }
 
                     if (rawData && !rawData.includes("403 Forbidden") && !rawData.includes("<!DOCTYPE")) {
                         const watchMatches = [...rawData.matchAll(/"videoId"\s*:\s*"([a-zA-Z0-9_-]{11})"/g)];
                         if (watchMatches.length > 0) {
-                            const videoIds = [...new Set(watchMatches.map(m => m[1]))];
-                            console.log(`[VideoManager] TVHTML5 InnerTube search via proxy (${requestUrl}) returned ${videoIds.length} YouTube videos.`);
-                            return videoIds.map(id => ({
+                            const uniqueIds = [...new Set(watchMatches.map(m => m[1]))];
+                            // Take only the top 5 most relevant search results (dropping bottom recommended feed)
+                            const topCandidates = uniqueIds.slice(0, 5);
+                            console.log(`[VideoManager] TVHTML5 InnerTube search via proxy returned top ${topCandidates.length} relevant YouTube videos.`);
+                            return topCandidates.map(id => ({
                                 videoId: id,
                                 title: query,
                                 author: "",
@@ -273,7 +287,7 @@ const VideoManager = {
                         }
                     }
                 } catch (proxyErr) {
-                    console.warn(`[VideoManager] TVHTML5 search failed on proxy (${requestUrl}):`, proxyErr.message);
+                    console.warn(`[VideoManager] TVHTML5 search failed on proxy:`, proxyErr.message);
                 }
             }
         } catch (e) {
