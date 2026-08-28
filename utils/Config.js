@@ -61,9 +61,6 @@ try {
     if (!localStorage.getItem("spicetify:corsProxyTemplate")) {
         localStorage.setItem("spicetify:corsProxyTemplate", "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}");
     }
-    if (localStorage.getItem("lyrics-plus:visual:video-background-fullscreen") === null) {
-        localStorage.setItem("lyrics-plus:visual:video-background-fullscreen", "true");
-    }
 } catch (_) {}
 
 // Debug Logger - only logs when debug-mode is enabled
@@ -190,7 +187,7 @@ const CONFIG = {
         "video-background-dim": Number(localStorage.getItem("lyrics-plus:visual:video-background-dim")) || 50,
         "video-host": localStorage.getItem("lyrics-plus:visual:video-host") || "www.youtube.com",
         "video-background-scale": Number(localStorage.getItem("lyrics-plus:visual:video-background-scale")) || 1.0,
-        "video-background-fullscreen": ConfigUtils.get("lyrics-plus:visual:video-background-fullscreen", true),
+        "video-background-fullscreen": ConfigUtils.get("lyrics-plus:visual:video-background-fullscreen", false),
         "mini-lyrics": ConfigUtils.get("lyrics-plus:visual:mini-lyrics", false),
     },
     providers: {

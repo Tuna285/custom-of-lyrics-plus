@@ -351,14 +351,16 @@ const VideoBackground = (() => {
             );
         };
 
+        const isFullscreenMode = Boolean(fullscreen);
+
         return react.createElement("div", {
-            className: `lyrics-video-background-container video-bg-fullscreen`,
+            className: `lyrics-video-background-container${isFullscreenMode ? " video-bg-fullscreen" : ""}`,
             style: {
-                position: "fixed",
+                position: isFullscreenMode ? "fixed" : "absolute",
                 top: 0,
                 left: 0,
-                width: "100vw",
-                height: "100vh",
+                width: isFullscreenMode ? "100vw" : "100%",
+                height: isFullscreenMode ? "100vh" : "100%",
                 overflow: "hidden",
                 zIndex: -1,
             }

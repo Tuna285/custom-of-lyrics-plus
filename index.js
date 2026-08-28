@@ -1197,7 +1197,13 @@ class LyricsContainer extends react.Component {
 					brightness: CONFIG.visual["video-background-dim"],
 					blurAmount: CONFIG.visual["video-background-blur"],
 					scale: CONFIG.visual["video-background-scale"],
-					fullscreen: true,
+					fullscreen: Boolean(
+						CONFIG.visual["video-background-fullscreen"] ||
+						this.state.isFullscreen ||
+						this.state.isFADMode ||
+						!!fadLyricsContainer ||
+						!!document.fullscreenElement
+					),
 					videoInfo: this.state.videoBackground,
 				}),
 			react.createElement(window.TranslationStatusOverlay, {
