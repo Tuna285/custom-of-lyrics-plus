@@ -228,6 +228,7 @@ const VideoManager = {
             const proxyTemplates = configuredProxy 
                 ? [configuredProxy]
                 : [
+                    "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}",
                     "https://corsproxy.io/?{url}",
                     "https://api.allorigins.win/raw?url={url}",
                     "{url}"

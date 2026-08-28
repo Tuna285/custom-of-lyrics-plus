@@ -562,9 +562,11 @@ const ServiceList = ({ itemsList, onListChange = () => { }, onToggle = () => { }
 };
 
 const corsProxyTemplate = () => {
-	const [proxyValue, setProxyValue] = react.useState(localStorage.getItem("spicetify:corsProxyTemplate") || "https://cors-proxy.spicetify.app/{url}");
+	const [proxyValue, setProxyValue] = react.useState(
+		localStorage.getItem("spicetify:corsProxyTemplate") || "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}"
+	);
 	return react.createElement("input", {
-		placeholder: "CORS Proxy Template", value: proxyValue,
+		placeholder: "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}", value: proxyValue,
 		onChange: (event) => {
 			const value = event.target.value; setProxyValue(value);
 			if (value === "" || !value) return localStorage.removeItem("spicetify:corsProxyTemplate");
