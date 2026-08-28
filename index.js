@@ -472,6 +472,7 @@ class LyricsContainer extends react.Component {
 
 		this.fetchTempo(info.uri);
 		this.resetDelay();
+		this.fetchVideoBackground(info);
 
 		let tempState;
 		// if lyrics are cached
@@ -559,7 +560,6 @@ class LyricsContainer extends react.Component {
 
 		// if song changed one time
 		if (tempState.uri !== this.state.uri || refresh) {
-			this.fetchVideoBackground(info);
 			// when a song starts for the first time and language-override is selected, the lyrics are converted to the specified language.
 			// however, when switching it off again, the detected language needs to be known, so defaultLanguage has been introduced.
 			const newLyrics = tempState.synced || tempState.unsynced || tempState.genius || [];
@@ -851,6 +851,9 @@ class LyricsContainer extends react.Component {
 					CACHE[resp.uri] = resp;
 				}
 			});
+			if (CONFIG.visual["video-background"] && window.VideoManager && typeof window.VideoManager.fetchVideoForTrack === "function") {
+				window.VideoManager.fetchVideoForTrack(nextInfo, null, true);
+			}
 		};
 
 		if (Spicetify.Player?.data?.item) {
