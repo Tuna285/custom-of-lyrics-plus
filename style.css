@@ -359,10 +359,13 @@
   transform: translateY(
     calc(var(--position-index) * var(--lyrics-line-height) + var(--offset))
   );
-  transform-origin: var(--lyrics-align-text);
-  transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+  transform-origin: var(--lyrics-align-text, left center);
+  transition-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
   transition-duration: var(--line-transition-duration, 0.4s);
   transition-property: transform, color, opacity, text-shadow, filter;
+  will-change: transform, opacity, filter;
+  backface-visibility: hidden;
+  -webkit-font-smoothing: subpixel-antialiased;
 }
 
 .lyrics-lyricsContainer-LyricsContainer.blur-enabled
@@ -379,7 +382,7 @@
 
 .lyrics-lyricsContainer-UnsyncedLyricsPage .lyrics-lyricsContainer-LyricsLine {
   color: var(--lyrics-color-inactive);
-  transition: color 0.25s cubic-bezier(0, 0, 0.58, 1);
+  transition: color 0.25s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .lyrics-lyricsContainer-UnsyncedLyricsPage
@@ -407,13 +410,13 @@
   transform: translateY(
       calc(var(--position-index) * var(--lyrics-line-height) + var(--offset))
     )
-    scale(1.1);
+    scale(1.06);
   filter: none !important;
-  /* Glow effect for active line */
+  /* Ambient glow effect for active line */
   text-shadow:
-    0 0 20px rgba(255, 255, 255, 0.35),
-    0 0 40px rgba(255, 255, 255, 0.15),
-    0 2px 8px rgba(0, 0, 0, 0.4);
+    0 0 16px rgba(255, 255, 255, 0.3),
+    0 0 32px rgba(255, 255, 255, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
 .lyrics-lyricsContainer-SyncedLyrics
