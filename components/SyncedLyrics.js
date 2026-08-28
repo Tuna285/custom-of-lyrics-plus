@@ -160,19 +160,27 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
             }
 
             if (currentLine && nextLine && currentLine.startTime && nextLine.startTime) {
-                const interval = nextLine.startTime - currentLine.startTime;
+                                const interval = nextLine.startTime - currentLine.startTime;
                 const estDur = estimateLineDuration(currentLine, timingStats);
-                const silentDuration = nextLine.startTime - (currentLine.startTime + estDur);
+                const silentDuration = interval - estDur;
 
                 const canInsert =
                     silentDuration >= 4500 &&
+                    interval >= GAP_THRESHOLD_MIN &&
                     !isNoteLineObject(currentLine) &&
                     !isNoteLineObject(nextLine);
 
                 if (canInsert) {
-                    const lineEnd = currentLine.startTime + estDur;
-                    const insertTime = lineEnd + 1000;
-                    if (nextLine.startTime - insertTime >= 3000) {
+                    const text = currentLine.originalText || currentLine.text || "";
+                    const len = typeof text === "string" ? text.trim().length : 0;
+                    const ratio = len < 10 ? 0.85 : len < 20 ? 0.80 : LINE_END_INTERVAL_FLOOR_RATIO;
+
+                    const lineEnd = currentLine.startTime + Math.min(
+                        Math.max(estDur, interval * ratio),
+                        estDur * 1.5
+                    );
+                    const insertTime = lineEnd + IDLE_GRACE_MS;
+                    if (nextLine.startTime - insertTime >= IDLE_MIN_VISIBLE_MS) {
                         processed.push({
                             text: "♪",
                             startTime: insertTime,
@@ -457,18 +465,19 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
             }
 
             if (currentLine && nextLine && currentLine.startTime && nextLine.startTime) {
-                const interval = nextLine.startTime - currentLine.startTime;
-                // Auto-gap detector with adaptive threshold + grace period.
+                                const interval = nextLine.startTime - currentLine.startTime;
+                const estDur = estimateLineDuration(currentLine, timingStats);
+                const silentDuration = interval - estDur;
+
                 const canInsert =
                     silentDuration >= 4500 &&
+                    interval >= GAP_THRESHOLD_MIN &&
                     !isNoteLineObject(currentLine) &&
                     !isNoteLineObject(nextLine);
 
                 if (canInsert) {
-                    const estDur = estimateLineDuration(currentLine, timingStats);
                     const text = currentLine.originalText || currentLine.text || "";
                     const len = typeof text === "string" ? text.trim().length : 0;
-                    // Dynamic safety floor ratio based on character length.
                     const ratio = len < 10 ? 0.85 : len < 20 ? 0.80 : LINE_END_INTERVAL_FLOOR_RATIO;
 
                     const lineEnd = currentLine.startTime + Math.min(
