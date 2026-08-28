@@ -327,10 +327,13 @@ const ProviderNetease = (() => {
                 setResults([]);
                 setErrorMsg("");
                 try {
-                    const songs = await searchSongs(cleanQuery, 8);
+                    const songs = await searchSongs(cleanQuery, 5);
                     
-                    // Fetch lyric status for all results in parallel to detect sync type
-                    const songsWithLyrics = await Promise.all(songs.map(async (song) => {
+                    // Fetch lyric status only for top 3 results to save proxy request quota
+                    const songsWithLyrics = await Promise.all(songs.map(async (song, idx) => {
+                        if (idx > 2) {
+                            return { ...song, hasLyrics: undefined, isSynced: undefined };
+                        }
                         try {
                             const lyricData = await fetchLyricsById(song.id);
                             const rawLrc = lyricData?.lrc?.lyric || "";
