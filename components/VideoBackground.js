@@ -138,6 +138,17 @@ const VideoBackground = (() => {
                             setIsPlayerReady(true);
                             event.target.mute();
 
+                            try {
+                                if (typeof event.target.getIframe === "function") {
+                                    const iframe = event.target.getIframe();
+                                    if (iframe) {
+                                        iframe.style.pointerEvents = "none";
+                                        iframe.tabIndex = -1;
+                                        iframe.setAttribute("aria-hidden", "true");
+                                    }
+                                }
+                            } catch (_) {}
+
                             // Unload & clear captions/subtitles modules completely to prevent layout interference
                             try {
                                 if (typeof event.target.setOption === "function") {

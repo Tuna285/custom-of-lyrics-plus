@@ -424,6 +424,15 @@
   opacity: 0;
 }
 
+/* Video Background - Disable all mouse/hover interactions to eliminate YouTube overlays & icons */
+.lyrics-video-background-container,
+.lyrics-video-background-container *,
+.lyrics-video-background-container iframe {
+  pointer-events: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
 /* Video Background Active - Enhanced text visibility for bright videos */
 .video-bg-active .lyrics-lyricsContainer-LyricsLine {
   text-shadow: none;
