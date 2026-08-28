@@ -4,14 +4,15 @@ const ProviderNetease = (() => {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         "Referer":    "https://music.163.com",
         "Origin":     "https://music.163.com",
+        "Cookie":     "os=pc; appver=8.9.70; channel=netease; __remember_me=true;",
     };
 
     async function searchSongs(query, limit = 5) {
-        const urlPrimary = `http://music.163.com/api/search/get?s=${encodeURIComponent(query)}&type=1&offset=0&limit=${limit}`;
+        const urlPrimary = `https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(query)}&type=1&offset=0&limit=${limit}`;
         const headers = { ...BASE_HEADERS };
         const token = typeof CONFIG !== "undefined" && CONFIG?.providers?.netease?.token;
         if (token) {
-            headers["Cookie"] = token;
+            headers["Cookie"] = `${BASE_HEADERS.Cookie} ${token}`;
         }
 
         try {
@@ -19,14 +20,18 @@ const ProviderNetease = (() => {
             if (json.code === 200) {
                 return json?.result?.songs || [];
             }
-            throw new Error(`NetEase search code ${json.code}`);
+            if (json.code !== 200) {
+                console.warn(`[ProviderNetease] Primary cloudsearch returned code ${json.code}, trying fallback...`);
+            }
+        } catch (_) {}
+
+        // Fallback to legacy HTTPS search if cloudsearch fails
+        try {
+            const urlSecondary = `https://music.163.com/api/search/get?s=${encodeURIComponent(query)}&type=1&offset=0&limit=${limit}`;
+            const json2 = await Spicetify.CosmosAsync.get(urlSecondary, null, headers);
+            if (json2.code === 200) return json2?.result?.songs || [];
+            throw new Error(`NetEase search code ${json2.code}`);
         } catch (e) {
-            // Fallback to HTTPS cloudsearch if needed
-            try {
-                const urlSecondary = `https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(query)}&type=1&offset=0&limit=${limit}`;
-                const json2 = await Spicetify.CosmosAsync.get(urlSecondary, null, headers);
-                if (json2.code === 200) return json2?.result?.songs || [];
-            } catch (_) {}
             throw new Error(`NetEase search failed: ${e.message}`);
         }
     }
