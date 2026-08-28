@@ -7,42 +7,58 @@ const ProviderNetease = (() => {
         "Cookie":     "os=pc; appver=8.9.70; channel=netease; __remember_me=true;",
     };
 
+    async function fetchNetEase(targetUrl) {
+        if (!targetUrl) return null;
+        const proxyTemplate = localStorage.getItem("spicetify:corsProxyTemplate") || "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}";
+        const proxiedUrl = proxyTemplate.replace("{url}", encodeURIComponent(targetUrl));
+
+        // 1. Primary: Direct fetch via our Cloudflare Worker CORS Proxy
+        try {
+            const res = await fetch(proxiedUrl);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && (data.code === 200 || data.result)) return data;
+            }
+        } catch (_) {}
+
+        // 2. Fallback: Spicetify.CosmosAsync
+        try {
+            const data = await Spicetify.CosmosAsync.get(targetUrl, null, BASE_HEADERS);
+            if (data && (data.code === 200 || data.result)) return data;
+        } catch (_) {}
+
+        // 3. Fallback: corsproxy.io
+        try {
+            const fallbackUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+            const res = await fetch(fallbackUrl);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && (data.code === 200 || data.result)) return data;
+            }
+        } catch (_) {}
+
+        return null;
+    }
+
     async function searchSongs(query, limit = 5) {
         if (!query || !query.trim()) return [];
         const cleanQ = query.trim();
-        const headers = { ...BASE_HEADERS };
-        const token = typeof CONFIG !== "undefined" && CONFIG?.providers?.netease?.token;
-        if (token) {
-            headers["Cookie"] = `${BASE_HEADERS.Cookie} ${token}`;
-        }
 
-        // 1. Try Primary CloudSearch
+        // 1. Try CloudSearch PC
         try {
             const urlPrimary = `https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
-            const json = await Spicetify.CosmosAsync.get(urlPrimary, null, headers);
+            const json = await fetchNetEase(urlPrimary);
             if (json && json.code === 200 && Array.isArray(json?.result?.songs)) {
                 return json.result.songs;
             }
         } catch (_) {}
 
-        // 2. Try Secondary Search
+        // 2. Try Secondary Search GET
         try {
             const urlSecondary = `https://music.163.com/api/search/get?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
-            const json2 = await Spicetify.CosmosAsync.get(urlSecondary, null, headers);
+            const json2 = await fetchNetEase(urlSecondary);
             if (json2 && json2.code === 200 && Array.isArray(json2?.result?.songs)) {
                 return json2.result.songs;
-            }
-        } catch (_) {}
-
-        // 3. Try Direct Fetch (native fallback)
-        try {
-            const directUrl = `https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
-            const res = await fetch(directUrl);
-            if (res.ok) {
-                const json3 = await res.json();
-                if (json3 && json3.code === 200 && Array.isArray(json3?.result?.songs)) {
-                    return json3.result.songs;
-                }
             }
         } catch (_) {}
 
@@ -51,26 +67,10 @@ const ProviderNetease = (() => {
 
     async function fetchLyricsById(id) {
         if (!id) return null;
-        const headers = { ...BASE_HEADERS };
-        const token = typeof CONFIG !== "undefined" && CONFIG?.providers?.netease?.token;
-        if (token) {
-            headers["Cookie"] = `${BASE_HEADERS.Cookie} ${token}`;
-        }
-
-        // 1. Try Primary Lyric endpoint
         try {
             const url = `https://music.163.com/api/song/lyric?id=${id}&lv=-1&kv=-1&tv=-1`;
-            const json = await Spicetify.CosmosAsync.get(url, null, headers);
+            const json = await fetchNetEase(url);
             if (json && json.code === 200) return json;
-        } catch (_) {}
-
-        // 2. Try Direct Fetch
-        try {
-            const res = await fetch(`https://music.163.com/api/song/lyric?id=${id}&lv=-1&kv=-1&tv=-1`);
-            if (res.ok) {
-                const json2 = await res.json();
-                if (json2 && json2.code === 200) return json2;
-            }
         } catch (_) {}
 
         return null;

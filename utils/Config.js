@@ -56,6 +56,13 @@ const ConfigUtils = {
     }
 };
 
+// Auto-initialize default CORS proxy template if empty
+try {
+    if (!localStorage.getItem("spicetify:corsProxyTemplate")) {
+        localStorage.setItem("spicetify:corsProxyTemplate", "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}");
+    }
+} catch (_) {}
+
 // Debug Logger - only logs when debug-mode is enabled
 const DebugLogger = {
     log(...args) {
