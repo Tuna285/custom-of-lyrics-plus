@@ -180,7 +180,7 @@ const CONFIG = {
         "video-background-dim": Number(localStorage.getItem("lyrics-plus:visual:video-background-dim")) || 50,
         "video-host": localStorage.getItem("lyrics-plus:visual:video-host") || "www.youtube.com",
         "video-background-scale": Number(localStorage.getItem("lyrics-plus:visual:video-background-scale")) || 1.0,
-        "video-background-fullscreen": ConfigUtils.get("lyrics-plus:visual:video-background-fullscreen", false),
+        "video-background-fullscreen": ConfigUtils.get("lyrics-plus:visual:video-background-fullscreen", true),
         "mini-lyrics": ConfigUtils.get("lyrics-plus:visual:mini-lyrics", false),
     },
     providers: {

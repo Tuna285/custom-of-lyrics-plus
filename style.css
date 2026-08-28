@@ -433,6 +433,15 @@
   -webkit-user-select: none !important;
 }
 
+.lyrics-video-background-container.video-bg-fullscreen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: -1 !important;
+}
+
 /* Video Background Active - Enhanced text visibility for bright videos */
 .video-bg-active .lyrics-lyricsContainer-LyricsLine {
   text-shadow: none;
