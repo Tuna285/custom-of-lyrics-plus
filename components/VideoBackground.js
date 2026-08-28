@@ -352,13 +352,13 @@ const VideoBackground = (() => {
         };
 
         return react.createElement("div", {
-            className: `lyrics-video-background-container${fullscreen ? " video-bg-fullscreen" : ""}`,
+            className: `lyrics-video-background-container video-bg-fullscreen`,
             style: {
-                position: fullscreen ? "fixed" : "absolute",
+                position: "fixed",
                 top: 0,
                 left: 0,
-                width: fullscreen ? "100vw" : "100%",
-                height: fullscreen ? "100vh" : "100%",
+                width: "100vw",
+                height: "100vh",
                 overflow: "hidden",
                 zIndex: -1,
             }
