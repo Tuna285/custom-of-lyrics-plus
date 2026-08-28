@@ -8,49 +8,72 @@ const ProviderNetease = (() => {
     };
 
     async function searchSongs(query, limit = 5) {
-        const urlPrimary = `https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(query)}&type=1&offset=0&limit=${limit}`;
+        if (!query || !query.trim()) return [];
+        const cleanQ = query.trim();
         const headers = { ...BASE_HEADERS };
         const token = typeof CONFIG !== "undefined" && CONFIG?.providers?.netease?.token;
         if (token) {
             headers["Cookie"] = `${BASE_HEADERS.Cookie} ${token}`;
         }
 
+        // 1. Try Primary CloudSearch
         try {
+            const urlPrimary = `https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
             const json = await Spicetify.CosmosAsync.get(urlPrimary, null, headers);
-            if (json.code === 200) {
-                return json?.result?.songs || [];
-            }
-            if (json.code !== 200) {
-                console.warn(`[ProviderNetease] Primary cloudsearch returned code ${json.code}, trying fallback...`);
+            if (json && json.code === 200 && Array.isArray(json?.result?.songs)) {
+                return json.result.songs;
             }
         } catch (_) {}
 
-        // Fallback to legacy HTTPS search if cloudsearch fails
+        // 2. Try Secondary Search
         try {
-            const urlSecondary = `https://music.163.com/api/search/get?s=${encodeURIComponent(query)}&type=1&offset=0&limit=${limit}`;
+            const urlSecondary = `https://music.163.com/api/search/get?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
             const json2 = await Spicetify.CosmosAsync.get(urlSecondary, null, headers);
-            if (json2.code === 200) return json2?.result?.songs || [];
-            throw new Error(`NetEase search code ${json2.code}`);
-        } catch (e) {
-            throw new Error(`NetEase search failed: ${e.message}`);
-        }
+            if (json2 && json2.code === 200 && Array.isArray(json2?.result?.songs)) {
+                return json2.result.songs;
+            }
+        } catch (_) {}
+
+        // 3. Try Direct Fetch (native fallback)
+        try {
+            const directUrl = `https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
+            const res = await fetch(directUrl);
+            if (res.ok) {
+                const json3 = await res.json();
+                if (json3 && json3.code === 200 && Array.isArray(json3?.result?.songs)) {
+                    return json3.result.songs;
+                }
+            }
+        } catch (_) {}
+
+        return [];
     }
 
     async function fetchLyricsById(id) {
-        const url = `https://music.163.com/api/song/lyric?id=${id}&lv=-1&kv=-1&tv=-1`;
+        if (!id) return null;
         const headers = { ...BASE_HEADERS };
         const token = typeof CONFIG !== "undefined" && CONFIG?.providers?.netease?.token;
         if (token) {
-            headers["Cookie"] = token;
+            headers["Cookie"] = `${BASE_HEADERS.Cookie} ${token}`;
         }
 
+        // 1. Try Primary Lyric endpoint
         try {
+            const url = `https://music.163.com/api/song/lyric?id=${id}&lv=-1&kv=-1&tv=-1`;
             const json = await Spicetify.CosmosAsync.get(url, null, headers);
-            if (json.code !== 200) throw new Error(`NetEase lyric code ${json.code}`);
-            return json;
-        } catch (e) {
-            throw new Error(`NetEase lyric failed: ${e.message}`);
-        }
+            if (json && json.code === 200) return json;
+        } catch (_) {}
+
+        // 2. Try Direct Fetch
+        try {
+            const res = await fetch(`https://music.163.com/api/song/lyric?id=${id}&lv=-1&kv=-1&tv=-1`);
+            if (res.ok) {
+                const json2 = await res.json();
+                if (json2 && json2.code === 200) return json2;
+            }
+        } catch (_) {}
+
+        return null;
     }
 
     function levenshtein(a, b) {
