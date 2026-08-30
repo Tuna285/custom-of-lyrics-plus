@@ -166,43 +166,51 @@ const ProviderNetease = (() => {
             const primaryArtist = info.artist.split(",")[0].split("&")[0].trim(); // Extract first artist
 
             DebugLogger.log(`[NetEase] Searching for "${cleanTitle}" by primary artist "${primaryArtist}"`);
-            let songs = await searchSongs(`${cleanTitle} ${primaryArtist}`, 6);
-            let searchMethod = "combined";
-
-            // Layered Fallback 1: Search by clean title alone (excellent for rare or multi-artist songs)
-            if (!songs.length) {
-                DebugLogger.log(`[NetEase] No results for "${cleanTitle} ${primaryArtist}", falling back to title alone: "${cleanTitle}"`);
-                songs = await searchSongs(cleanTitle, 8);
-                searchMethod = "title_only";
-            }
-
-            // Layered Fallback 2: Search by primary artist alone + match by duration (last resort)
-            if (!songs.length) {
-                DebugLogger.log(`[NetEase] No results for title alone, falling back to artist: "${primaryArtist}"`);
-                songs = await searchSongs(primaryArtist, 10);
-                searchMethod = "artist_only";
-            }
-            if (!songs.length) return err("NetEase: no results");
-
-            const scored = songs
+            let songs = await searchSongs(`${cleanTitle} ${primaryArtist}`, 8);
+            let scored = songs
                 .map(c => ({ c, score: scoreCandidate(c, info) }))
                 .sort((a, b) => b.score - a.score);
+
+            // Layered Fallback 1: If no results or best match score is poor, search by title alone
+            if (!scored.length || scored[0].score < SCORE_THRESHOLD) {
+                DebugLogger.log(`[NetEase] Combined search score too low (${scored[0]?.score?.toFixed(2) || 0}), falling back to title alone: "${cleanTitle}"`);
+                const titleOnlySongs = await searchSongs(cleanTitle, 10);
+                const titleScored = titleOnlySongs
+                    .map(c => ({ c, score: scoreCandidate(c, info) }))
+                    .sort((a, b) => b.score - a.score);
+
+                if (titleScored.length && (!scored.length || titleScored[0].score > scored[0].score)) {
+                    scored = titleScored;
+                }
+            }
+
+            // Layered Fallback 2: If still poor, search by primary artist alone
+            if (!scored.length || scored[0].score < SCORE_THRESHOLD) {
+                DebugLogger.log(`[NetEase] Title search score too low, falling back to artist: "${primaryArtist}"`);
+                const artistOnlySongs = await searchSongs(primaryArtist, 10);
+                const artistScored = artistOnlySongs
+                    .map(c => ({ c, score: scoreCandidate(c, info) }))
+                    .sort((a, b) => b.score - a.score);
+
+                if (artistScored.length && (!scored.length || artistScored[0].score > scored[0].score)) {
+                    scored = artistScored;
+                }
+            }
+            if (!scored.length) return err("NetEase: no results");
 
             DebugLogger.log(
                 `[NetEase] Top matches for "${info.title}":`,
                 scored.slice(0, 3).map(s => `${s.c.name} — ${s.score.toFixed(2)}`)
             );
 
-            // Dynamic thresholds to handle foreign translated titles (e.g. Japanese/Chinese/Korean)
+            // Dynamic thresholds for close duration matches
             let threshold = SCORE_THRESHOLD;
-            if (searchMethod === "combined") {
-                const bestCand = scored[0].c;
-                const deltaMs = Math.abs((bestCand.dt || bestCand.duration || 0) - (info.duration || 0));
-                if (deltaMs < 8000) {
-                    threshold = 0.12; // High confidence: matching combination and close duration
-                } else if (deltaMs < 15000) {
-                    threshold = 0.18;
-                }
+            const bestCand = scored[0].c;
+            const deltaMs = Math.abs((bestCand.dt || bestCand.duration || 0) - (info.duration || 0));
+            if (deltaMs < 8000) {
+                threshold = 0.12; // High confidence when duration is closely aligned
+            } else if (deltaMs < 15000) {
+                threshold = 0.18;
             }
 
             if (scored[0].score < threshold) {
