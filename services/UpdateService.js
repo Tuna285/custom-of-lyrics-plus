@@ -4,20 +4,8 @@ const UpdateService = {
     VERSION_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/version.json",
     RAW_BASE_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main",
     INSTALL_COMMAND: "iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/install.ps1 | iex",
-    CURRENT_VERSION: "1.8.0",
-    CHECK_INTERVAL: 0,
-
-    UPDATE_FILES: [
-        "index.js", "style.css", "manifest.json", "version.json", "types.d.ts", "variables.css",
-        "utils/Namespace.js", "utils/Utils.js", "utils/Config.js", "utils/Cache.js", "utils/Prompts.js", "utils/TranslationUtils.js",
-        "i18n/I18n.js", "i18n/LangEN.js", "i18n/LangVI.js", "i18n/LangKO.js", "i18n/LangJA.js", "i18n/LangZH.js",
-        "parsers/LRCParser.js",
-        "services/AdBlocker.js", "services/IDBCache.js", "services/LyricsFetcher.js", "services/GeminiClient.js", "services/Translator.js", "services/TranslationCoordinator.js", "services/UpdateService.js",
-        "components/Components.js", "components/SyncedLyrics.js", "components/UnsyncedLyrics.js", "components/TabBar.js", "components/Settings.js", "components/OptionsMenu.js", "components/PlaybarButton.js", "components/MiniLyrics.js", "components/VideoBackground.js", "components/VideoManager.js", "components/VideoSettingsModal.js",
-        "providers/ProviderLRCLIB.js", "providers/ProviderMusixmatch.js", "providers/ProviderNetease.js", "providers/Providers.js",
-        "assets/libs/kuroshiro.min.js", "assets/libs/kuroshiro-analyzer-kuromoji.min.js", "assets/libs/aromanize.min.js", "assets/libs/opencc.min.js", "assets/libs/pinyin-pro.min.js",
-        "assets/preview.gif"
-    ],
+    CURRENT_VERSION: "1.9.0",
+    CHECK_INTERVAL: 1800000, // 30 minutes for silent auto-checks
 
     async checkForUpdates(silent = false) {
         try {
@@ -32,7 +20,12 @@ const UpdateService = {
                 cache: "no-cache"
             });
 
-            if (!response.ok) return null;
+            if (!response.ok) {
+                if (!silent) {
+                    Spicetify.showNotification("⚠️ Không thể kết nối tới máy chủ cập nhật.", true, 3000);
+                }
+                return null;
+            }
 
             const data = await response.json();
             localStorage.setItem("lyrics-plus:last-update-check", String(now));
@@ -48,13 +41,19 @@ const UpdateService = {
                 }
 
                 console.log(`[Lyrics+] New version available: ${data.version} (current: ${this.CURRENT_VERSION})`);
-                this.showUpdateNotification(data.version, data.changelog);
+                this.showUpdateNotification(data.version, data.changelog || data.description);
                 return data;
+            } else if (!silent) {
+                const msg = typeof getText === "function" ? getText("notifications.upToDate", { version: this.CURRENT_VERSION }) : `🎉 Bạn đang sử dụng phiên bản mới nhất (v${this.CURRENT_VERSION})!`;
+                Spicetify.showNotification(msg || `🎉 Bạn đang ở phiên bản mới nhất (v${this.CURRENT_VERSION})!`, false, 3000);
             }
 
             return null;
         } catch (error) {
             console.warn("[Lyrics+] Update check failed:", error.message);
+            if (!silent) {
+                Spicetify.showNotification("⚠️ Lỗi kiểm tra cập nhật: " + error.message, true, 3000);
+            }
             return null;
         }
     },
@@ -144,55 +143,57 @@ const UpdateService = {
 
     showUpdateNotification(newVersion, changelog = null) {
         const React = Spicetify.React;
-
-        // State management for the modal
-        let isDownloading = false;
-        let downloadProgress = 0;
-        let downloadStatus = "";
+        const isVi = (CONFIG?.visual?.["ui-language"] || "vi") === "vi";
 
         const renderModal = () => {
             Spicetify.PopupModal.display({
-                title: "🎵 Lyrics Plus Update Available",
-                content: React.createElement("div", { style: { padding: "15px", minWidth: "350px" } },
-                    // Version info
+                title: isVi ? "🚀 Cập Nhật Lyrics Plus Mới" : "🚀 Lyrics Plus Update Available",
+                content: React.createElement("div", { style: { padding: "10px", minWidth: "340px", maxWidth: "480px" } },
+                    // Version badge
                     React.createElement("div", {
                         style: {
-                            background: "linear-gradient(135deg, var(--spice-button) 0%, var(--spice-button-active) 100%)",
-                            padding: "15px",
-                            borderRadius: "10px",
-                            marginBottom: "15px",
-                            color: "white",
-                            textAlign: "center"
+                            background: "linear-gradient(135deg, var(--spice-button, #1db954) 0%, var(--spice-button-active, #1ed760) 100%)",
+                            padding: "16px",
+                            borderRadius: "12px",
+                            marginBottom: "16px",
+                            color: "var(--spice-text, #ffffff)",
+                            textAlign: "center",
+                            boxShadow: "0 4px 15px rgba(0,0,0,0.2)"
                         }
                     },
-                        React.createElement("div", { style: { fontSize: "24px", fontWeight: "bold" } }, `v${newVersion}`),
-                        React.createElement("div", { style: { fontSize: "12px", opacity: 0.8 } }, `Current: v${this.CURRENT_VERSION}`)
+                        React.createElement("div", { style: { fontSize: "26px", fontWeight: "bold", letterSpacing: "0.5px" } }, `v${newVersion}`),
+                        React.createElement("div", { style: { fontSize: "13px", opacity: 0.9, marginTop: "4px" } }, 
+                            isVi ? `Phiên bản hiện tại: v${this.CURRENT_VERSION}` : `Current version: v${this.CURRENT_VERSION}`
+                        )
                     ),
 
                     // Quick update section
                     React.createElement("div", {
                         style: {
-                            background: "var(--spice-card)",
-                            padding: "15px",
-                            borderRadius: "10px",
-                            marginBottom: "15px"
+                            background: "var(--spice-card, rgba(255,255,255,0.05))",
+                            padding: "16px",
+                            borderRadius: "12px",
+                            marginBottom: "16px",
+                            border: "1px solid rgba(255,255,255,0.08)"
                         }
                     },
                         React.createElement("div", {
-                            style: { fontWeight: "bold", marginBottom: "10px", fontSize: "14px" }
-                        }, "⚡ Quick Update (Recommended)"),
+                            style: { fontWeight: "bold", marginBottom: "8px", fontSize: "14px", color: "var(--spice-text)" }
+                        }, isVi ? "⚡ Cập nhật nhanh (Khuyên dùng)" : "⚡ Quick Update (Recommended)"),
                         React.createElement("p", {
-                            style: { fontSize: "12px", color: "var(--spice-subtext)", marginBottom: "10px" }
-                        }, "Copy the command below and paste it in PowerShell:"),
+                            style: { fontSize: "12px", color: "var(--spice-subtext)", marginBottom: "10px", lineHeight: "1.4" }
+                        }, isVi ? "Chạy lệnh sau trong PowerShell để cập nhật tự động:" : "Run the following command in PowerShell to update:"),
                         React.createElement("div", {
                             style: {
-                                background: "var(--spice-sidebar)",
-                                padding: "10px",
-                                borderRadius: "5px",
+                                background: "var(--spice-sidebar, rgba(0,0,0,0.3))",
+                                padding: "10px 12px",
+                                borderRadius: "8px",
                                 fontFamily: "monospace",
                                 fontSize: "11px",
                                 wordBreak: "break-all",
-                                marginBottom: "10px"
+                                marginBottom: "12px",
+                                color: "var(--spice-subtext)",
+                                border: "1px solid rgba(255,255,255,0.05)"
                             }
                         }, this.INSTALL_COMMAND),
                         React.createElement("button", {
@@ -205,20 +206,20 @@ const UpdateService = {
                                 background: "var(--spice-button)",
                                 color: "var(--spice-text)",
                                 border: "none",
-                                borderRadius: "20px",
+                                borderRadius: "24px",
                                 cursor: "pointer",
                                 fontWeight: "bold",
-                                fontSize: "14px"
+                                fontSize: "13px"
                             }
-                        }, "📋 Copy Install Command")
+                        }, isVi ? "📋 Sao chép lệnh cài đặt" : "📋 Copy Install Command")
                     ),
 
                     // Manual options
                     React.createElement("div", {
                         style: {
                             display: "flex",
-                            gap: "10px",
-                            marginTop: "10px"
+                            gap: "8px",
+                            marginTop: "8px"
                         }
                     },
                         React.createElement("button", {
@@ -227,15 +228,16 @@ const UpdateService = {
                             },
                             style: {
                                 flex: 1,
-                                padding: "10px",
+                                padding: "10px 8px",
                                 background: "transparent",
-                                color: "var(--spice-subtext)",
-                                border: "1px solid var(--spice-subtext)",
+                                color: "var(--spice-text)",
+                                border: "1px solid rgba(255,255,255,0.15)",
                                 borderRadius: "20px",
                                 cursor: "pointer",
-                                fontSize: "12px"
+                                fontSize: "12px",
+                                fontWeight: 500
                             }
-                        }, "View Changelog"),
+                        }, isVi ? "Xem Chi Tiết" : "Changelog"),
                         React.createElement("button", {
                             onClick: () => {
                                 const skippedVersions = JSON.parse(localStorage.getItem("lyrics-plus:skipped-versions") || "[]");
@@ -244,49 +246,32 @@ const UpdateService = {
                                     localStorage.setItem("lyrics-plus:skipped-versions", JSON.stringify(skippedVersions));
                                 }
                                 Spicetify.PopupModal.hide();
-                                Spicetify.showNotification(getText("notifications.updateSkipped"), false, 1500);
+                                Spicetify.showNotification(isVi ? "Đã bỏ qua thông báo bản này" : "Version skipped", false, 1500);
                             },
                             style: {
                                 flex: 1,
-                                padding: "10px",
+                                padding: "10px 8px",
                                 background: "transparent",
                                 color: "var(--spice-subtext)",
-                                border: "1px solid var(--spice-subtext)",
+                                border: "1px solid rgba(255,255,255,0.15)",
                                 borderRadius: "20px",
                                 cursor: "pointer",
                                 fontSize: "12px"
                             }
-                        }, "Skip This Version"),
+                        }, isVi ? "Bỏ Qua Bản Này" : "Skip Version"),
                         React.createElement("button", {
                             onClick: () => Spicetify.PopupModal.hide(),
                             style: {
                                 flex: 1,
-                                padding: "10px",
+                                padding: "10px 8px",
                                 background: "transparent",
                                 color: "var(--spice-subtext)",
-                                border: "1px solid var(--spice-subtext)",
+                                border: "1px solid rgba(255,255,255,0.15)",
                                 borderRadius: "20px",
                                 cursor: "pointer",
                                 fontSize: "12px"
                             }
-                        }, "Later")
-                    ),
-
-                    // Instructions
-                    React.createElement("div", {
-                        style: {
-                            marginTop: "15px",
-                            padding: "10px",
-                            background: "rgba(var(--spice-rgb-button), 0.1)",
-                            borderRadius: "8px",
-                            fontSize: "11px",
-                            color: "var(--spice-subtext)"
-                        }
-                    },
-                        React.createElement("div", { style: { fontWeight: "bold", marginBottom: "5px" } }, "📝 After running the command:"),
-                        React.createElement("div", null, "1. Wait for download to complete"),
-                        React.createElement("div", null, "2. Restart Spotify"),
-                        React.createElement("div", null, "3. Enjoy the new features! 🎉")
+                        }, isVi ? "Để Sau" : "Later")
                     )
                 )
             });
@@ -294,14 +279,16 @@ const UpdateService = {
 
         // Show notification toast first
         try {
-            Spicetify.showNotification(
-                getText("notifications.updateAvailable", { version: newVersion }),
-                false,
-                5000
-            );
-        } catch (e) { }
+            const toastMsg = typeof getText === "function" ? getText("notifications.updateAvailable", { version: newVersion }) : `Lyrics Plus v${newVersion} đã có sẵn!`;
+            Spicetify.showNotification(toastMsg || `Lyrics Plus v${newVersion} available!`, false, 5000);
+        } catch (_) { }
 
-        // Then show modal
+        // Then display modal
         renderModal();
     }
 };
+
+window.UpdateService = UpdateService;
+if (window.LyricsPlus) {
+    window.LyricsPlus.UpdateService = UpdateService;
+}

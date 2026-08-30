@@ -286,7 +286,8 @@ window.LANG_EN = {
     "failedReadFileCorrupted": "Failed to read file: File may be corrupted",
     "installCommandCopied": "Install command copied! Paste in PowerShell",
     "updateSkipped": "Update skipped",
-    "updateAvailable": "Lyrics Plus v{version} available! Click to update"
+    "updateAvailable": "Lyrics Plus v{version} available! Click to update",
+    "upToDate": "You are already using the latest version (v{version})!"
   },
   "contextMenu": {
     "provider": "Translation Provider",

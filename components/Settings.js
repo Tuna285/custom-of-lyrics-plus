@@ -720,7 +720,44 @@ const ConfigHelper = () => {
 			content = react.createElement("div", null,
 				react.createElement(CollapsibleSection, { title: getText("sections.displayControls") }, react.createElement(OptionList, { items: generalSettings, onChange })),
 				react.createElement(CollapsibleSection, { title: getText("sections.syncedOptions") }, react.createElement(OptionList, { items: syncedSettings, onChange })),
-				react.createElement(CollapsibleSection, { title: getText("sections.unsyncedOptions") }, react.createElement(OptionList, { items: unsyncedSettings, onChange }))
+				react.createElement(CollapsibleSection, { title: getText("sections.unsyncedOptions") }, react.createElement(OptionList, { items: unsyncedSettings, onChange })),
+				react.createElement(CollapsibleSection, { title: getText("sections.aboutAndUpdates") || "ℹ️ Thông tin & Cập nhật" },
+					react.createElement("div", {
+						style: {
+							padding: "14px 16px",
+							background: "rgba(255, 255, 255, 0.04)",
+							borderRadius: "8px",
+							display: "flex",
+							justifyContent: "space-between",
+							alignItems: "center",
+							gap: "12px",
+							margin: "8px 0"
+						}
+					},
+						react.createElement("div", null,
+							react.createElement("div", { style: { fontWeight: "bold", fontSize: "14px", color: "var(--spice-text)" } }, `Lyric Plus Translate v${window.UpdateService?.CURRENT_VERSION || "1.9.0"}`),
+							react.createElement("div", { style: { fontSize: "12px", color: "var(--spice-subtext)", marginTop: "2px" } }, "AI-powered translation & video background")
+						),
+						react.createElement("button", {
+							onClick: () => {
+								if (window.UpdateService?.checkForUpdates) {
+									window.UpdateService.checkForUpdates(false);
+								}
+							},
+							style: {
+								padding: "8px 16px",
+								background: "var(--spice-button)",
+								color: "var(--spice-text)",
+								border: "none",
+								borderRadius: "20px",
+								cursor: "pointer",
+								fontWeight: "bold",
+								fontSize: "12px",
+								whiteSpace: "nowrap"
+							}
+						}, "🔄 " + (getText("settings.checkForUpdates") || "Kiểm tra cập nhật"))
+					)
+				)
 			);
 			break;
 		case "translation":

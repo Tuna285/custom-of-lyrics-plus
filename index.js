@@ -866,6 +866,13 @@ class LyricsContainer extends react.Component {
 		this.updateVisualOnConfigChange();
 		Utils.addQueueListener(this.onQueueChange);
 
+		// Auto-check for updates silently on startup
+		setTimeout(() => {
+			if (window.UpdateService?.checkForUpdates) {
+				window.UpdateService.checkForUpdates(true);
+			}
+		}, 4000);
+
 		lyricContainerUpdate = () => {
 			this.reRenderLyricsPage = !this.reRenderLyricsPage;
 			this.updateVisualOnConfigChange();

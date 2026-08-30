@@ -280,7 +280,8 @@ window.LANG_VI = {
     "failedReadFileCorrupted": "Đọc file thất bại: File có thể bị hỏng",
     "installCommandCopied": "Đã sao chép lệnh cài đặt! Dán vào PowerShell",
     "updateSkipped": "Đã bỏ qua cập nhật",
-    "updateAvailable": "Lyrics Plus v{version} đã có sẵn! Bấm để cập nhật"
+    "updateAvailable": "Lyrics Plus v{version} đã có sẵn! Bấm để cập nhật",
+    "upToDate": "Bạn đang sử dụng phiên bản mới nhất (v{version})!"
   },
   "contextMenu": {
     "provider": "Nguồn dịch",
