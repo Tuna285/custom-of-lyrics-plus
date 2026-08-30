@@ -354,10 +354,29 @@ const ProviderNetease = (() => {
                 setResults([]);
                 setErrorMsg("");
                 try {
-                    const songs = await searchSongs(cleanQuery, 5);
+                    let songs = await searchSongs(cleanQuery, 6);
+
+                    // Smart Fallback for manual modal initial query
+                    if (info && cleanQuery === `${info.title} ${info.artist}`.trim()) {
+                        const scored = songs.map(c => ({ c, score: scoreCandidate(c, info) }));
+                        if (!scored.length || Math.max(...scored.map(s => s.score)) < 0.28) {
+                            const titleSongs = await searchSongs(info.title, 6);
+                            if (titleSongs.length) {
+                                const existingIds = new Set(songs.map(s => s.id));
+                                for (const ts of titleSongs) {
+                                    if (!existingIds.has(ts.id)) songs.push(ts);
+                                }
+                            }
+                        }
+                    }
+
+                    // Rank results by relevance to current playing track
+                    if (info) {
+                        songs.sort((a, b) => scoreCandidate(b, info) - scoreCandidate(a, info));
+                    }
                     
-                    // Fetch lyric status only for top 3 results to save proxy request quota
-                    const songsWithLyrics = await Promise.all(songs.map(async (song, idx) => {
+                    // Fetch lyric status for top results to display badges
+                    const songsWithLyrics = await Promise.all(songs.slice(0, 6).map(async (song, idx) => {
                         if (idx > 2) {
                             return { ...song, hasLyrics: undefined, isSynced: undefined };
                         }
