@@ -7,13 +7,14 @@ const ProviderNetease = (() => {
         "Cookie":     "os=pc; appver=8.9.70; channel=netease; __remember_me=true;",
     };
 
+    const DEDICATED_WORKER_TEMPLATE = "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}";
+
     async function fetchNetEase(targetUrl) {
         if (!targetUrl) return null;
-        const proxyTemplate = localStorage.getItem("spicetify:corsProxyTemplate") || "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}";
-        const proxiedUrl = proxyTemplate.replace("{url}", encodeURIComponent(targetUrl));
-
-        // 1. Primary: Direct fetch via our Cloudflare Worker CORS Proxy
+        
+        // Priority 1: Always use our dedicated hardened Cloudflare Worker
         try {
+            const proxiedUrl = DEDICATED_WORKER_TEMPLATE.replace("{url}", encodeURIComponent(targetUrl));
             const res = await fetch(proxiedUrl);
             if (res.ok) {
                 const data = await res.json();
@@ -21,20 +22,23 @@ const ProviderNetease = (() => {
             }
         } catch (_) {}
 
-        // 2. Fallback: Spicetify.CosmosAsync
+        // Priority 2: Configured proxy in localStorage (if different)
         try {
-            const data = await Spicetify.CosmosAsync.get(targetUrl, null, BASE_HEADERS);
-            if (data && (data.code === 200 || data.result)) return data;
+            const configuredProxy = localStorage.getItem("spicetify:corsProxyTemplate");
+            if (configuredProxy && configuredProxy !== DEDICATED_WORKER_TEMPLATE && !configuredProxy.includes("corsproxy.io")) {
+                const proxiedUrl2 = configuredProxy.replace("{url}", encodeURIComponent(targetUrl));
+                const res2 = await fetch(proxiedUrl2);
+                if (res2.ok) {
+                    const data2 = await res2.json();
+                    if (data2 && (data2.code === 200 || data2.result)) return data2;
+                }
+            }
         } catch (_) {}
 
-        // 3. Fallback: corsproxy.io
+        // Priority 3: Spicetify.CosmosAsync
         try {
-            const fallbackUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-            const res = await fetch(fallbackUrl);
-            if (res.ok) {
-                const data = await res.json();
-                if (data && (data.code === 200 || data.result)) return data;
-            }
+            const data3 = await Spicetify.CosmosAsync.get(targetUrl, null, BASE_HEADERS);
+            if (data3 && (data3.code === 200 || data3.result)) return data3;
         } catch (_) {}
 
         return null;
@@ -44,21 +48,30 @@ const ProviderNetease = (() => {
         if (!query || !query.trim()) return [];
         const cleanQ = query.trim();
 
-        // 1. Try CloudSearch PC
+        // 1. Primary: interface.music.163.com cloudsearch/pc
         try {
-            const urlPrimary = `https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
+            const urlPrimary = `https://interface.music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
             const json = await fetchNetEase(urlPrimary);
             if (json && json.code === 200 && Array.isArray(json?.result?.songs)) {
                 return json.result.songs;
             }
         } catch (_) {}
 
-        // 2. Try Secondary Search GET
+        // 2. Secondary: interface.music.163.com search/get/web
         try {
-            const urlSecondary = `https://music.163.com/api/search/get?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
+            const urlSecondary = `https://interface.music.163.com/api/search/get/web?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
             const json2 = await fetchNetEase(urlSecondary);
             if (json2 && json2.code === 200 && Array.isArray(json2?.result?.songs)) {
                 return json2.result.songs;
+            }
+        } catch (_) {}
+
+        // 3. Tertiary: music.163.com cloudsearch/pc
+        try {
+            const urlTertiary = `https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
+            const json3 = await fetchNetEase(urlTertiary);
+            if (json3 && json3.code === 200 && Array.isArray(json3?.result?.songs)) {
+                return json3.result.songs;
             }
         } catch (_) {}
 
@@ -68,9 +81,15 @@ const ProviderNetease = (() => {
     async function fetchLyricsById(id) {
         if (!id) return null;
         try {
-            const url = `https://music.163.com/api/song/lyric?id=${id}&lv=-1&kv=-1&tv=-1`;
+            const url = `https://interface.music.163.com/api/song/lyric?id=${id}&lv=-1&kv=-1&tv=-1`;
             const json = await fetchNetEase(url);
             if (json && json.code === 200) return json;
+        } catch (_) {}
+
+        try {
+            const fallbackUrl = `https://music.163.com/api/song/lyric?id=${id}&lv=-1&kv=-1&tv=-1`;
+            const json2 = await fetchNetEase(fallbackUrl);
+            if (json2 && json2.code === 200) return json2;
         } catch (_) {}
 
         return null;

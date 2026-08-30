@@ -56,9 +56,10 @@ const ConfigUtils = {
     }
 };
 
-// Auto-initialize default CORS proxy template if empty
+// Auto-initialize default CORS proxy template if empty or legacy corsproxy.io
 try {
-    if (!localStorage.getItem("spicetify:corsProxyTemplate")) {
+    const curProxy = localStorage.getItem("spicetify:corsProxyTemplate");
+    if (!curProxy || curProxy.includes("corsproxy.io")) {
         localStorage.setItem("spicetify:corsProxyTemplate", "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}");
     }
 } catch (_) {}
