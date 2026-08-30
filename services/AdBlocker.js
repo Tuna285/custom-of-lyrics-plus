@@ -320,7 +320,7 @@
         if (!src || !/youtu(be\.com|\.be|be-nocookie\.com)/i.test(src)) return src;
         try {
             const url = new URL(src, window.location.origin);
-            url.hostname = "www.youtube-nocookie.com";
+            url.hostname = "www.youtube.com";
             url.searchParams.set("rel", "0");
             url.searchParams.set("iv_load_policy", "3");
             url.searchParams.set("modestbranding", "1");
