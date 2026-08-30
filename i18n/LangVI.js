@@ -38,7 +38,8 @@ window.LANG_VI = {
     "videoBackground": "Video Background",
     "generalBackground": "Nền chung",
     "appearanceColors": "Màu sắc Giao diện",
-    "appearanceButton": "Kiểu Nút"
+    "appearanceButton": "Kiểu Nút",
+    "aboutAndUpdates": "Thông tin & Cập nhật"
   },
   "settings": {
     "language": {
@@ -226,7 +227,9 @@ window.LANG_VI = {
       "label": "Màu sắc nổi bật (Accent)",
       "desc": "Màu sắc làm điểm nhấn cho các nút và thành phần UI chính."
     },
-    "usingThemeColor": "Dùng màu mặc định của Theme"
+    "usingThemeColor": "Dùng màu mặc định của Theme",
+    "checkForUpdates": "Kiểm tra cập nhật",
+    "updateAppSubtitle": "Dịch lời bài hát AI & Video nền"
   },
   "buttons": {
     "clearCache": "Xóa Cache đã lưu",
@@ -402,5 +405,15 @@ window.LANG_VI = {
     "search": "Tìm",
     "failed": "Tìm kiếm thất bại",
     "noResults": "Không tìm thấy kết quả. Thử tìm bằng tên gốc hoặc romaji."
+  },
+  "updateModal": {
+    "title": "Cập Nhật Lyrics Plus Mới",
+    "currentVersion": "Phiên bản hiện tại: v{version}",
+    "quickUpdate": "Cập nhật nhanh (Khuyên dùng)",
+    "quickUpdateDesc": "Chạy lệnh sau trong PowerShell để cập nhật tự động:",
+    "copyCommand": "Sao chép lệnh cài đặt",
+    "changelog": "Xem Chi Tiết",
+    "skipVersion": "Bỏ Qua Bản Này",
+    "later": "Để Sau"
   }
 };

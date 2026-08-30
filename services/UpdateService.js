@@ -22,7 +22,7 @@ const UpdateService = {
 
             if (!response.ok) {
                 if (!silent) {
-                    Spicetify.showNotification("⚠️ Không thể kết nối tới máy chủ cập nhật.", true, 3000);
+                    Spicetify.showNotification(getText("notifications.updateError") || "Không thể kết nối tới máy chủ cập nhật.", true, 3000);
                 }
                 return null;
             }
@@ -44,23 +44,23 @@ const UpdateService = {
                 this.showUpdateNotification(data.version, data.changelog || data.description);
                 return data;
             } else if (!silent) {
-                const msg = typeof getText === "function" ? getText("notifications.upToDate", { version: this.CURRENT_VERSION }) : `🎉 Bạn đang sử dụng phiên bản mới nhất (v${this.CURRENT_VERSION})!`;
-                Spicetify.showNotification(msg || `🎉 Bạn đang ở phiên bản mới nhất (v${this.CURRENT_VERSION})!`, false, 3000);
+                const msg = typeof getText === "function" ? getText("notifications.upToDate", { version: this.CURRENT_VERSION }) : `Bạn đang sử dụng phiên bản mới nhất (v${this.CURRENT_VERSION})!`;
+                Spicetify.showNotification(msg || `Bạn đang ở phiên bản mới nhất (v${this.CURRENT_VERSION})!`, false, 3000);
             }
 
             return null;
         } catch (error) {
             console.warn("[Lyrics+] Update check failed:", error.message);
             if (!silent) {
-                Spicetify.showNotification("⚠️ Lỗi kiểm tra cập nhật: " + error.message, true, 3000);
+                Spicetify.showNotification(error.message, true, 3000);
             }
             return null;
         }
     },
 
     compareVersions(v1, v2) {
-        const parts1 = v1.split('.').map(Number);
-        const parts2 = v2.split('.').map(Number);
+        const parts1 = String(v1 || "0").split('.').map(Number);
+        const parts2 = String(v2 || "0").split('.').map(Number);
 
         for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
             const num1 = parts1[i] || 0;
@@ -73,81 +73,29 @@ const UpdateService = {
 
     // Copy install command to clipboard
     async copyInstallCommand() {
+        const successMsg = typeof getText === "function" ? getText("notifications.installCommandCopied") : "Đã sao chép lệnh cài đặt! Dán vào PowerShell";
         try {
             await navigator.clipboard.writeText(this.INSTALL_COMMAND);
-            Spicetify.showNotification(getText("notifications.installCommandCopied"), false, 3000);
+            Spicetify.showNotification(successMsg || "Đã sao chép lệnh cài đặt!", false, 3000);
             return true;
         } catch (e) {
-            // Fallback for older browsers
             const textarea = document.createElement('textarea');
             textarea.value = this.INSTALL_COMMAND;
             document.body.appendChild(textarea);
             textarea.select();
             document.execCommand('copy');
             document.body.removeChild(textarea);
-            Spicetify.showNotification(getText("notifications.installCommandCopied"), false, 3000);
+            Spicetify.showNotification(successMsg || "Đã sao chép lệnh cài đặt!", false, 3000);
             return true;
         }
     },
 
-    // Download all update files and store in localStorage for offline update
-    async downloadUpdateFiles(progressCallback) {
-        const downloadedFiles = {};
-        const totalFiles = this.UPDATE_FILES.length;
-        let downloaded = 0;
-        let failed = [];
-
-        for (const file of this.UPDATE_FILES) {
-            try {
-                const url = `${this.RAW_BASE_URL}/${file}?t=${Date.now()}`;
-                const response = await fetch(url);
-
-                if (!response.ok) {
-                    failed.push(file);
-                    continue;
-                }
-
-                const content = await response.text();
-                downloadedFiles[file] = content;
-                downloaded++;
-
-                if (progressCallback) {
-                    progressCallback({
-                        current: downloaded,
-                        total: totalFiles,
-                        file: file,
-                        percent: Math.round((downloaded / totalFiles) * 100)
-                    });
-                }
-            } catch (e) {
-                failed.push(file);
-                console.warn(`[Update] Failed to download: ${file}`, e);
-            }
-        }
-
-        // Store in localStorage for manual installation
-        if (Object.keys(downloadedFiles).length > 0) {
-            try {
-                localStorage.setItem("lyrics-plus:pending-update", JSON.stringify({
-                    files: downloadedFiles,
-                    timestamp: Date.now(),
-                    failed: failed
-                }));
-            } catch (e) {
-                console.warn("[Update] Failed to store update files:", e);
-            }
-        }
-
-        return { downloaded, failed, files: downloadedFiles };
-    },
-
     showUpdateNotification(newVersion, changelog = null) {
         const React = Spicetify.React;
-        const isVi = (CONFIG?.visual?.["ui-language"] || "vi") === "vi";
 
         const renderModal = () => {
             Spicetify.PopupModal.display({
-                title: isVi ? "🚀 Cập Nhật Lyrics Plus Mới" : "🚀 Lyrics Plus Update Available",
+                title: typeof getText === "function" ? getText("updateModal.title") : "Lyrics Plus Update Available",
                 content: React.createElement("div", { style: { padding: "10px", minWidth: "340px", maxWidth: "480px" } },
                     // Version badge
                     React.createElement("div", {
@@ -163,7 +111,7 @@ const UpdateService = {
                     },
                         React.createElement("div", { style: { fontSize: "26px", fontWeight: "bold", letterSpacing: "0.5px" } }, `v${newVersion}`),
                         React.createElement("div", { style: { fontSize: "13px", opacity: 0.9, marginTop: "4px" } }, 
-                            isVi ? `Phiên bản hiện tại: v${this.CURRENT_VERSION}` : `Current version: v${this.CURRENT_VERSION}`
+                            typeof getText === "function" ? getText("updateModal.currentVersion", { version: this.CURRENT_VERSION }) : `Current: v${this.CURRENT_VERSION}`
                         )
                     ),
 
@@ -179,10 +127,10 @@ const UpdateService = {
                     },
                         React.createElement("div", {
                             style: { fontWeight: "bold", marginBottom: "8px", fontSize: "14px", color: "var(--spice-text)" }
-                        }, isVi ? "⚡ Cập nhật nhanh (Khuyên dùng)" : "⚡ Quick Update (Recommended)"),
+                        }, typeof getText === "function" ? getText("updateModal.quickUpdate") : "Quick Update (Recommended)"),
                         React.createElement("p", {
                             style: { fontSize: "12px", color: "var(--spice-subtext)", marginBottom: "10px", lineHeight: "1.4" }
-                        }, isVi ? "Chạy lệnh sau trong PowerShell để cập nhật tự động:" : "Run the following command in PowerShell to update:"),
+                        }, typeof getText === "function" ? getText("updateModal.quickUpdateDesc") : "Run the following command in PowerShell to update:"),
                         React.createElement("div", {
                             style: {
                                 background: "var(--spice-sidebar, rgba(0,0,0,0.3))",
@@ -211,7 +159,7 @@ const UpdateService = {
                                 fontWeight: "bold",
                                 fontSize: "13px"
                             }
-                        }, isVi ? "📋 Sao chép lệnh cài đặt" : "📋 Copy Install Command")
+                        }, typeof getText === "function" ? getText("updateModal.copyCommand") : "Copy Install Command")
                     ),
 
                     // Manual options
@@ -237,7 +185,7 @@ const UpdateService = {
                                 fontSize: "12px",
                                 fontWeight: 500
                             }
-                        }, isVi ? "Xem Chi Tiết" : "Changelog"),
+                        }, typeof getText === "function" ? getText("updateModal.changelog") : "Changelog"),
                         React.createElement("button", {
                             onClick: () => {
                                 const skippedVersions = JSON.parse(localStorage.getItem("lyrics-plus:skipped-versions") || "[]");
@@ -246,7 +194,7 @@ const UpdateService = {
                                     localStorage.setItem("lyrics-plus:skipped-versions", JSON.stringify(skippedVersions));
                                 }
                                 Spicetify.PopupModal.hide();
-                                Spicetify.showNotification(isVi ? "Đã bỏ qua thông báo bản này" : "Version skipped", false, 1500);
+                                Spicetify.showNotification(typeof getText === "function" ? getText("notifications.updateSkipped") : "Update skipped", false, 1500);
                             },
                             style: {
                                 flex: 1,
@@ -258,7 +206,7 @@ const UpdateService = {
                                 cursor: "pointer",
                                 fontSize: "12px"
                             }
-                        }, isVi ? "Bỏ Qua Bản Này" : "Skip Version"),
+                        }, typeof getText === "function" ? getText("updateModal.skipVersion") : "Skip This Version"),
                         React.createElement("button", {
                             onClick: () => Spicetify.PopupModal.hide(),
                             style: {
@@ -271,7 +219,7 @@ const UpdateService = {
                                 cursor: "pointer",
                                 fontSize: "12px"
                             }
-                        }, isVi ? "Để Sau" : "Later")
+                        }, typeof getText === "function" ? getText("updateModal.later") : "Later")
                     )
                 )
             });
@@ -279,7 +227,7 @@ const UpdateService = {
 
         // Show notification toast first
         try {
-            const toastMsg = typeof getText === "function" ? getText("notifications.updateAvailable", { version: newVersion }) : `Lyrics Plus v${newVersion} đã có sẵn!`;
+            const toastMsg = typeof getText === "function" ? getText("notifications.updateAvailable", { version: newVersion }) : `Lyrics Plus v${newVersion} available!`;
             Spicetify.showNotification(toastMsg || `Lyrics Plus v${newVersion} available!`, false, 5000);
         } catch (_) { }
 

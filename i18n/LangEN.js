@@ -37,7 +37,8 @@ window.LANG_EN = {
     "videoBackground": "Video Background",
     "generalBackground": "General Background",
     "appearanceColors": "Colors",
-    "appearanceButton": "Button Style"
+    "appearanceButton": "Button Style",
+    "aboutAndUpdates": "About & Updates"
   },
   "settings": {
     "language": {
@@ -225,7 +226,9 @@ window.LANG_EN = {
       "label": "Accent color",
       "desc": "Color for buttons and UI highlights."
     },
-    "usingThemeColor": "Using theme default"
+    "usingThemeColor": "Using theme default",
+    "checkForUpdates": "Check for Updates",
+    "updateAppSubtitle": "AI-powered lyrics translation & video background"
   },
   "buttons": {
     "clearCache": "Clear all cached lyrics",
@@ -401,5 +404,15 @@ window.LANG_EN = {
     "search": "Search",
     "failed": "Search failed",
     "noResults": "No results found. Try searching by original name or romaji."
+  },
+  "updateModal": {
+    "title": "Lyrics Plus Update Available",
+    "currentVersion": "Current version: v{version}",
+    "quickUpdate": "Quick Update (Recommended)",
+    "quickUpdateDesc": "Run the following command in PowerShell to update:",
+    "copyCommand": "Copy Install Command",
+    "changelog": "View Changelog",
+    "skipVersion": "Skip This Version",
+    "later": "Later"
   }
 };

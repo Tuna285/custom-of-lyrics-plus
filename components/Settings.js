@@ -720,44 +720,7 @@ const ConfigHelper = () => {
 			content = react.createElement("div", null,
 				react.createElement(CollapsibleSection, { title: getText("sections.displayControls") }, react.createElement(OptionList, { items: generalSettings, onChange })),
 				react.createElement(CollapsibleSection, { title: getText("sections.syncedOptions") }, react.createElement(OptionList, { items: syncedSettings, onChange })),
-				react.createElement(CollapsibleSection, { title: getText("sections.unsyncedOptions") }, react.createElement(OptionList, { items: unsyncedSettings, onChange })),
-				react.createElement(CollapsibleSection, { title: getText("sections.aboutAndUpdates") || "ℹ️ Thông tin & Cập nhật" },
-					react.createElement("div", {
-						style: {
-							padding: "14px 16px",
-							background: "rgba(255, 255, 255, 0.04)",
-							borderRadius: "8px",
-							display: "flex",
-							justifyContent: "space-between",
-							alignItems: "center",
-							gap: "12px",
-							margin: "8px 0"
-						}
-					},
-						react.createElement("div", null,
-							react.createElement("div", { style: { fontWeight: "bold", fontSize: "14px", color: "var(--spice-text)" } }, `Lyric Plus Translate v${window.UpdateService?.CURRENT_VERSION || "1.9.0"}`),
-							react.createElement("div", { style: { fontSize: "12px", color: "var(--spice-subtext)", marginTop: "2px" } }, "AI-powered translation & video background")
-						),
-						react.createElement("button", {
-							onClick: () => {
-								if (window.UpdateService?.checkForUpdates) {
-									window.UpdateService.checkForUpdates(false);
-								}
-							},
-							style: {
-								padding: "8px 16px",
-								background: "var(--spice-button)",
-								color: "var(--spice-text)",
-								border: "none",
-								borderRadius: "20px",
-								cursor: "pointer",
-								fontWeight: "bold",
-								fontSize: "12px",
-								whiteSpace: "nowrap"
-							}
-						}, "🔄 " + (getText("settings.checkForUpdates") || "Kiểm tra cập nhật"))
-					)
-				)
+				react.createElement(CollapsibleSection, { title: getText("sections.unsyncedOptions") }, react.createElement(OptionList, { items: unsyncedSettings, onChange }))
 			);
 			break;
 		case "translation":
@@ -817,12 +780,49 @@ const ConfigHelper = () => {
 			];
 			content = react.createElement("div", null,
 				react.createElement(OptionList, { items: advSettings, onChange }),
+				react.createElement(CollapsibleSection, { title: getText("sections.aboutAndUpdates") },
+					react.createElement("div", {
+						style: {
+							padding: "14px 16px",
+							background: "rgba(255, 255, 255, 0.04)",
+							borderRadius: "8px",
+							display: "flex",
+							justifyContent: "space-between",
+							alignItems: "center",
+							gap: "12px",
+							margin: "8px 0 16px 0"
+						}
+					},
+						react.createElement("div", null,
+							react.createElement("div", { style: { fontWeight: "bold", fontSize: "14px", color: "var(--spice-text)" } }, `Lyric Plus Translate v${window.UpdateService?.CURRENT_VERSION || "1.9.0"}`),
+							react.createElement("div", { style: { fontSize: "12px", color: "var(--spice-subtext)", marginTop: "2px" } }, getText("settings.updateAppSubtitle"))
+						),
+						react.createElement("button", {
+							onClick: () => {
+								if (window.UpdateService?.checkForUpdates) {
+									window.UpdateService.checkForUpdates(false);
+								}
+							},
+							style: {
+								padding: "8px 16px",
+								background: "var(--spice-button)",
+								color: "var(--spice-text)",
+								border: "none",
+								borderRadius: "20px",
+								cursor: "pointer",
+								fontWeight: "bold",
+								fontSize: "12px",
+								whiteSpace: "nowrap"
+							}
+						}, getText("settings.checkForUpdates"))
+					)
+				),
 				react.createElement("div", { className: "cors-proxy-section" },
-				react.createElement("h2", null, getText("sections.corsProxy")),
-				react.createElement("p", { className: "setting-desc cors-proxy-desc", dangerouslySetInnerHTML: { __html: getText("settings.corsProxyDesc") } }),
-				react.createElement(corsProxyTemplate),
-				react.createElement("p", { className: "setting-desc cors-proxy-desc", dangerouslySetInnerHTML: { __html: getText("settings.corsProxyDefault") } })
-			)
+					react.createElement("h2", null, getText("sections.corsProxy")),
+					react.createElement("p", { className: "setting-desc cors-proxy-desc", dangerouslySetInnerHTML: { __html: getText("settings.corsProxyDesc") } }),
+					react.createElement(corsProxyTemplate),
+					react.createElement("p", { className: "setting-desc cors-proxy-desc", dangerouslySetInnerHTML: { __html: getText("settings.corsProxyDefault") } })
+				)
 			);
 			break;
 	}
