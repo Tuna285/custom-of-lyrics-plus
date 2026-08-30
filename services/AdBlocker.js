@@ -5,6 +5,7 @@
     const logPrefix = "[Lyrics+ Ad-Blocker]";
 
     const blockedPatterns = [
+        // --- Google / DoubleClick / YouTube Ad Networks ---
         /doubleclick\.net/i,
         /googlesyndication\.com/i,
         /googleads\.g\.doubleclick\.net/i,
@@ -13,6 +14,8 @@
         /tpc\.googlesyndication\.com/i,
         /pubads\.g\.doubleclick\.net/i,
         /securepubads\.g\.doubleclick\.net/i,
+        /adservice\.google\.com/i,
+        /static\.doubleclick\.net/i,
         /gvt\d+\.com\/ads/i,
         /manifest\.googlevideo\.com\/api\/manifest\/ads/i,
         /googlevideo\.com\/videoplayback.*[&?](ctier|oad|adformat)=/i,
@@ -21,6 +24,7 @@
         /youtube\.com\/ptracking/i,
         /youtube\.com\/api\/stats\/(ads|qoe|watchtime|playback)/i,
         /youtubei\/v1\/log_event/i,
+        /youtubei\/v1\/player\/(ad_break|ad)/i,
         /youtubei\/v1\/player.*adformat/i,
         /youtube\.com\/get_video_info.*adformat/i,
         /youtube\.com\/yva_/i,
@@ -28,7 +32,20 @@
         /ytimg\.com\/.*ad/i,
         /yt3\.ggpht\.com\/ytc\/.*ad/i,
         /s0\.2mdn\.net/i,
-        /gstaticadssl\.googleapis\.com/i
+        /gstaticadssl\.googleapis\.com/i,
+        /play\.google\.com\/log/i,
+
+        // --- Spotify Native Audio & Display Ad Endpoints ---
+        /spclient\.wg\.spotify\.com\/ad-logic\//i,
+        /spclient\.wg\.spotify\.com\/ads\//i,
+        /spclient\.wg\.spotify\.com\/ad-feedback\//i,
+        /spclient\.wg\.spotify\.com\/desktop-omni-ads\//i,
+        /spclient\.wg\.spotify\.com\/partner-offers-api\//i,
+        /spclient\.wg\.spotify\.com\/commercial-break\//i,
+        /spclient\.wg\.spotify\.com\/track-playback\/v1\/commercial/i,
+        /audio-ak-spotify-com\.akamaized\.net\/audio\/ad\//i,
+        /heads-ak-spotify-com\.akamaized\.net\/head\/ad\//i,
+        /video-fa-spotify-com\.akamaized\.net\/ad\//i
     ];
 
     const normalizeUrlString = (candidate) => {
@@ -356,7 +373,8 @@
         const OriginalPlayer = window.YT.Player;
         window.YT.Player = function patchedPlayer(element, config = {}) {
             const mergedConfig = { ...config };
-            mergedConfig.host = "https://www.youtube-nocookie.com";
+            // Preserve configured host or default to https://www.youtube.com for reliable postMessage communication
+            mergedConfig.host = config.host || "https://www.youtube.com";
             
             const forcedPlayerVars = {
                 rel: 0,
@@ -404,7 +422,23 @@
             ];
             mergedConfig.playerVars.fflags = mergeFeatureFlags(mergedConfig.playerVars.fflags, forcedFeatureFlags);
 
-            // Active Ad Skipping Logic
+            // Active Ad Watchdog & Skipping Logic
+            let adWatchdog = null;
+            const skipActiveAd = (player) => {
+                try {
+                    const isAd = (typeof player.getAdState === "function" && player.getAdState() === 1) ||
+                                 (typeof player.getVideoData === "function" && player.getVideoData()?.isAd);
+
+                    if (isAd) {
+                        player.setPlaybackRate?.(16);
+                        player.mute?.();
+                        const dur = player.getDuration?.() || 0;
+                        if (dur > 0) player.seekTo?.(dur, true);
+                        if (typeof player.skipAd === "function") player.skipAd();
+                    }
+                } catch (_) {}
+            };
+
             const originalEvents = mergedConfig.events || {};
             mergedConfig.events = {
                 ...originalEvents,
@@ -413,17 +447,22 @@
                     const player = event.target;
                     const state = event.data;
                     
-                    const isAd = [105, 106, 107, 108, 109, 110, 111].includes(state) || 
-                                 (typeof player.getAdState === 'function' && player.getAdState() === 1);
+                    const isAdState = [105, 106, 107, 108, 109, 110, 111].includes(state) || 
+                                     (typeof player.getAdState === "function" && player.getAdState() === 1);
 
-                    if (isAd) {
-                        try {
-                            player.setPlaybackRate(16);
-                            player.mute();
-                            const duration = player.getDuration();
-                            if (duration > 0) player.seekTo(duration - 0.1, true);
-                            if (typeof player.skipAd === 'function') player.skipAd();
-                        } catch (e) {}
+                    if (isAdState) {
+                        skipActiveAd(player);
+                    }
+
+                    if (state === 1) { // Playing
+                        if (!adWatchdog) {
+                            adWatchdog = setInterval(() => skipActiveAd(player), 300);
+                        }
+                    } else if ([0, 2, -1].includes(state)) { // Ended, Paused, Unstarted
+                        if (adWatchdog) {
+                            clearInterval(adWatchdog);
+                            adWatchdog = null;
+                        }
                     }
                 }
             };
@@ -431,7 +470,85 @@
             return new OriginalPlayer(element, mergedConfig);
         };
         window.YT.Player.__lyricsPlusAdBlockWrapped = true;
-        console.log(`${logPrefix} YouTube Player API Patched`);
+    };
+
+    // --- Spotify Native Audio Ad Interceptor ---
+
+    const initSpotifyAudioAdBlocker = () => {
+        let lastUserVolume = null;
+        let isAdSkipping = false;
+
+        const checkAndSkipAudioAd = () => {
+            if (typeof Spicetify === "undefined" || !Spicetify.Player || !Spicetify.Player.data) return;
+
+            const item = Spicetify.Player.data.item;
+            if (!item) return;
+
+            const isAd = item.metadata?.is_advertisement === "true" ||
+                         item.type === "ad" ||
+                         item.isAd === true ||
+                         (typeof item.uri === "string" && item.uri.includes(":ad:"));
+
+            if (isAd) {
+                if (!isAdSkipping) {
+                    isAdSkipping = true;
+                    if (lastUserVolume === null) {
+                        lastUserVolume = Spicetify.Player.getVolume?.() ?? 1;
+                    }
+                    Spicetify.Player.setVolume?.(0);
+                    Spicetify.Player.next?.();
+                    if (window.lyricsPlusDebug) {
+                        console.log(`${logPrefix} Spotify audio ad detected -> Auto-Muted & Skipped`);
+                    }
+                }
+            } else {
+                if (isAdSkipping) {
+                    isAdSkipping = false;
+                    if (lastUserVolume !== null) {
+                        Spicetify.Player.setVolume?.(lastUserVolume);
+                        lastUserVolume = null;
+                    }
+                }
+            }
+        };
+
+        const setupWatcher = () => {
+            if (typeof Spicetify !== "undefined" && Spicetify.Player) {
+                Spicetify.Player.addEventListener?.("songchange", checkAndSkipAudioAd);
+                setInterval(checkAndSkipAudioAd, 500);
+            } else {
+                setTimeout(setupWatcher, 1000);
+            }
+        };
+        setupWatcher();
+    };
+
+    // --- Inject CSS to Purge Ad Elements ---
+
+    const injectAdBlockStyles = () => {
+        if (document.getElementById("lyrics-plus-adblock-styles")) return;
+        const style = document.createElement("style");
+        style.id = "lyrics-plus-adblock-styles";
+        style.textContent = `
+            .main-leaderboardComponent-container,
+            [data-testid="ad-leaderboard"],
+            .sponsor-container,
+            .upgrade-button,
+            .ytp-ad-overlay-container,
+            .ytp-ad-message-container,
+            .ytp-ad-player-overlay,
+            .ytp-ad-skip-button-container,
+            .ytp-ad-module,
+            .video-ads {
+                display: none !important;
+                visibility: hidden !important;
+                pointer-events: none !important;
+                opacity: 0 !important;
+                height: 0 !important;
+                width: 0 !important;
+            }
+        `;
+        (document.head || document.documentElement).appendChild(style);
     };
 
     const initialize = () => {
@@ -448,12 +565,14 @@
         patchWindowOpen();
         patchYouTubePlayer();
         observeDOM();
+        initSpotifyAudioAdBlocker();
+        injectAdBlockStyles();
         console.log(`${logPrefix} Initialized`);
     };
 
     if (document.body) {
         initialize();
     } else {
-        window.addEventListener('DOMContentLoaded', initialize);
+        window.addEventListener("DOMContentLoaded", initialize);
     }
 })();
