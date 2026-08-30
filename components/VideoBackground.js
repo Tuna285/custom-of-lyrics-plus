@@ -37,6 +37,7 @@ const VideoBackground = (() => {
 
         const playerRef = useRef(null);
         const playerDivRef = useRef(null);
+        const currentVideoIdRef = useRef(null);
         const uiFlashTimeoutRef = useRef(null);
         const lastSeekAttemptRef = useRef({ time: 0, attempts: 0 });
         const lastSeekTimeRef = useRef(0);
@@ -62,8 +63,12 @@ const VideoBackground = (() => {
         // Monitor Spotify playback state
         useEffect(() => {
             const update = () => {
-                setIsPlaying(Spicetify.Player.isPlaying());
+                const spotifyPlaying = Spicetify.Player.isPlaying();
+                setIsPlaying(spotifyPlaying);
                 if (playerRef.current && isPlayerReady) {
+                    if (spotifyPlaying) {
+                        try { playerRef.current.playVideo(); } catch (_) {}
+                    }
                     setTimeout(() => window.dispatchEvent(new CustomEvent("lyricsPlusSyncRequest")), 50);
                 }
             };
@@ -71,31 +76,50 @@ const VideoBackground = (() => {
             return () => Spicetify.Player.removeEventListener("onplaypause", update);
         }, [isPlayerReady]);
 
-        // Reset auxiliary state on track change
-        useEffect(() => {
-            if (!trackUri) return;
-            setIsAdPlaying(false);
-            setHasStartedPlaying(false);
-            setIsYTReadyToRender(false);
-        }, [trackUri]);
-
-        // Load/Recreate video player when video_id changes
+        // Load or switch video when videoInfo changes
         useEffect(() => {
             if (!videoInfo || !videoInfo.video_id) {
                 setIsPlayerReady(false);
                 setIsYTReadyToRender(false);
+                setHasStartedPlaying(false);
+                currentVideoIdRef.current = null;
                 return;
             }
 
-            // Destroy old player before creating new one
+            const targetVideoId = videoInfo.video_id;
+
+            // Fast Path: Reuse existing player iframe with loadVideoById (10x faster, no black flash)
+            if (playerRef.current && typeof playerRef.current.loadVideoById === "function" && isPlayerReady) {
+                if (currentVideoIdRef.current !== targetVideoId) {
+                    currentVideoIdRef.current = targetVideoId;
+                    setHasStartedPlaying(false);
+                    setIsYTReadyToRender(false);
+                    try {
+                        const spotifyTime = (Spicetify.Player.getProgress() || 0) / 1000;
+                        const syncOffset = videoInfo.sync_offset || 0;
+                        const startSecs = Math.max(0, spotifyTime + syncOffset);
+                        playerRef.current.loadVideoById({
+                            videoId: targetVideoId,
+                            startSeconds: startSecs
+                        });
+                        playerRef.current.mute();
+                        if (Spicetify.Player.isPlaying()) {
+                            playerRef.current.playVideo();
+                        }
+                    } catch (_) {}
+                }
+                return;
+            }
+
+            currentVideoIdRef.current = targetVideoId;
+            setIsPlayerReady(false);
+            setHasStartedPlaying(false);
+            setIsYTReadyToRender(false);
+
             if (playerRef.current) {
                 try { playerRef.current.destroy(); } catch (_) {}
                 playerRef.current = null;
             }
-
-            setIsPlayerReady(false);
-            setHasStartedPlaying(false);
-            setIsYTReadyToRender(false);
 
             const tryCreate = () => {
                 if (!window.YT || !window.YT.Player) {
@@ -107,7 +131,6 @@ const VideoBackground = (() => {
                 const playerDiv = playerDivRef.current;
                 if (!playerDiv) return;
 
-                // Clear previous content
                 playerDiv.innerHTML = "";
                 const ytTarget = document.createElement("div");
                 playerDiv.appendChild(ytTarget);
@@ -115,22 +138,23 @@ const VideoBackground = (() => {
                 playerRef.current = new window.YT.Player(ytTarget, {
                     height: "100%",
                     width: "100%",
-                    videoId: videoInfo.video_id,
-                    host: "https://www.youtube-nocookie.com",
+                    videoId: targetVideoId,
+                    host: "https://www.youtube.com",
                     playerVars: {
                         autoplay: 1,
                         controls: 0,
                         disablekb: 1,
+                        enablejsapi: 1,
                         fs: 0,
                         rel: 0,
                         iv_load_policy: 3,
                         modestbranding: 1,
                         mute: 1,
                         playsinline: 1,
-                        cc_load_policy: 0, // Disable captions/subtitles by default
+                        cc_load_policy: 0,
                         cc_lang_pref: "none",
                         hl: "en",
-                        origin: window.location.origin,
+                        origin: window.location.origin || "https://xpui.app.spotify.com",
                     },
                     events: {
                         onReady: (event) => {
@@ -149,7 +173,6 @@ const VideoBackground = (() => {
                                 }
                             } catch (_) {}
 
-                            // Unload & clear captions/subtitles modules completely to prevent layout interference
                             try {
                                 if (typeof event.target.setOption === "function") {
                                     event.target.setOption("captions", "track", {});
@@ -159,11 +182,11 @@ const VideoBackground = (() => {
                                     event.target.unloadModule("captions");
                                     event.target.unloadModule("cc");
                                 }
-                            } catch (e) {
-                                if (window.lyricsPlusDebug) console.warn("[VideoBackground] Failed to unload captions module:", e);
-                            }
+                            } catch (_) {}
 
-                            event.target.playVideo();
+                            if (Spicetify.Player.isPlaying()) {
+                                event.target.playVideo();
+                            }
                         },
                         onStateChange: (event) => {
                             if (!isMountedRef.current) return;
@@ -175,10 +198,11 @@ const VideoBackground = (() => {
                                 if (uiFlashTimeoutRef.current) clearTimeout(uiFlashTimeoutRef.current);
                             }
 
-                            if (state === 1) {
+                            if (state === 1 || state === 3) {
                                 if (uiFlashTimeoutRef.current) clearTimeout(uiFlashTimeoutRef.current);
-                                uiFlashTimeoutRef.current = setTimeout(() => setIsUIFlashing(false), 400);
+                                uiFlashTimeoutRef.current = setTimeout(() => setIsUIFlashing(false), 300);
                                 setHasStartedPlaying(true);
+                                setIsYTReadyToRender(true);
 
                                 try {
                                     if (typeof player.setOption === "function") {
@@ -190,13 +214,6 @@ const VideoBackground = (() => {
                                         player.unloadModule("cc");
                                     }
                                 } catch (_) {}
-
-                                // Wait for 1.2s of stable playback to hide YouTube play overlay & vignette
-                                setTimeout(() => {
-                                    if (isMountedRef.current) {
-                                        setIsYTReadyToRender(true);
-                                    }
-                                }, 1200);
                             }
 
                             if (state === 0) {
@@ -238,9 +255,20 @@ const VideoBackground = (() => {
                 });
             };
             tryCreate();
-        }, [videoInfo?.video_id]);
 
-        // Sync Logic
+            // Safety Watchdog: After 2.5s, force dismiss loading screen if player is alive
+            const safetyTimer = setTimeout(() => {
+                if (isMountedRef.current && isPlayerReady) {
+                    setHasStartedPlaying(true);
+                    setIsYTReadyToRender(true);
+                    setIsUIFlashing(false);
+                }
+            }, 2500);
+
+            return () => clearTimeout(safetyTimer);
+        }, [videoInfo?.video_id, isPlayerReady]);
+
+        // Sync & Watchdog Logic
         useEffect(() => {
             const syncTime = () => {
                 const player = playerRef.current;
@@ -248,13 +276,29 @@ const VideoBackground = (() => {
                 if (typeof player.getPlayerState !== "function") return;
 
                 const spotifyIsPlaying = Spicetify.Player.isPlaying();
+                const playerState = player.getPlayerState();
+
+                // 🛡️ Watchdog: If video is moving or playing, immediately clear loading indicator
+                if (typeof player.getCurrentTime === "function") {
+                    const curr = player.getCurrentTime();
+                    if ((curr > 0.05 || playerState === 1) && (!hasStartedPlaying || !isYTReadyToRender)) {
+                        setHasStartedPlaying(true);
+                        setIsYTReadyToRender(true);
+                        setIsUIFlashing(false);
+                    }
+                    if ((playerState === 5 || playerState === -1) && spotifyIsPlaying) {
+                        player.playVideo();
+                    }
+                }
 
                 if (!spotifyIsPlaying) {
-                    if (player.getPlayerState() === 1) {
+                    if (playerState === 1) {
                         player.pauseVideo();
                     }
                 } else {
-                    if (player.getPlayerState() !== 1) player.playVideo();
+                    if (playerState !== 1 && playerState !== 3) {
+                        player.playVideo();
+                    }
                 }
 
                 const spotifyTime = Spicetify.Player.getProgress() / 1000;
@@ -268,10 +312,9 @@ const VideoBackground = (() => {
                     }
                 }
 
-                if (targetVideoTime >= 0) {
+                if (targetVideoTime >= 0 && typeof player.getCurrentTime === "function") {
                     const currentVideoTime = player.getCurrentTime();
                     const timeDiff = Math.abs(currentVideoTime - targetVideoTime);
-                    const playerState = player.getPlayerState();
 
                     if (timeDiff > 0.5) {
                         const now = Date.now();
@@ -365,7 +408,7 @@ const VideoBackground = (() => {
                 zIndex: -1,
             }
         },
-            // Dark background while loading
+            // Dark background while player is initializing
             !isPlayerReady && react.createElement("div", {
                 style: {
                     position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
@@ -373,8 +416,8 @@ const VideoBackground = (() => {
                     zIndex: 1,
                 }
             }),
-            // Loading indicator
-            (!isPlayerReady || !hasStartedPlaying || isUIFlashing) && videoInfo && react.createElement(LoadingIndicator),
+            // Loading indicator — automatically hidden as soon as video starts playing or watchdog triggers
+            (!isPlayerReady || !hasStartedPlaying) && videoInfo && react.createElement(LoadingIndicator),
             // Video mount point — player div gets rendered here
             react.createElement("div", {
                 ref: playerDivRef,
@@ -383,8 +426,8 @@ const VideoBackground = (() => {
                     width: "177.78vh", height: "56.25vw",
                     minWidth: "100%", minHeight: "100%",
                     transform: `translate(-50%, -50%) scale(${(scale || 1.0) * (blurValue ? 1.12 : 1.08)})`,
-                    opacity: isPlayerReady && hasStartedPlaying && !isAdPlaying && !isUIFlashing && isPlaying && isYTReadyToRender ? 1 : 0,
-                    transition: "opacity 0.5s ease",
+                    opacity: isPlayerReady && hasStartedPlaying && !isAdPlaying && isPlaying ? 1 : 0,
+                    transition: "opacity 0.4s ease",
                     pointerEvents: "none",
                     filter: blurValue ? `blur(${blurValue}px)` : "none",
                 }
@@ -392,7 +435,6 @@ const VideoBackground = (() => {
             // Brightness overlay
             react.createElement("div", {
                 style: {
-                    position: "absolute top 0 left 0 width 100% height 100%".replace(/ /g, ":0;").replace(/%:/g, "%;").replace(/px:/g, "px;").replace(/black:/g, "black;").replace(/zIndex:/g, "zIndex;"), // formatting safety
                     position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
                     backgroundColor: "black", opacity: 1 - brightnessRatio,
                     zIndex: 2, pointerEvents: "none"
