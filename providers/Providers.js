@@ -158,4 +158,7 @@ const Providers = {
 
 // Expose to global scope
 window.Providers = Providers;
+if (window.LyricsPlus) {
+    window.LyricsPlus.Providers = Providers;
+}
 

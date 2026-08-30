@@ -241,7 +241,10 @@ const ProviderMusixmatch = (() => {
 		}));
 	}
 
-	return { findLyrics, getSynced, getUnsynced, getTranslation };
+	return { findLyrics, fetchLyrics: findLyrics, getSynced, getUnsynced, getTranslation };
 })();
 
 window.ProviderMusixmatch = ProviderMusixmatch;
+if (window.LyricsPlus) {
+    window.LyricsPlus.ProviderMusixmatch = ProviderMusixmatch;
+}
