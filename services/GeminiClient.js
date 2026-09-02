@@ -1224,7 +1224,9 @@ const GeminiClient = {
                 userMessage = `Bad Request (400). ${errorMsg.replace(/^HTTP 400:\s*/, '').substring(0, 100)}`;
             }
             
-            const shouldNotify = error.status !== 429;
+            // Suppress notification toast if the error is already handled by internal retry/key rotation or is a 429
+            const isHandledInternally = error.status === 429 || _isRetry || /Format validation|leaked reasoning/i.test(errorMsg);
+            const shouldNotify = !isHandledInternally;
             
             if (shouldNotify) {
                 try {
