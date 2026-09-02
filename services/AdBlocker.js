@@ -33,19 +33,7 @@
         /yt3\.ggpht\.com\/ytc\/.*ad/i,
         /s0\.2mdn\.net/i,
         /gstaticadssl\.googleapis\.com/i,
-        /play\.google\.com\/log/i,
-
-        // --- Spotify Native Audio & Display Ad Endpoints ---
-        /spclient\.wg\.spotify\.com\/ad-logic\//i,
-        /spclient\.wg\.spotify\.com\/ads\//i,
-        /spclient\.wg\.spotify\.com\/ad-feedback\//i,
-        /spclient\.wg\.spotify\.com\/desktop-omni-ads\//i,
-        /spclient\.wg\.spotify\.com\/partner-offers-api\//i,
-        /spclient\.wg\.spotify\.com\/commercial-break\//i,
-        /spclient\.wg\.spotify\.com\/track-playback\/v1\/commercial/i,
-        /audio-ak-spotify-com\.akamaized\.net\/audio\/ad\//i,
-        /heads-ak-spotify-com\.akamaized\.net\/head\/ad\//i,
-        /video-fa-spotify-com\.akamaized\.net\/ad\//i
+        /play\.google\.com\/log/i
     ];
 
     const normalizeUrlString = (candidate) => {
@@ -472,68 +460,13 @@
         window.YT.Player.__lyricsPlusAdBlockWrapped = true;
     };
 
-    // --- Spotify Native Audio Ad Interceptor ---
-
-    const initSpotifyAudioAdBlocker = () => {
-        let lastUserVolume = null;
-        let isAdSkipping = false;
-
-        const checkAndSkipAudioAd = () => {
-            if (typeof Spicetify === "undefined" || !Spicetify.Player || !Spicetify.Player.data) return;
-
-            const item = Spicetify.Player.data.item;
-            if (!item) return;
-
-            const isAd = item.metadata?.is_advertisement === "true" ||
-                         item.type === "ad" ||
-                         item.isAd === true ||
-                         (typeof item.uri === "string" && item.uri.includes(":ad:"));
-
-            if (isAd) {
-                if (!isAdSkipping) {
-                    isAdSkipping = true;
-                    if (lastUserVolume === null) {
-                        lastUserVolume = Spicetify.Player.getVolume?.() ?? 1;
-                    }
-                    Spicetify.Player.setVolume?.(0);
-                    Spicetify.Player.next?.();
-                    if (window.lyricsPlusDebug) {
-                        console.log(`${logPrefix} Spotify audio ad detected -> Auto-Muted & Skipped`);
-                    }
-                }
-            } else {
-                if (isAdSkipping) {
-                    isAdSkipping = false;
-                    if (lastUserVolume !== null) {
-                        Spicetify.Player.setVolume?.(lastUserVolume);
-                        lastUserVolume = null;
-                    }
-                }
-            }
-        };
-
-        const setupWatcher = () => {
-            if (typeof Spicetify !== "undefined" && Spicetify.Player) {
-                Spicetify.Player.addEventListener?.("songchange", checkAndSkipAudioAd);
-                setInterval(checkAndSkipAudioAd, 500);
-            } else {
-                setTimeout(setupWatcher, 1000);
-            }
-        };
-        setupWatcher();
-    };
-
-    // --- Inject CSS to Purge Ad Elements ---
+    // --- Inject CSS to Purge YouTube Overlay Ads ---
 
     const injectAdBlockStyles = () => {
         if (document.getElementById("lyrics-plus-adblock-styles")) return;
         const style = document.createElement("style");
         style.id = "lyrics-plus-adblock-styles";
         style.textContent = `
-            .main-leaderboardComponent-container,
-            [data-testid="ad-leaderboard"],
-            .sponsor-container,
-            .upgrade-button,
             .ytp-ad-overlay-container,
             .ytp-ad-message-container,
             .ytp-ad-player-overlay,
@@ -565,7 +498,6 @@
         patchWindowOpen();
         patchYouTubePlayer();
         observeDOM();
-        initSpotifyAudioAdBlocker();
         injectAdBlockStyles();
         console.log(`${logPrefix} Initialized`);
     };
