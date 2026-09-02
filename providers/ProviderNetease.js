@@ -114,20 +114,25 @@ const ProviderNetease = (() => {
     }
 
     function scoreCandidate(candidate, info) {
+        const isInstSearch = /instrumental|off vocal|karaoke|カラオケ|伴奏/i.test(info.title || "");
+        const isInstCand = /instrumental|off vocal|karaoke|カラオケ|伴奏/i.test(candidate.name || "");
+        const penalty = (!isInstSearch && isInstCand) ? 0.35 : 0;
+
         const artistStr = (candidate.ar || candidate.artists || []).map(a => a.name).join(" ");
         const titleSim  = levenshtein(candidate.name, info.title);
         const artistSim = levenshtein(artistStr, info.artist);
         const deltaMs   = Math.abs((candidate.dt || candidate.duration || 0) - (info.duration || 0));
         const durScore  = Math.max(0, 1 - deltaMs / 10000);
-        return titleSim * 0.4 + artistSim * 0.3 + durScore * 0.3;
+        return Math.max(0, titleSim * 0.4 + artistSim * 0.3 + durScore * 0.3 - penalty);
     }
 
     const SCORE_THRESHOLD = 0.28;
 
     function parseLyrics(lrcText) {
         if (!lrcText?.trim()) return { synced: null, unsynced: null };
-        if (typeof Utils !== "undefined" && Utils.parseLocalLyrics) {
-            const p = Utils.parseLocalLyrics(lrcText);
+        const U = typeof Utils !== "undefined" ? Utils : (window.LyricsPlus?.Utils || {});
+        if (U.parseLocalLyrics) {
+            const p = U.parseLocalLyrics(lrcText);
             return { synced: p.synced || null, unsynced: p.unsynced || null };
         }
         // Minimal fallback - modernized to handle [mm:ss:xx] and filter metadata
@@ -161,9 +166,10 @@ const ProviderNetease = (() => {
         const err = (msg) => ({ error: msg, uri: info.uri });
 
         try {
+            const U = typeof Utils !== "undefined" ? Utils : (window.LyricsPlus?.Utils || {});
             // Clean title and extract primary artist to optimize NetEase's search engine
-            const cleanTitle = Utils.removeSongFeat(Utils.removeExtraInfo(info.title));
-            const primaryArtist = info.artist.split(",")[0].split("&")[0].trim(); // Extract first artist
+            const cleanTitle = U.removeSongFeat ? U.removeSongFeat(U.removeExtraInfo(info.title)) : info.title;
+            const primaryArtist = (info.artist || "").split(",")[0].split("&")[0].trim(); // Extract first artist
 
             DebugLogger.log(`[NetEase] Searching for "${cleanTitle}" by primary artist "${primaryArtist}"`);
             let songs = await searchSongs(`${cleanTitle} ${primaryArtist}`, 8);
@@ -203,60 +209,61 @@ const ProviderNetease = (() => {
                 scored.slice(0, 3).map(s => `${s.c.name} — ${s.score.toFixed(2)}`)
             );
 
-            // Dynamic thresholds for close duration matches
-            let threshold = SCORE_THRESHOLD;
-            const bestCand = scored[0].c;
-            const deltaMs = Math.abs((bestCand.dt || bestCand.duration || 0) - (info.duration || 0));
-            if (deltaMs < 8000) {
-                threshold = 0.12; // High confidence when duration is closely aligned
-            } else if (deltaMs < 15000) {
-                threshold = 0.18;
-            }
-
-            if (scored[0].score < threshold) {
-                return err(`NetEase: best match score ${scored[0].score.toFixed(2)} below threshold ${threshold.toFixed(2)}`);
-            }
-
-            const best    = scored[0].c;
-            const songId  = best.id;
-            const lyricData = await fetchLyricsById(songId);
-            
-            const rawLrc = lyricData?.lrc?.lyric || "";
-            let { synced, unsynced } = parseLyrics(rawLrc);
-            if (!synced && !unsynced) return err("NetEase: no lyrics found for this track");
-
-            let neteaseTranslation = null;
-            // Only load translation if it's not already used as primary lyrics
-            if (lyricData?.tlyric?.lyric && lyricData.tlyric.lyric !== rawLrc) {
-                const transResult = parseLyrics(lyricData.tlyric.lyric);
-                neteaseTranslation = transResult.synced || transResult.unsynced || null;
-            }
-
-            if (!synced && unsynced && neteaseTranslation && neteaseTranslation.some(l => l.startTime !== undefined)) {
-                // If original is unsynced but translation is synced, copy timestamps
-                const newSynced = unsynced.map((line, idx) => {
-                    const transLine = neteaseTranslation[idx];
-                    return {
-                        ...line,
-                        startTime: transLine ? transLine.startTime : undefined
-                    };
-                });
-                if (newSynced.some(l => l.startTime !== undefined)) {
-                    synced = newSynced;
+            // Iterate through top candidates to find one with actual lyrics
+            for (const item of scored.slice(0, 5)) {
+                let threshold = SCORE_THRESHOLD;
+                const cand = item.c;
+                const deltaMs = Math.abs((cand.dt || cand.duration || 0) - (info.duration || 0));
+                if (deltaMs < 8000) {
+                    threshold = 0.12; // High confidence when duration is closely aligned
+                } else if (deltaMs < 15000) {
+                    threshold = 0.18;
                 }
+
+                if (item.score < threshold) continue;
+
+                const songId  = cand.id;
+                const lyricData = await fetchLyricsById(songId);
+                
+                const rawLrc = lyricData?.lrc?.lyric || "";
+                let { synced, unsynced } = parseLyrics(rawLrc);
+                if (!synced && !unsynced) continue;
+
+                let neteaseTranslation = null;
+                // Only load translation if it's not already used as primary lyrics
+                if (lyricData?.tlyric?.lyric && lyricData.tlyric.lyric !== rawLrc) {
+                    const transResult = parseLyrics(lyricData.tlyric.lyric);
+                    neteaseTranslation = transResult.synced || transResult.unsynced || null;
+                }
+
+                if (!synced && unsynced && neteaseTranslation && neteaseTranslation.some(l => l.startTime !== undefined)) {
+                    // If original is unsynced but translation is synced, copy timestamps
+                    const newSynced = unsynced.map((line, idx) => {
+                        const transLine = neteaseTranslation[idx];
+                        return {
+                            ...line,
+                            startTime: transLine ? transLine.startTime : undefined
+                        };
+                    });
+                    if (newSynced.some(l => l.startTime !== undefined)) {
+                        synced = newSynced;
+                    }
+                }
+
+                return {
+                    uri:               info.uri,
+                    provider:          "netease",
+                    copyright:         "网易云音乐 (NetEase Cloud Music)",
+                    synced,
+                    unsynced,
+                    genius:            null,
+                    neteaseTranslation,
+                    _neteaseId:        songId,
+                    _neteaseScore:     item.score,
+                };
             }
 
-            return {
-                uri:               info.uri,
-                provider:          "netease",
-                copyright:         "网易云音乐 (NetEase Cloud Music)",
-                synced,
-                unsynced,
-                genius:            null,
-                neteaseTranslation,
-                _neteaseId:        songId,
-                _neteaseScore:     scored[0].score,
-            };
+            return err("NetEase: no valid lyrics found across top candidates");
 
         } catch (e) {
             console.warn("[Lyrics+] ProviderNetease:", e.message);
