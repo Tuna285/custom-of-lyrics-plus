@@ -513,3 +513,7 @@ const DBManager = {
 // Expose to global scope for other modules
 window.Utils = Utils;
 window.DBManager = DBManager;
+if (window.LyricsPlus) {
+    window.LyricsPlus.Utils = Utils;
+    window.LyricsPlus.DBManager = DBManager;
+}
