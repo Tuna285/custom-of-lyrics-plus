@@ -992,7 +992,8 @@ const GeminiClient = {
 
     async callGemini({ apiKey, artist, title, text, styleKey, pronounKey, wantSmartPhonetic, wantFurigana, _isRetry, priority, taskId, onReasoningProgress }) {
         const startTime = Date.now();
-        const lineCount = text.split('\n').length;
+        const rawLines = text.split('\n');
+        const lineCount = rawLines.length;
 
         DebugLogger.group(`${wantSmartPhonetic ? 'Phonetic' : 'Translation'} Request`);
 
