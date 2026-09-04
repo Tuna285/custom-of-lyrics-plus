@@ -217,6 +217,8 @@ const GeminiClient = {
             if (/Empty response|No response from API/i.test(msg)) throw error;
             // Hard quota exceeded (429 with quota message) won't succeed on same key retry — throw immediately to let key rotation handle it.
             if (error.status === 429 && /quota/i.test(msg)) throw error;
+            // High demand (503) or stalled connect/idle won't succeed on same key retry — throw immediately to rotate keys
+            if (error.status === 503 || error.idleAbort || error.isStalledConnect) throw error;
 
             // True exponential backoff: delay = baseDelay * 2^attempt
             const delay = baseDelay * Math.pow(2, attempt - 1);
@@ -560,12 +562,17 @@ const GeminiClient = {
             const isGeminiWithBudget = /gemini-(2\.5|[3-9])|flash-thinking|thinking-exp/.test(m);
             const isGemma4 = /gemma-4/.test(m);
             if (isGeminiWithBudget) {
-                // Google's OpenAI-compatible endpoint accepts top-level reasoning_effort:
-                // "none" -> disables thinking (0 tokens)
-                // "low" -> 1,024 thinking tokens (~1-2s brief deliberation)
-                // "medium" -> 8,192 thinking tokens
-                // "high" -> 24,576 thinking tokens
-                body.reasoning_effort = effort === "off" ? "none" : effort;
+                // Google's OpenAI-compatible endpoint:
+                // Only Gemini 3.7+ accepts top-level reasoning_effort: "none". Older/other models throw HTTP 400.
+                if (effort === "off") {
+                    if (/gemini-(?:3\.[7-9]|[4-9])/.test(m)) {
+                        body.reasoning_effort = "none";
+                    } else {
+                        delete body.reasoning_effort;
+                    }
+                } else {
+                    body.reasoning_effort = effort;
+                }
             } else if (isGemma4) {
                 // Gemma 4 (26B + 31B) thinks natively via <|think|> chat template token.
                 // Google's hosted API does NOT accept reasoning_effort or thinking_config
@@ -1110,7 +1117,8 @@ const GeminiClient = {
         }
 
         // Apply provider-specific reasoning-effort flags (already read above to feed the prompt).
-        if (reasoningEffort !== "default") {
+        // Phonetic tasks (Furigana / Romaji / Pinyin) are pure mechanical transcription and must never send reasoning flags.
+        if (!wantSmartPhonetic && reasoningEffort !== "default") {
             this.applyReasoningEffort(body, endpoint, model, reasoningEffort);
         }
 
@@ -1121,18 +1129,27 @@ const GeminiClient = {
             const makeRequest = async () => {
                 const streamed = await this.fetchWithRetry(async () => {
                     const controller = new AbortController();
-                    // Idle timeout instead of total cap: reset on every streamed chunk.
-                    // A total 120s cap killed Gemma 4 31B mid-thinking on 50+ line songs
-                    // (which can legitimately think 2-3 min). An idle timeout keeps the
-                    // connection alive as long as the model is actively emitting SSE data
-                    // (reasoning OR content) and only aborts when the server truly hangs.
-                    const IDLE_MS = 90000; // 90s of silence → abort
+                    // Connection timeouts:
+                    // 1) Initial connect timeout: if Google queues/stalls the connection for >15s without sending headers/tokens,
+                    //    abort early with isStalledConnect to let key rotation switch to a fast key immediately.
+                    // 2) Streaming idle timeout: once streaming, allow up to 45s between chunks for long deliberation.
+                    const CONNECT_TIMEOUT_MS = 15000;
+                    const STREAM_IDLE_MS = 45000;
+                    let hasReceivedFirstChunk = false;
                     let idleAbort = false;
-                    let idleTimer = setTimeout(() => { idleAbort = true; try { controller.abort(); } catch (_) {} }, IDLE_MS);
+                    let isStalledConnect = false;
+
+                    let idleTimer = setTimeout(() => {
+                        idleAbort = true;
+                        if (!hasReceivedFirstChunk) isStalledConnect = true;
+                        try { controller.abort(); } catch (_) {}
+                    }, CONNECT_TIMEOUT_MS);
+
                     const resetIdle = () => {
                         if (idleAbort) return;
+                        hasReceivedFirstChunk = true;
                         clearTimeout(idleTimer);
-                        idleTimer = setTimeout(() => { idleAbort = true; try { controller.abort(); } catch (_) {} }, IDLE_MS);
+                        idleTimer = setTimeout(() => { idleAbort = true; try { controller.abort(); } catch (_) {} }, STREAM_IDLE_MS);
                     };
                     try {
                         return await this.streamChatCompletion({
@@ -1153,6 +1170,7 @@ const GeminiClient = {
                         if (!e.endpoint) { try { e.endpoint = endpoint; } catch (_) {} }
                         if (!e.model) { try { e.model = model; } catch (_) {} }
                         if (idleAbort) { try { e.idleAbort = true; } catch (_) {} }
+                        if (isStalledConnect) { try { e.isStalledConnect = true; } catch (_) {} }
                         throw e;
                     } finally { clearTimeout(idleTimer); }
                 });
@@ -1221,8 +1239,8 @@ const GeminiClient = {
                 userMessage = `Bad Request (400). ${errorMsg.replace(/^HTTP 400:\s*/, '').substring(0, 100)}`;
             }
             
-            // Suppress notification toast if the error is already handled by internal retry/key rotation or is a 429
-            const isHandledInternally = error.status === 429 || _isRetry || /Format validation|leaked reasoning/i.test(errorMsg);
+            // Suppress notification toast if the error is already handled by internal retry/key rotation, is 429, or is 503
+            const isHandledInternally = error.status === 429 || error.status === 503 || error.idleAbort || error.isStalledConnect || _isRetry || /Format validation|leaked reasoning/i.test(errorMsg);
             const shouldNotify = !isHandledInternally;
             
             if (shouldNotify) {
@@ -1340,12 +1358,7 @@ const GeminiClient = {
             const isMajorMismatch = ratio < 0.85;
 
             if (!isRetry && isMajorMismatch) {
-                if (result.isFallbackSplit) {
-                    throw new Error(`Format validation failed: expected ${lineCount} structured lines, but parser fell back to raw line splitting and got ${result.vi.length} lines.`);
-                }
-                if (responseMode === "json_schema") {
-                    throw new Error(`JSON format validation failed: expected ${lineCount} lines, got ${result.vi.length} lines.`);
-                }
+                throw new Error(`Format validation failed: expected ${lineCount} lines, got ${result.vi.length} lines (ratio: ${ratio.toFixed(2)}).`);
             }
 
             DebugLogger.warn(`Line count mismatch! Expected: ${lineCount}, Got: ${result.vi.length} (Ratio: ${ratio.toFixed(2)}). Padding/trimming to fit.`);
