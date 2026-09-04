@@ -250,31 +250,13 @@ Avoid archaic, artificial, or formulaic literary clichés (từ ngữ ước l�
 - Academic & Abstract Nouns: When encountering abstract, biological, or philosophical terms in J-Pop (e.g., 細胞, 美学, 煩悩), paraphrase them into relatable human emotional states without changing the core imagery.
 
 [MELODIC ALIGNMENT & DYNAMIC EQUIVALENCE]
-1. Syllable & Rhythm Matching: Condense or expand the Vietnamese phrasing to match the natural breath and pacing of the song. Do not write long, unsingable prose sentences.
-2. Tonal Flow (Tránh Cưỡng Âm): Avoid stacking heavy/sharp tones (thanh trắc: sắc, nặng) awkwardly at phrase endings. Lean towards natural breathing vowels (thanh bằng/huyền) where appropriate.
-3. Imagery Integrity: Transcreate actions for emotional resonance, but preserve the original intensity (do not escalate to "mổ tung" or "khét lẹt" if the original vibe is subtle).
+1. Syllable & Rhythm Matching: Condense or expand the Vietnamese phrasing to match the natural breath and pacing of the song.
+2. Tonal Flow (Tránh Cưỡng Âm): Avoid stacking heavy/sharp tones (thanh trắc: sắc, nặng) awkwardly at phrase endings.
+3. Imagery Integrity: Transcreate actions for emotional resonance, but preserve original intensity without over-dramatizing.
 
-[MASTERCLASS EXEMPLARS (POSITIVE FEW-SHOT)]
-- Example 1 (Handling Raw Actions vs Emotion):
-  Original: 転んで足元つばを吐いた
-  Bad AI: Vấp ngã nhổ bọt xuống chân.
-  Good Lyricist: Vấp ngã giữa đời, bực dọc buông tiếng thở dài. (Focuses on the emotional frustration, highly singable).
-- Example 2 (Restraint on Surreal Imagery):
-  Original: 雀の啄む逆さ富士 / 焦げた匂い
-  Bad AI: Chim sẻ mổ tung bóng Phú Sĩ ngược dòng / Mùi khét lẹt.
-  Good Lyricist: Đàn sẻ nhỏ mổ xuống bóng Phú Sĩ in ngược / Thoang thoảng mùi cháy khét. (Preserves surreal imagery without overdramatizing).
-- Example 3 (Handling Fillers & Rhythmic Repetition):
-  Original: そう... / 心の内 心の内 見せてから
-  Bad AI: Đúng vậy... / Bộc lộ nỗi lòng bộc lộ nỗi lòng.
-  Good Lyricist: Cứ thế... / Một khi đã phơi bày mọi tâm can. (Replaces stiff conversational filler with smooth lyricism, merges repeated phrases naturally).
-- Example 4 (Transcreating Abstract Nouns - Pronoun-Agnostic):
-  Original: 鍛えられた細胞 崩してよ / 一切合切 自我の煩悩で
-  Bad AI: Hãy đập tan những tế bào đã rèn giũa này đi / Tất cả chỉ là phiền não của cái tôi.
-  Good Lyricist: Xin hãy phá nát từng tế bào đã chai cứng này / Suy cho cùng cũng chỉ vì sự ích kỷ của bản ngã. (Transforms rigid terms into poetic indie concepts without forcing pronouns).
-- Example 5 (Cognitive Verbs & Anti-Clichés):
-  Original: 確かめるまで終わらせないで
-  Bad AI: Xin đừng kết thúc khi chưa thể tỏ tường / thấu suốt.
-  Good Lyricist: Xin đừng kết thúc khi chưa thể hiểu rõ / nhận ra. (Uses pure, modern Vietnamese instead of archaic AI clichés).`;
+[MASTERCLASS EXEMPLARS (FEW-SHOT)]
+- Example 1 (Handling Raw Actions): 転んで足元つばを吐いた -> Vấp ngã giữa đời, bực dọc buông tiếng thở dài.
+- Example 2 (Restraint on Surreal Imagery): 雀の啄む逆さ富士 -> Đàn sẻ nhỏ mổ xuống bóng Phú Sĩ in ngược.`;
 }
 
 /**
@@ -284,8 +266,8 @@ Avoid archaic, artificial, or formulaic literary clichés (từ ngữ ước l�
 function buildTranslationFlowPunctuation() {
     return `FLOW & PUNCTUATION:
 1) Use natural Vietnamese phrasing.
-2) If a sentence continues to the next line (Enjambment), do NOT end the current line with a comma, and ensure the translated continuation connects smoothly in Vietnamese.
-3) Map emotional interjections (嗚呼, 呜呼, 아) to "Ah". Do not use "Ôi"/"Than ôi". Keep vocal sounds (Yeah, La la, Oh, Ah) unchanged.
+2) If a sentence continues to the next line (Enjambment), do NOT end the current line with a comma.
+3) Map emotional interjections to "Ah". Do not use "Ôi". Keep vocal sounds (Yeah, La la, Oh, Ah) unchanged.
 4) You may reorder phrases WITHIN a line for natural Vietnamese word order, but preserve meaning.`;
 }
 
@@ -307,17 +289,16 @@ function buildTranslationFlowPunctuation() {
  * @returns {string}
  */
 function buildTaskThinkingRules(finalOutputLabel, effort = "low") {
-    const hygiene = `1) Visible reply must be ONLY the required ${finalOutputLabel}. No filler ("Sure", "Here is..."), no plan headings, no commentary around the answer.
-2) Do not output chain-of-thought, scratchpad lists, or draft lines in the final output. The final output must start directly with the translation tags (or JSON object) unless reasoning is active.
+    const hygiene = `1) Visible reply must be ONLY the required ${finalOutputLabel}. No filler, no commentary.
+2) Do not output draft lines in the final output. The final output must start directly with the translation tags or JSON object.
 3) The final ${finalOutputLabel} must appear once and comprise the entire message.
-4) Translate the source DIRECTLY to Vietnamese. Do not route through English, romaji, pinyin, or any other intermediate language.
-5) Produce the Vietnamese for each line ONCE in the FINAL REPLY. The full set of tags must appear EXACTLY ONCE, and ONLY in the final reply.
-6) **DELIVERABLE POSITION & TAGGING — CRITICAL.** If you output any reasoning, you MUST wrap it entirely inside <thought>...</thought> tags at the very beginning of your response. NEVER place translation tags inside <thought>...</thought>.`;
+4) Translate the source DIRECTLY to Vietnamese.
+5) **DELIVERABLE POSITION & TAGGING — CRITICAL.** If you output any reasoning, you MUST wrap it entirely inside <thought>...</thought> tags at the very beginning of your response. NEVER place translation tags inside <thought>...</thought>.`;
 
     if (effort === "off") {
         return `THINKING PROCESS RULES (STRICT — NO DELIBERATION):
 ${hygiene}
-7) Skip deliberation entirely. Trust your first instinct and write the ${finalOutputLabel} immediately. No thinking, no auditing, no redrafting.`;
+6) Skip deliberation entirely. Write the ${finalOutputLabel} immediately.`;
     }
 
     const depthStr = effort === "high" ? "Deep Deliberation" : (effort === "medium" ? "Medium Effort" : "Concise Planning");
@@ -325,21 +306,14 @@ ${hygiene}
     return `THINKING PROCESS RULES (${depthStr}):
 ${hygiene}
 
-[PRE-FLIGHT VIBE CHECK & REASONING GUIDE]
-Use the <thought> space to analyze the song BEFORE translating. You MUST output this analysis:
-1. **Holistic Story Arc & Mood:** In 1-2 concise sentences, summarize the song's overall narrative story and emotional arc (from beginning through climax to resolution).
-2. **Metadata & Genre Profiling:** Infer the musical style and artist persona.
-3. **Pronoun & Register Lock:** Establish the pronoun pair (e.g., Tớ-Cậu, Anh-Em) and lock it across the entire track. Choose the vocabulary register (e.g., Street slang, poetic restraint, conversational).
-4. **Tone & Intensity Mapping (1-10):** Evaluate emotional intensity. If low/subtle (3/10), explicitly avoid heavy intensifiers. If high-intensity (9/10), allow punchy colloquialisms.
-5. **Metaphor & Idiom Strategy:** Identify key metaphors (e.g., Sakasa Fuji) or mimetic words (Gitaigo) and plan their cohesive Vietnamese imagery.
-
-*Constraint:* Keep reasoning to a high-level overview. Absolutely DO NOT list lines, write out draft translations, or draft specific line translations inside the reasoning block. The actual translated lines must ONLY appear in the final tags/JSON.`;
+[PRE-FLIGHT REASONING GUIDE (CONCISE)]
+In <thought>, outline in 1-2 brief sentences the overall emotional mood, artist persona, and locked pronoun pair (e.g., Tớ-Cậu, Anh-Em).
+*Strict Constraint:* Keep reasoning ultra-concise (< 50 words). Never list lines, draft line-by-line translations, or write long essays in thought. Start outputting translation tags/JSON immediately after </thought>.`;
 }
 
 /**
  * Builds the thinking process rules for phonetic transcription.
  * @param {string} finalOutputLabel - The name of the final output format
- * @param {"off" | "low" | "medium" | "high"} effort - Reasoning effort level
  * @returns {string}
  */
 function buildPhoneticTaskThinkingRules(finalOutputLabel, effort = "low") {
@@ -553,8 +527,8 @@ Output (${lineCount} tags):`
 
         return {
             system: systemPrompt,
-            user: `Translate lyrics to Vietnamese.
-CRITICAL: Every single line MUST be translated into Vietnamese. Do NOT copy or output the original foreign text (Japanese, Korean, Chinese, etc.).
+            user: `Translate lyrics to natural, singable Vietnamese.
+CRITICAL: Every single line MUST be translated into Vietnamese. Even if the original text is in English, Spanish, French, Japanese, Korean, Chinese, or Latin/Romaji, DO NOT copy or output the original untranslated text. You MUST output a 100% poetic Vietnamese translation for each line.
 
 Song: ${artist} - ${title}
 
@@ -587,6 +561,7 @@ Input: ${linesJson}
 Output JSON:`;
         }
         return `Translate to Vietnamese. Output valid JSON Array of ${lines.length} strings. 1:1 mapping. No merging.
+CRITICAL: Every line must be translated to Vietnamese. Even if the input is in English, French, Japanese, or any language, DO NOT output or copy the original foreign text.
 Input: ${linesJson}
 Output JSON:`;
     },
@@ -618,6 +593,7 @@ ${taggedInput}
 Output:`;
         }
         return `Translate to Vietnamese. Output EXACTLY ${lineCount} XML tags (<1>...</1> to <${lineCount}>...</${lineCount}>). 1:1 mapping. No merging.
+CRITICAL: Every line must be translated to Vietnamese. Even if the input is in English, French, Japanese, or any language, DO NOT output or copy the original foreign text.
 Input:
 ${taggedInput}
 Output:`;
@@ -641,8 +617,8 @@ Output:`;
 
         return {
             system: systemPrompt,
-            user: `Translate lyrics to Vietnamese.
-CRITICAL: Every single line MUST be translated into Vietnamese. Do NOT copy or output the original foreign text (Japanese, Korean, Chinese, etc.).
+            user: `Translate lyrics to natural, singable Vietnamese.
+CRITICAL: Every single line MUST be translated into Vietnamese. Even if the original text is in English, Japanese, Korean, Chinese, or Latin/Romaji, DO NOT copy or output the original untranslated text.
 
 Song: ${artist} - ${title}
 

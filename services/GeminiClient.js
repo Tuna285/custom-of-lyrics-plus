@@ -560,16 +560,12 @@ const GeminiClient = {
             const isGeminiWithBudget = /gemini-(2\.5|[3-9])|flash-thinking|thinking-exp/.test(m);
             const isGemma4 = /gemma-4/.test(m);
             if (isGeminiWithBudget) {
-                body.extra_body = {
-                    ...(body.extra_body || {}),
-                    google: {
-                        ...((body.extra_body && body.extra_body.google) || {}),
-                        thinking_config: {
-                            thinking_budget: geminiBudget,
-                            include_thoughts: effort !== "off",
-                        },
-                    },
-                };
+                // Google's OpenAI-compatible endpoint accepts top-level reasoning_effort:
+                // "none" -> disables thinking (0 tokens)
+                // "low" -> 1,024 thinking tokens (~1-2s brief deliberation)
+                // "medium" -> 8,192 thinking tokens
+                // "high" -> 24,576 thinking tokens
+                body.reasoning_effort = effort === "off" ? "none" : effort;
             } else if (isGemma4) {
                 // Gemma 4 (26B + 31B) thinks natively via <|think|> chat template token.
                 // Google's hosted API does NOT accept reasoning_effort or thinking_config
@@ -1162,7 +1158,7 @@ const GeminiClient = {
 
                 // Adapt streamed result to the shape processResponse expects
                 const data = { choices: [{ message: streamed.message }], usage: streamed.usage };
-                return this.processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime, _isRetry);
+                return this.processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime, _isRetry, rawLines);
             };
 
             if (disableQueue) {
@@ -1271,7 +1267,7 @@ const GeminiClient = {
         return "";
     },
 
-    processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime, isRetry = false) {
+    processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime, isRetry = false, sourceLines = []) {
         // OpenAI-compatible format: always data.choices[0].message.content
         if (!data?.choices?.length) throw new Error("No response from API");
         const message = data.choices[0]?.message;
@@ -1311,6 +1307,28 @@ const GeminiClient = {
         }
 
         const duration = Date.now() - startTime;
+
+        // Anti-Parroting Guard: Detect if AI echoed/copied the source lyrics without translating
+        if (!wantSmartPhonetic && Array.isArray(result.vi) && Array.isArray(sourceLines) && sourceLines.length >= 3) {
+            let exactMatches = 0;
+            let meaningfulLines = 0;
+            const minLen = Math.min(result.vi.length, sourceLines.length);
+            for (let i = 0; i < minLen; i++) {
+                const trans = (result.vi[i] || "").trim().toLowerCase();
+                const orig = (sourceLines[i] || "").trim().toLowerCase();
+                // Skip empty lines, lines with only numbers/punctuation, or vocal ad-libs
+                if (!orig || /^[0-9\s\p{P}]+$/u.test(orig) || /^(yeah|la|oh|ah|woo|uh|huh)+$/i.test(orig)) {
+                    continue;
+                }
+                meaningfulLines++;
+                if (trans === orig) {
+                    exactMatches++;
+                }
+            }
+            if (meaningfulLines >= 3 && (exactMatches / meaningfulLines) >= 0.5) {
+                throw new Error(`Format validation failed: AI returned untranslated source lyrics (${exactMatches}/${meaningfulLines} lines identical)`);
+            }
+        }
 
         // Validate line count and structure integrity
         if (result.vi && result.vi.length !== lineCount) {
