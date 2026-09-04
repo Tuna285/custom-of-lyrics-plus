@@ -241,7 +241,7 @@ const ProviderMusixmatch = (() => {
 		}));
 	}
 
-	return { findLyrics, fetchLyrics: findLyrics, getSynced, getUnsynced, getTranslation };
+	return { findLyrics, fetchLyrics: findLyrics, getSynced, getUnsynced, getTranslation, refreshMusixmatchToken };
 })();
 
 window.ProviderMusixmatch = ProviderMusixmatch;

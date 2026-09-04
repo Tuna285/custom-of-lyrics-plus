@@ -364,6 +364,7 @@ window.LANG_EN = {
     "copy": "Copy to clipboard",
     "searchYoutube": "Search on YouTube",
     "searchNetease": "Search on NetEase",
+    "manualSearch": "Manual Lyrics Search",
     "viewReasoning": "View AI reasoning"
   },
   "videoModal": {
@@ -405,6 +406,17 @@ window.LANG_EN = {
     "search": "Search",
     "failed": "Search failed",
     "noResults": "No results found. Try searching by original name or romaji."
+  },
+  "manualSearchModal": {
+    "title": "Manual Lyrics Search",
+    "placeholder": "Search by song title, artist, or romaji...",
+    "search": "Search",
+    "all": "All",
+    "searching": "Searching across providers…",
+    "failed": "Search failed",
+    "noResults": "No lyrics found across any provider. Try searching by original name or romaji.",
+    "cjkSuggestions": "CJK Phonetic Suggestions:",
+    "lyricsLoaded": "Lyrics loaded from {provider}: {songName}"
   },
   "updateModal": {
     "title": "Lyrics Plus Update Available",

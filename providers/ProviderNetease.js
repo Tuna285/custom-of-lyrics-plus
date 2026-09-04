@@ -710,7 +710,7 @@ const ProviderNetease = (() => {
         });
     }
 
-    return { findLyrics, fetchLyrics: findLyrics, openManualSearchModal, searchSongs, fetchLyricsById };
+    return { findLyrics, fetchLyrics: findLyrics, openManualSearchModal, searchSongs, fetchLyricsById, parseLyrics };
 })();
 
 window.ProviderNetease = ProviderNetease;

@@ -358,6 +358,7 @@ window.LANG_VI = {
     "copy": "Sao chép",
     "searchYoutube": "Tìm kiếm trên YouTube",
     "searchNetease": "Tìm Lyrics trên NetEase",
+    "manualSearch": "Tìm kiếm lời thủ công",
     "viewReasoning": "Xem quá trình suy nghĩ"
   },
   "providers": {
@@ -406,6 +407,17 @@ window.LANG_VI = {
     "search": "Tìm",
     "failed": "Tìm kiếm thất bại",
     "noResults": "Không tìm thấy kết quả. Thử tìm bằng tên gốc hoặc romaji."
+  },
+  "manualSearchModal": {
+    "title": "Tìm kiếm Lời bài hát Thủ công",
+    "placeholder": "Tìm theo tên bài hát, nghệ sĩ hoặc romaji...",
+    "search": "Tìm",
+    "all": "Tất cả",
+    "searching": "Đang tìm kiếm trên các nguồn…",
+    "failed": "Tìm kiếm thất bại",
+    "noResults": "Không tìm thấy kết quả nào từ các nguồn. Hãy thử tìm bằng tên gốc hoặc romaji.",
+    "cjkSuggestions": "Gợi ý phiên âm CJK:",
+    "lyricsLoaded": "Đã tải lời bài hát từ {provider}: {songName}"
   },
   "updateModal": {
     "title": "Cập Nhật Lyrics Plus Mới",

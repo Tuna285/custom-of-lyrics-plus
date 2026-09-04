@@ -94,6 +94,7 @@ $filesToDownload = @(
     "components/OptionsMenu.js",
     "components/PlaybarButton.js",
     "components/MiniLyrics.js",
+    "components/ManualSearchModal.js",
     "components/VideoSettingsModal.js",
     "components/VideoBackground.js"
 )

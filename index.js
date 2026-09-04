@@ -1239,70 +1239,23 @@ class LyricsContainer extends react.Component {
 						musixmatchSelectedLanguage: this.state.musixmatchTranslationLanguage || CONFIG.visual["musixmatch-translation-language"],
 					}),
 				react.createElement(AdjustmentsMenu, { mode, hasPerformer }),
-				// 3. NetEase Search button (N)
+				// 3. Manual Lyrics Search button (All Providers)
 				react.createElement(
 					Spicetify.ReactComponent.TooltipWrapper,
 					{
-						label: getText("tooltips.searchNetease", {}, "Search NetEase"),
+						label: getText("tooltips.manualSearch", {}, "Manual Lyrics Search"),
 					},
 					react.createElement(
 						"button",
 						{
 							className: "lyrics-config-button",
 							onClick: () => {
-								if (typeof ProviderNetease?.openManualSearchModal === "function") {
-									ProviderNetease.openManualSearchModal((selectedLyrics) => {
-										if (selectedLyrics) {
-											if (CACHE[selectedLyrics.uri]) {
-												const resetKeys = ["romaji", "furigana", "hiragana", "katakana", "hangul", "romaja", "cn", "hk", "tw", "musixmatchTranslation", "musixmatchTranslationLanguage", "neteaseTranslation"];
-												for (const k of resetKeys) {
-													delete CACHE[selectedLyrics.uri][k];
-												}
-											}
-											CACHE[selectedLyrics.uri] = {
-												...CACHE[selectedLyrics.uri],
-												...selectedLyrics
-											};
-											let finalMode = -1;
-											if (selectedLyrics.karaoke) {
-												finalMode = KARAOKE;
-											} else if (selectedLyrics.synced) {
-												finalMode = SYNCED;
-											} else if (selectedLyrics.unsynced) {
-												finalMode = UNSYNCED;
-											} else if (selectedLyrics.genius) {
-												finalMode = GENIUS;
-											}
-											this.state.explicitMode = finalMode;
-											const newCurrentLyrics = selectedLyrics.synced || selectedLyrics.unsynced || selectedLyrics.genius || null;
-											this.setState({
-												...emptyState,
-												...selectedLyrics,
-												currentLyrics: newCurrentLyrics,
-												romaji: null,
-												furigana: null,
-												hiragana: null,
-												katakana: null,
-												hangul: null,
-												romaja: null,
-												cn: null,
-												hk: null,
-												tw: null,
-												musixmatchTranslation: null,
-												musixmatchTranslationLanguage: null,
-												neteaseTranslation: selectedLyrics.neteaseTranslation ?? null,
-												mode: finalMode,
-												isLoading: false,
-												isCached: this.lyricsSaved(selectedLyrics.uri),
-											});
-										}
-									});
-								}
-							},
-							className: "lyrics-config-button",
-							onClick: () => {
-								if (typeof ProviderNetease?.openManualSearchModal === "function") {
-									ProviderNetease.openManualSearchModal((selectedLyrics) => {
+								const modalOpener = (typeof ManualSearchModal?.open === "function")
+									? ManualSearchModal.open
+									: (typeof ProviderNetease?.openManualSearchModal === "function" ? ProviderNetease.openManualSearchModal : null);
+
+								if (modalOpener) {
+									modalOpener((selectedLyrics) => {
 										if (selectedLyrics) {
 											if (CACHE[selectedLyrics.uri]) {
 												const resetKeys = ["romaji", "furigana", "hiragana", "katakana", "hangul", "romaja", "cn", "hk", "tw", "musixmatchTranslation", "musixmatchTranslationLanguage", "neteaseTranslation"];
