@@ -367,7 +367,7 @@ const GeminiClient = {
 
             if (result.length > 0) {
                 console.log(`[Lyrics+] Parsed ${result.length} lines via Robust Compact Tags`);
-                return { vi: result, phonetic: result.join('\n') };
+                return { translation: result, vi: result, phonetic: result.join('\n') };
             }
         }
 
@@ -396,7 +396,7 @@ const GeminiClient = {
             
             if (result.length > 0) {
                 console.log(`[Lyrics+] Parsed ${result.length} lines via Numbered List`);
-                return { vi: result, phonetic: result.join('\n') };
+                return { translation: result, vi: result, phonetic: result.join('\n') };
             }
         }
 
@@ -474,7 +474,7 @@ const GeminiClient = {
         if (Array.isArray(arr)) {
             console.log(`[Lyrics+] Parsed ${arr.length} lines via JSON`);
             const stringArr = arr.map(x => (x == null ? "" : String(x)));
-            return { vi: stringArr, phonetic: stringArr.join('\n') };
+            return { translation: stringArr, vi: stringArr, phonetic: stringArr.join('\n') };
         }
 
         // Priority 2.5: Regex JSON Recovery (if JSON parsing failed but response contains JSON structures)
@@ -500,7 +500,7 @@ const GeminiClient = {
                 }
                 if (stringArr.length > 0) {
                     console.log(`[Lyrics+] Recovered ${stringArr.length} lines from malformed JSON via regex`);
-                    return { vi: stringArr, phonetic: stringArr.join('\n') };
+                    return { translation: stringArr, vi: stringArr, phonetic: stringArr.join('\n') };
                 }
             }
         }
@@ -516,7 +516,7 @@ const GeminiClient = {
         if (rawLines.length === 0) {
             throw new Error("Format validation failed: empty output after removing invalid content");
         }
-        return { vi: rawLines, phonetic: rawLines.join('\n'), isFallbackSplit: true };
+        return { translation: rawLines, vi: rawLines, phonetic: rawLines.join('\n'), isFallbackSplit: true };
     },
 
     /**
@@ -997,7 +997,7 @@ const GeminiClient = {
         return Math.min(16000, Math.max(2000, estimated));
     },
 
-    async callGemini({ apiKey, artist, title, text, styleKey, pronounKey, wantSmartPhonetic, wantFurigana, _isRetry, priority, taskId, onReasoningProgress }) {
+    async callGemini({ apiKey, artist, title, text, styleKey, pronounKey, wantSmartPhonetic, wantFurigana, _isRetry, priority, taskId, onReasoningProgress, targetLang = "vi" }) {
         const startTime = Date.now();
         const rawLines = text.split('\n');
         const lineCount = rawLines.length;
@@ -1062,12 +1062,12 @@ const GeminiClient = {
             if (_isRetry) {
                 prompt = {
                     system: wantSmartPhonetic ? "You are a phonetic transcriber. Output valid JSON only." : "You are a translator. Output valid JSON only.",
-                    user: Prompts.buildMinimalFallbackPrompt({ artist, title, text, wantSmartPhonetic, wantFurigana })
+                    user: Prompts.buildMinimalFallbackPrompt({ artist, title, text, wantSmartPhonetic, wantFurigana, targetLang })
                 };
             } else if (wantSmartPhonetic) {
                 prompt = Prompts.buildJsonSchemaPhoneticPrompt({ artist, title, text, wantFurigana, reasoningEffort });
             } else {
-                prompt = Prompts.buildJsonSchemaTranslationPrompt({ artist, title, text, styleKey, pronounKey, reasoningEffort });
+                prompt = Prompts.buildJsonSchemaTranslationPrompt({ artist, title, text, styleKey, pronounKey, reasoningEffort, targetLang });
             }
 
             body = {
@@ -1086,10 +1086,10 @@ const GeminiClient = {
             if (_isRetry) {
                 prompt = {
                     system: wantSmartPhonetic ? "You are a phonetic transcriber. Output compact tags <1>...</1> only." : "You are a translator. Output compact tags <1>...</1> only.",
-                    user: Prompts.buildMinimalFallbackTagsPrompt({ artist, title, text, wantSmartPhonetic, wantFurigana })
+                    user: Prompts.buildMinimalFallbackTagsPrompt({ artist, title, text, wantSmartPhonetic, wantFurigana, targetLang })
                 };
             } else {
-                prompt = Prompts.buildPromptEngPrompt({ artist, title, text, styleKey, pronounKey, wantSmartPhonetic, wantFurigana, reasoningEffort });
+                prompt = Prompts.buildPromptEngPrompt({ artist, title, text, styleKey, pronounKey, wantSmartPhonetic, wantFurigana, reasoningEffort, targetLang });
             }
 
             let msgs = [];
@@ -1208,7 +1208,7 @@ const GeminiClient = {
                     apiKey, artist, title, text,
                     styleKey: 'literal_study', pronounKey: 'default',
                     wantSmartPhonetic, wantFurigana, _isRetry: true,
-                    onReasoningProgress
+                    onReasoningProgress, targetLang
                 });
             }
 
@@ -1328,12 +1328,13 @@ const GeminiClient = {
         const duration = Date.now() - startTime;
 
         // Anti-Parroting Guard: Detect if AI echoed/copied the source lyrics without translating
-        if (!wantSmartPhonetic && Array.isArray(result.vi) && Array.isArray(sourceLines) && sourceLines.length >= 3) {
+        const transLines = result.translation || result.vi;
+        if (!wantSmartPhonetic && Array.isArray(transLines) && Array.isArray(sourceLines) && sourceLines.length >= 3) {
             let exactMatches = 0;
             let meaningfulLines = 0;
-            const minLen = Math.min(result.vi.length, sourceLines.length);
+            const minLen = Math.min(transLines.length, sourceLines.length);
             for (let i = 0; i < minLen; i++) {
-                const trans = (result.vi[i] || "").trim().toLowerCase();
+                const trans = (transLines[i] || "").trim().toLowerCase();
                 const orig = (sourceLines[i] || "").trim().toLowerCase();
                 // Skip empty lines, lines with only numbers/punctuation, or vocal ad-libs
                 if (!orig || /^[0-9\s\p{P}]+$/u.test(orig) || /^(yeah|la|oh|ah|woo|uh|huh)+$/i.test(orig)) {
@@ -1350,34 +1351,38 @@ const GeminiClient = {
         }
 
         // Validate line count and structure integrity
-        if (result.vi && result.vi.length !== lineCount) {
-            const ratio = result.vi.length / lineCount;
+        if (transLines && transLines.length !== lineCount) {
+            const ratio = transLines.length / lineCount;
             // If we got less than 85% of the expected lines, we treat it as a major truncation
             // and trigger a retry (if not already a retry). Otherwise, we accept the partial
             // translation and pad the missing lines to prevent showing a full crash/error to the user.
             const isMajorMismatch = ratio < 0.85;
 
             if (!isRetry && isMajorMismatch) {
-                throw new Error(`Format validation failed: expected ${lineCount} lines, got ${result.vi.length} lines (ratio: ${ratio.toFixed(2)}).`);
+                throw new Error(`Format validation failed: expected ${lineCount} lines, got ${transLines.length} lines (ratio: ${ratio.toFixed(2)}).`);
             }
 
-            DebugLogger.warn(`Line count mismatch! Expected: ${lineCount}, Got: ${result.vi.length} (Ratio: ${ratio.toFixed(2)}). Padding/trimming to fit.`);
+            DebugLogger.warn(`Line count mismatch! Expected: ${lineCount}, Got: ${transLines.length} (Ratio: ${ratio.toFixed(2)}). Padding/trimming to fit.`);
             // Pad or trim to match expected count
-            if (result.vi.length < lineCount) {
-                while (result.vi.length < lineCount) result.vi.push("");
-            } else if (result.vi.length > lineCount) {
-                result.vi = result.vi.slice(0, lineCount);
+            if (transLines.length < lineCount) {
+                while (transLines.length < lineCount) transLines.push("");
+            } else if (transLines.length > lineCount) {
+                transLines.splice(lineCount);
             }
+            result.translation = transLines;
+            result.vi = transLines;
         }
         // Update phonetic after any modifications
-        if (result.vi) {
-            result.phonetic = result.vi.join('\n');
+        if (transLines) {
+            result.phonetic = transLines.join('\n');
+            result.translation = transLines;
+            result.vi = transLines;
         }
         // Log translation results for debugging
         if (wantSmartPhonetic) {
-            DebugLogger.log(`Phonetic result:`, result.vi);
+            DebugLogger.log(`Phonetic result:`, transLines);
         } else {
-            DebugLogger.log(`Vietnamese result:`, result.vi);
+            DebugLogger.log(`${targetLang} result:`, transLines);
         }
 
         DebugLogger.log(`Completed in ${duration}ms.`);

@@ -286,13 +286,14 @@ function buildTranslationFlowPunctuation() {
  *                  to use their full thinking budget.
  * @param {string} finalOutputLabel - The name of the final output format (e.g. "JSON object" or "tags")
  * @param {"off" | "low" | "medium" | "high"} effort - Reasoning effort level
+ * @param {string} [langName="Vietnamese"] - Target language name
  * @returns {string}
  */
-function buildTaskThinkingRules(finalOutputLabel, effort = "low") {
+function buildTaskThinkingRules(finalOutputLabel, effort = "low", langName = "Vietnamese") {
     const hygiene = `1) Visible reply must be ONLY the required ${finalOutputLabel}. No filler, no commentary.
 2) Do not output draft lines in the final output. The final output must start directly with the translation tags or JSON object.
 3) The final ${finalOutputLabel} must appear once and comprise the entire message.
-4) Translate the source DIRECTLY to Vietnamese.
+4) Translate the source DIRECTLY to ${langName}.
 5) **DELIVERABLE POSITION & TAGGING — CRITICAL.** If you output any reasoning, you MUST wrap it entirely inside <thought>...</thought> tags at the very beginning of your response. NEVER place translation tags inside <thought>...</thought>.`;
 
     if (effort === "off") {
@@ -347,14 +348,15 @@ ${hygiene}`;
 /**
  * Builds the tag-based output format section for translation.
  * @param {number} lineCount - Number of lines
+ * @param {string} [langName="Vietnamese"] - Target language name
  * @returns {string}
  */
-function buildTranslationOutputTagsBlock(lineCount) {
+function buildTranslationOutputTagsBlock(lineCount, langName = "Vietnamese") {
     return `OUTPUT FORMAT (COMPACT TAGS — STRICT):
-<1>[Vietnamese translation of line 1]</1>
-<2>[Vietnamese translation of line 2]</2>
+<1>[${langName} translation of line 1]</1>
+<2>[${langName} translation of line 2]</2>
 ...
-<${lineCount}>[Vietnamese translation of line ${lineCount}]</${lineCount}>
+<${lineCount}>[${langName} translation of line ${lineCount}]</${lineCount}>
 
 MAPPING RULES:
 1) 1 source line = 1 output tag. NEVER split, merge, or reorder lines.
@@ -394,30 +396,72 @@ MAPPING RULES:
 }
 
 /**
+ * Modular Target Language Registry
+ * -------------------------------------------------------------
+ * HOW TO ADD A NEW TARGET LANGUAGE IN THE FUTURE:
+ * Simply add a new language profile object below (e.g. 'en', 'ja', 'es').
+ * Each language module encapsulates its own:
+ *  - code: ISO 639-1 code ('vi', 'en', ...)
+ *  - name: Display name in the UI ('Tiếng Việt', 'English', ...)
+ *  - label: Full label for settings
+ *  - hasPronouns: boolean (true if language uses complex pronoun mapping like Vietnamese)
+ *  - pronouns: Pronoun options object or null
+ *  - styles: Style instructions object (role & strategy per style)
+ *  - guardrails: Custom linguistic rules & guidelines
+ *  - flowPunctuation: Punctuation & phrasing rules
+ *  - userPromptPreamble: Function returning user instruction for prompt engineering mode
+ *  - jsonSchemaUserPrompt: Function returning user instruction for JSON schema mode
+ *  - fallbackInstruction: String for fallback prompt
+ * -------------------------------------------------------------
+ */
+const TARGET_LANGUAGES = {
+    vi: {
+        code: "vi",
+        name: "Tiếng Việt",
+        label: "Tiếng Việt (Vietnamese)",
+        hasPronouns: true,
+        pronouns: PRONOUN_MODES,
+        styles: STYLE_INSTRUCTIONS,
+        buildPronounSection: (pronounKey, styleObj) => buildPronounSection(pronounKey, styleObj),
+        buildGuardrails: () => buildTranslationGuardrails(),
+        buildFlowPunctuation: () => buildTranslationFlowPunctuation(),
+        buildOutputTagsBlock: (lineCount) => buildTranslationOutputTagsBlock(lineCount, "Vietnamese"),
+        buildOutputJsonBlock: (lineCount) => buildTranslationOutputJsonBlock(lineCount),
+        userPromptPreamble: (artist, title) => `Translate lyrics to natural, singable Vietnamese.\nCRITICAL: Every single line MUST be translated into Vietnamese. Even if the original text is in English, Spanish, French, Japanese, Korean, Chinese, or Latin/Romaji, DO NOT copy or output the original untranslated text. You MUST output a 100% poetic Vietnamese translation for each line.\n\nSong: ${artist} - ${title}`,
+        jsonSchemaUserPrompt: (artist, title, lineCount) => `Translate lyrics to natural, singable Vietnamese.\nCRITICAL: Every single line MUST be translated into Vietnamese. Even if the original text is in English, Japanese, Korean, Chinese, or Latin/Romaji, DO NOT copy or output the original untranslated text.\n\nSong: ${artist} - ${title}`,
+        fallbackInstruction: "Translate to Vietnamese."
+    }
+};
+
+/**
  * Builds the translation system prompt.
  * @param {number} lineCount - Number of lines in the lyrics
  * @param {string} styleKey - The chosen style key
  * @param {string} pronounKey - The chosen pronoun mode key
  * @param {"json" | "tags"} mode - Output format mode
  * @param {"off" | "low" | "medium" | "high"} effort - Reasoning effort level
+ * @param {string} [targetLang="vi"] - Target language code
  * @returns {string} The full system prompt string
  */
-function buildTranslationSystemPrompt(lineCount, styleKey, pronounKey, mode, effort = "low") {
-    const styleObj = STYLE_INSTRUCTIONS[styleKey] || STYLE_INSTRUCTIONS.smart_adaptive;
-    const pronounSection = buildPronounSection(pronounKey, styleObj);
-    const outputBlock = mode === "json"
-        ? buildTranslationOutputJsonBlock(lineCount)
-        : buildTranslationOutputTagsBlock(lineCount);
+function buildTranslationSystemPrompt(lineCount, styleKey, pronounKey, mode, effort = "low", targetLang = "vi") {
+    const langModule = TARGET_LANGUAGES[targetLang] || TARGET_LANGUAGES.vi;
+    const styleObj = (langModule.styles && langModule.styles[styleKey]) || STYLE_INSTRUCTIONS[styleKey] || STYLE_INSTRUCTIONS.smart_adaptive;
+    const pronounSection = (langModule.hasPronouns && langModule.buildPronounSection)
+        ? langModule.buildPronounSection(pronounKey, styleObj)
+        : "";
+    const outputBlock = langModule.buildOutputTagsBlock
+        ? (mode === "json" ? langModule.buildOutputJsonBlock(lineCount) : langModule.buildOutputTagsBlock(lineCount))
+        : (mode === "json" ? buildTranslationOutputJsonBlock(lineCount) : buildTranslationOutputTagsBlock(lineCount, langModule.name));
     const thinkingLabel = mode === "json" ? "JSON object" : "tags";
 
     const parts = [
-        pronounSection.trimEnd(),
+        pronounSection ? pronounSection.trimEnd() : "",
         styleObj.role,
         styleObj.style,
         outputBlock,
-        buildTranslationGuardrails(),
-        buildTranslationFlowPunctuation(),
-        buildTaskThinkingRules(thinkingLabel, effort)
+        langModule.buildGuardrails ? langModule.buildGuardrails() : buildTranslationGuardrails(),
+        langModule.buildFlowPunctuation ? langModule.buildFlowPunctuation() : buildTranslationFlowPunctuation(),
+        buildTaskThinkingRules(thinkingLabel, effort, langModule.name || "Vietnamese")
     ];
 
     if (mode === "tags" && effort === "off") {
@@ -428,6 +472,10 @@ function buildTranslationSystemPrompt(lineCount, styleKey, pronounKey, mode, eff
 }
 
 const Prompts = {
+    languages: TARGET_LANGUAGES,
+    getLanguage(code) {
+        return TARGET_LANGUAGES[code] || TARGET_LANGUAGES.vi;
+    },
     styles: TRANSLATION_STYLES,
     pronouns: PRONOUN_MODES,
 
@@ -442,9 +490,10 @@ const Prompts = {
      * @param {boolean} [options.wantSmartPhonetic] - True if requesting phonetic prompt
      * @param {boolean} [options.wantFurigana] - True if Japanese Furigana is requested
      * @param {"off" | "low" | "medium" | "high"} [options.reasoningEffort] - Level of reasoning effort
+     * @param {string} [options.targetLang="vi"] - Target language code
      * @returns {{ system: string, user: string }}
      */
-    buildPromptEngPrompt({ artist, title, text, styleKey = "smart_adaptive", pronounKey = "default", wantSmartPhonetic = false, wantFurigana = false, reasoningEffort = "low" }) {
+    buildPromptEngPrompt({ artist, title, text, styleKey = "smart_adaptive", pronounKey = "default", wantSmartPhonetic = false, wantFurigana = false, reasoningEffort = "low", targetLang = "vi" }) {
         const lines = text.split("\n");
         const lineCount = lines.length;
         const taggedInput = lines.map((l, i) => `<${i + 1}>${l}</${i + 1}>`).join("\n");
@@ -523,14 +572,15 @@ Output (${lineCount} tags):`
             };
         }
 
-        const systemPrompt = buildTranslationSystemPrompt(lineCount, styleKey, pronounKey, "tags", reasoningEffort);
+        const langModule = TARGET_LANGUAGES[targetLang] || TARGET_LANGUAGES.vi;
+        const systemPrompt = buildTranslationSystemPrompt(lineCount, styleKey, pronounKey, "tags", reasoningEffort, targetLang);
+        const userPromptIntro = langModule.userPromptPreamble
+            ? langModule.userPromptPreamble(artist, title)
+            : `Translate lyrics to natural, singable ${langModule.name || "Vietnamese"}.\nCRITICAL: Every single line MUST be translated into ${langModule.name || "Vietnamese"}.\n\nSong: ${artist} - ${title}`;
 
         return {
             system: systemPrompt,
-            user: `Translate lyrics to natural, singable Vietnamese.
-CRITICAL: Every single line MUST be translated into Vietnamese. Even if the original text is in English, Spanish, French, Japanese, Korean, Chinese, or Latin/Romaji, DO NOT copy or output the original untranslated text. You MUST output a 100% poetic Vietnamese translation for each line.
-
-Song: ${artist} - ${title}
+            user: `${userPromptIntro}
 
 Input (${lineCount} lines):
 ${taggedInput}
@@ -545,9 +595,12 @@ Output (${lineCount} tags):`
      * @param {string} options.artist
      * @param {string} options.title
      * @param {string} options.text
+     * @param {boolean} [options.wantSmartPhonetic]
+     * @param {boolean} [options.wantFurigana]
+     * @param {string} [options.targetLang="vi"]
      * @returns {string}
      */
-    buildMinimalFallbackPrompt({ artist, title, text, wantSmartPhonetic = false, wantFurigana = false }) {
+    buildMinimalFallbackPrompt({ artist, title, text, wantSmartPhonetic = false, wantFurigana = false, targetLang = "vi" }) {
         const lines = text.split("\n");
         const linesJson = JSON.stringify(lines);
         if (wantSmartPhonetic) {
@@ -560,8 +613,10 @@ Output JSON:`;
 Input: ${linesJson}
 Output JSON:`;
         }
-        return `Translate to Vietnamese. Output valid JSON Array of ${lines.length} strings. 1:1 mapping. No merging.
-CRITICAL: Every line must be translated to Vietnamese. Even if the input is in English, French, Japanese, or any language, DO NOT output or copy the original foreign text.
+        const langModule = TARGET_LANGUAGES[targetLang] || TARGET_LANGUAGES.vi;
+        const langName = langModule.name || "Vietnamese";
+        return `Translate to ${langName}. Output valid JSON Array of ${lines.length} strings. 1:1 mapping. No merging.
+CRITICAL: Every line must be translated to ${langName}. Even if the input is in English, French, Japanese, or any language, DO NOT output or copy the original foreign text.
 Input: ${linesJson}
 Output JSON:`;
     },
@@ -574,9 +629,10 @@ Output JSON:`;
      * @param {string} options.text
      * @param {boolean} [options.wantSmartPhonetic]
      * @param {boolean} [options.wantFurigana]
+     * @param {string} [options.targetLang="vi"]
      * @returns {string}
      */
-    buildMinimalFallbackTagsPrompt({ artist, title, text, wantSmartPhonetic = false, wantFurigana = false }) {
+    buildMinimalFallbackTagsPrompt({ artist, title, text, wantSmartPhonetic = false, wantFurigana = false, targetLang = "vi" }) {
         const lines = text.split("\n");
         const lineCount = lines.length;
         const taggedInput = lines.map((l, i) => `<${i + 1}>${l}</${i + 1}>`).join("\n");
@@ -592,8 +648,10 @@ Input:
 ${taggedInput}
 Output:`;
         }
-        return `Translate to Vietnamese. Output EXACTLY ${lineCount} XML tags (<1>...</1> to <${lineCount}>...</${lineCount}>). 1:1 mapping. No merging.
-CRITICAL: Every line must be translated to Vietnamese. Even if the input is in English, French, Japanese, or any language, DO NOT output or copy the original foreign text.
+        const langModule = TARGET_LANGUAGES[targetLang] || TARGET_LANGUAGES.vi;
+        const langName = langModule.name || "Vietnamese";
+        return `Translate to ${langName}. Output EXACTLY ${lineCount} XML tags (<1>...</1> to <${lineCount}>...</${lineCount}>). 1:1 mapping. No merging.
+CRITICAL: Every line must be translated to ${langName}. Even if the input is in English, French, Japanese, or any language, DO NOT output or copy the original foreign text.
 Input:
 ${taggedInput}
 Output:`;
@@ -608,24 +666,26 @@ Output:`;
      * @param {string} [options.styleKey]
      * @param {string} [options.pronounKey]
      * @param {"off" | "low" | "medium" | "high"} [options.reasoningEffort]
+     * @param {string} [options.targetLang="vi"]
      * @returns {{ system: string, user: string }}
      */
-    buildJsonSchemaTranslationPrompt({ artist, title, text, styleKey = "smart_adaptive", pronounKey = "default", reasoningEffort = "low" }) {
+    buildJsonSchemaTranslationPrompt({ artist, title, text, styleKey = "smart_adaptive", pronounKey = "default", reasoningEffort = "low", targetLang = "vi" }) {
         const lines = text.split("\n");
         const lineCount = lines.length;
-        const systemPrompt = buildTranslationSystemPrompt(lineCount, styleKey, pronounKey, "json", reasoningEffort);
+        const langModule = TARGET_LANGUAGES[targetLang] || TARGET_LANGUAGES.vi;
+        const systemPrompt = buildTranslationSystemPrompt(lineCount, styleKey, pronounKey, "json", reasoningEffort, targetLang);
+        const userPromptIntro = langModule.jsonSchemaUserPrompt
+            ? langModule.jsonSchemaUserPrompt(artist, title, lineCount)
+            : `Translate lyrics to natural, singable ${langModule.name || "Vietnamese"}.\nCRITICAL: Every single line MUST be translated into ${langModule.name || "Vietnamese"}. Even if the original text is in English, Japanese, Korean, Chinese, or Latin/Romaji, DO NOT copy or output the original untranslated text.\n\nSong: ${artist} - ${title}`;
 
         return {
             system: systemPrompt,
-            user: `Translate lyrics to natural, singable Vietnamese.
-CRITICAL: Every single line MUST be translated into Vietnamese. Even if the original text is in English, Japanese, Korean, Chinese, or Latin/Romaji, DO NOT copy or output the original untranslated text.
-
-Song: ${artist} - ${title}
+            user: `${userPromptIntro}
 
 Input (${lineCount} lines):
 ${lines.map((l, i) => `${i + 1}. ${l}`).join("\n")}
 
-Output: A single JSON object with key "translations" only. The "translations" value must be an array of exactly ${lineCount} Vietnamese strings.`
+Output: A single JSON object with key "translations" only. The "translations" value must be an array of exactly ${lineCount} ${langModule.name || "Vietnamese"} strings.`
         };
     },
 

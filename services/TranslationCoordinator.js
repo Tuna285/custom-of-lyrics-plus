@@ -76,9 +76,8 @@ window.LyricsPlus.TranslationCoordinator = {
 			});
 		}
 
-		// For Gemini mode, use generic keys if no specific language detected
-		const provider = CONFIG.visual["translate:translated-lyrics-source"];
-		const modeKey = provider === "geminiVi" && !friendlyLanguage ? "gemini" : friendlyLanguage;
+		// Default to AI mode: use generic keys if no specific language detected
+		const modeKey = !friendlyLanguage ? "gemini" : friendlyLanguage;
 
 		const displayMode1 = CONFIG.visual[`translation-mode:${modeKey}`];
 		const displayMode2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
@@ -101,7 +100,9 @@ window.LyricsPlus.TranslationCoordinator = {
 				if (prog?.type === "progress" && prog?.trackUri === self.state.uri) {
 					self.setState({ translationStatus: null });
 				}
-				const modeDisplayName = mode === "gemini_romaji" ? "Romaji, Romaja, Pinyin translation" : "Vietnamese translation";
+				const targetLang = CONFIG.visual["translate:target-language"] || "vi";
+				const langName = (typeof Prompts !== "undefined" && Prompts.getLanguage) ? Prompts.getLanguage(targetLang).name : "Translation";
+				const modeDisplayName = mode === "gemini_romaji" ? "Romaji, Romaja, Pinyin translation" : (mode === "gemini_furigana" ? "Furigana translation" : `${langName} translation`);
 				Spicetify.showNotification(getText("notifications.translationFailedWithReason", { mode: modeDisplayName, reason: error.message || "Unknown error" }), true, 4000);
 				return null; // Return null on failure
 			}
@@ -124,25 +125,28 @@ window.LyricsPlus.TranslationCoordinator = {
 		}
 
 		// Settings change detection logic adjusted to ignore initial undefined state
+		const currentTargetLang = CONFIG.visual["translate:target-language"] || "vi";
 		const currentStyleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
 		const currentPronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
 
-		// If _lastStyleKey is undefined (first run), we initialize it and don't count it as a change
-		if (self._lastStyleKey === undefined || self._lastPronounKey === undefined) {
+		// If _lastTargetLang / _lastStyleKey is undefined (first run), we initialize it and don't count it as a change
+		if (self._lastTargetLang === undefined || self._lastStyleKey === undefined || self._lastPronounKey === undefined) {
+			self._lastTargetLang = currentTargetLang;
 			self._lastStyleKey = currentStyleKey;
 			self._lastPronounKey = currentPronounKey;
 		}
 
-		const settingsChanged = (self._lastStyleKey !== currentStyleKey || self._lastPronounKey !== currentPronounKey);
+		const settingsChanged = (self._lastTargetLang !== currentTargetLang || self._lastStyleKey !== currentStyleKey || self._lastPronounKey !== currentPronounKey);
 
 		if (settingsChanged && self._dmResults[currentUri]) {
 			// Clear cached results for this URI to force re-fetch with new settings
 			// Old translation continues to display via currentLyrics until new arrives
 			self._dmResults[currentUri] = {};
-			console.log(`[Lyrics+] Settings changed (${self._lastStyleKey}/${self._lastPronounKey} → ${currentStyleKey}/${currentPronounKey}), re-fetching...`);
+			console.log(`[Lyrics+] Settings changed (${self._lastTargetLang}/${self._lastStyleKey}/${self._lastPronounKey} → ${currentTargetLang}/${currentStyleKey}/${currentPronounKey}), re-fetching...`);
 		}
 		
 		// Update tracking for next call
+		self._lastTargetLang = currentTargetLang;
 		self._lastStyleKey = currentStyleKey;
 		self._lastPronounKey = currentPronounKey;
 
@@ -152,7 +156,11 @@ window.LyricsPlus.TranslationCoordinator = {
 			try {
 				const styleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
 				const pronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
-				const cacheKey2 = `${currentUri}:${mode}:${styleKey}:${pronounKey}`;
+				const targetLang = CONFIG.visual["translate:target-language"] || "vi";
+				// Backward compatibility: keep exact legacy format for Vietnamese ('vi') and phonetic tasks
+				const cacheKey2 = (targetLang === "vi" || mode !== "gemini_vi")
+					? `${currentUri}:${mode}:${styleKey}:${pronounKey}`
+					: `${currentUri}:${targetLang}:${mode}:${styleKey}:${pronounKey}`;
 
 				// Check cache first (async - L1 then L2)
 				const memCached = await CacheManager.get(cacheKey2);
@@ -415,8 +423,12 @@ window.LyricsPlus.TranslationCoordinator = {
 		// --- 2. CACHE CHECK (Async) ---
 		const styleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
 		const pronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
+		const targetLang = CONFIG.visual["translate:target-language"] || "vi";
 		const cacheKey = mode;
-		const cacheKey2 = `${lyricsState.uri}:${cacheKey}:${styleKey}:${pronounKey}`;
+		// Backward compatibility: keep exact legacy format for Vietnamese ('vi') and phonetic tasks
+		const cacheKey2 = (targetLang === "vi" || wantSmartPhonetic)
+			? `${lyricsState.uri}:${cacheKey}:${styleKey}:${pronounKey}`
+			: `${lyricsState.uri}:${targetLang}:${cacheKey}:${styleKey}:${pronounKey}`;
 
 		// Await Cache (L1 -> L2 logic inside CacheManager)
 		const cached = await CacheManager.get(cacheKey2);
@@ -527,6 +539,7 @@ window.LyricsPlus.TranslationCoordinator = {
 							pronounKey,
 							wantSmartPhonetic,
 							wantFurigana,
+							targetLang,
 							priority: inflight.uiWanted,
 							taskId: cacheKey2,
 							onReasoningProgress: handleReasoningProgress,
@@ -560,7 +573,7 @@ window.LyricsPlus.TranslationCoordinator = {
 					throw lastError || new Error("Failed to get translation from all API keys.");
 				}
 
-				const { vi, phonetic, duration, reasoningContent } = result;
+				const { vi, translation, phonetic, duration, reasoningContent } = result;
 
                 if (duration != null && inflight.uiWanted && trackUri === self.state.uri) {
 					const otherPending = [...self._inflightGemini.keys()].some(
@@ -592,7 +605,8 @@ window.LyricsPlus.TranslationCoordinator = {
                 }
 
                 // Process Result
-                let outText = wantSmartPhonetic ? phonetic : vi;
+                const transLines = translation || vi;
+                let outText = wantSmartPhonetic ? phonetic : transLines;
                 if (!outText) throw new Error("Empty result from Gemini.");
 
                 let lines = Array.isArray(outText) ? outText : (typeof outText === 'string' ? outText.split("\n") : null);
@@ -741,8 +755,8 @@ window.LyricsPlus.TranslationCoordinator = {
 
 		const provider = CONFIG.visual["translate:translated-lyrics-source"];
 
-		// For Gemini API, always detect language from lyrics (no override needed)
-		if (provider === "geminiVi") {
+		// For Gemini AI, always detect language from lyrics (no override needed)
+		if (provider === "geminiVi" || !provider) {
 			if (self.state.language) {
 				if (window.lyricsPlusDebug) {
 					console.log("Gemini mode - Using cached language:", self.state.language);

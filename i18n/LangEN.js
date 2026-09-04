@@ -295,6 +295,7 @@ window.LANG_EN = {
   "contextMenu": {
     "provider": "Translation Provider",
     "display": "Translation Display",
+    "targetLanguage": "Target Language",
     "style": "Translation Style",
     "pronoun": "Pronoun Mode",
     "langOverride": "Language Override",

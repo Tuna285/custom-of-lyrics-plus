@@ -289,6 +289,7 @@ window.LANG_VI = {
   "contextMenu": {
     "provider": "Nguồn dịch",
     "display": "Kiểu hiển thị",
+    "targetLanguage": "Ngôn ngữ dịch",
     "style": "Văn phong",
     "pronoun": "Xưng hô",
     "langOverride": "Ghi đè Ngôn ngữ",

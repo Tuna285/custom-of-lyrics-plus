@@ -128,6 +128,7 @@ const CONFIG = {
         "font-size": ConfigUtils.getPersisted("lyrics-plus:visual:font-size") || "32",
         "lyric-position": Number(ConfigUtils.getPersisted("lyrics-plus:visual:lyric-position")) || 50,
         "translate:translated-lyrics-source": ConfigUtils.getPersisted("lyrics-plus:visual:translate:translated-lyrics-source") || "geminiVi",
+        "translate:target-language": ConfigUtils.getPersisted("lyrics-plus:visual:translate:target-language") || "vi",
         "translate:display-mode": ConfigUtils.getPersisted("lyrics-plus:visual:translate:display-mode") || "replace",
         "translate:detect-language-override": ConfigUtils.getPersisted("lyrics-plus:visual:translate:detect-language-override") || "off",
         "translate:translation-style": ConfigUtils.getPersisted("lyrics-plus:visual:translate:translation-style") || "smart_adaptive",
