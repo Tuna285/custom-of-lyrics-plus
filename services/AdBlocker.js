@@ -353,10 +353,17 @@
     // --- YouTube Player Injection ---
 
     const patchYouTubePlayer = () => {
-        if (!window.YT || !window.YT.Player || window.YT.Player.__lyricsPlusAdBlockWrapped) {
-            setTimeout(patchYouTubePlayer, 500);
+        if (!window.YT || !window.YT.Player) {
+            // Hook onYouTubeIframeAPIReady so we patch the exact microsecond the YouTube API finishes loading
+            const prevReady = window.onYouTubeIframeAPIReady;
+            window.onYouTubeIframeAPIReady = () => {
+                patchYouTubePlayer();
+                if (typeof prevReady === "function") prevReady();
+            };
+            setTimeout(patchYouTubePlayer, 100);
             return;
         }
+        if (window.YT.Player.__lyricsPlusAdBlockWrapped) return;
 
         const OriginalPlayer = window.YT.Player;
         window.YT.Player = function patchedPlayer(element, config = {}) {

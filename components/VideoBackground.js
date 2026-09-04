@@ -97,7 +97,7 @@ const VideoBackground = (() => {
                     try {
                         const spotifyTime = (Spicetify.Player.getProgress() || 0) / 1000;
                         const syncOffset = videoInfo.sync_offset || 0;
-                        const startSecs = Math.max(0, spotifyTime + syncOffset);
+                        const startSecs = Math.max(0.1, spotifyTime + syncOffset);
                         playerRef.current.loadVideoById({
                             videoId: targetVideoId,
                             startSeconds: startSecs
@@ -135,6 +135,10 @@ const VideoBackground = (() => {
                 const ytTarget = document.createElement("div");
                 playerDiv.appendChild(ytTarget);
 
+                const spotifyTime = (Spicetify.Player.getProgress() || 0) / 1000;
+                const syncOffset = videoInfo.sync_offset || 0;
+                const initialStart = Math.max(0.1, spotifyTime + syncOffset);
+
                 playerRef.current = new window.YT.Player(ytTarget, {
                     height: "100%",
                     width: "100%",
@@ -155,6 +159,16 @@ const VideoBackground = (() => {
                         cc_lang_pref: "none",
                         hl: "en",
                         origin: window.location.origin || "https://xpui.app.spotify.com",
+                        start: Math.floor(initialStart),
+                        adformat: "0_0",
+                        suppress_ads: 1,
+                        html5_disable_ads: true,
+                        disable_persistent_ads: true,
+                        kevlar_allow_multistep_video_ads: false,
+                        enable_desktop_ad_controls: false,
+                        disable_new_pause_state3_player_ads: true,
+                        player_ads_enable_gcf: false,
+                        web_player_disable_afa: true,
                     },
                     events: {
                         onReady: (event) => {
@@ -222,12 +236,39 @@ const VideoBackground = (() => {
                             }
 
                             const isAd = [105, 106, 107, 108, 109, 110, 111].includes(state) ||
-                                         (typeof player.getAdState === "function" && player.getAdState() === 1);
+                                         (typeof player.getAdState === "function" && player.getAdState() === 1) ||
+                                         (typeof player.getVideoData === "function" && player.getVideoData()?.isAd);
 
                             if (isAd) {
                                 setIsAdPlaying(true);
                                 player.mute();
+                                try {
+                                    player.setPlaybackRate?.(16);
+                                    const dur = player.getDuration?.() || 0;
+                                    if (dur > 0) player.seekTo(dur, true);
+                                    if (typeof player.skipAd === "function") player.skipAd();
+                                } catch (_) {}
+
+                                // Auto-bypass ad by reloading at current Spotify progress (same mechanism as fullscreen toggle)
+                                if (!player._adBypassTimer) {
+                                    player._adBypassTimer = setTimeout(() => {
+                                        player._adBypassTimer = null;
+                                        try {
+                                            const currSpotify = Math.max(0.1, ((Spicetify.Player.getProgress() || 0) / 1000) + (videoInfo.sync_offset || 0));
+                                            player.loadVideoById({
+                                                videoId: targetVideoId,
+                                                startSeconds: currSpotify
+                                            });
+                                            player.mute();
+                                            player.playVideo();
+                                        } catch (_) {}
+                                    }, 800);
+                                }
                             } else if (state === 1) {
+                                if (player._adBypassTimer) {
+                                    clearTimeout(player._adBypassTimer);
+                                    player._adBypassTimer = null;
+                                }
                                 setIsAdPlaying(false);
                             }
                         },
