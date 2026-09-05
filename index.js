@@ -477,10 +477,12 @@ class LyricsContainer extends react.Component {
 		let tempState;
 		// if lyrics are cached
 		if ((mode === -1 && CACHE[info.uri]) || CACHE[info.uri]?.[CONFIG.modes?.[mode]]) {
-			tempState = { ...emptyState, ...CACHE[info.uri], isCached };
-			if (CACHE[info.uri]?.mode) {
-				this.state.explicitMode = CACHE[info.uri]?.mode;
-				tempState = { ...tempState, mode: CACHE[info.uri]?.mode };
+			const cachedLyrics = CACHE[info.uri];
+			const baseLyrics = cachedLyrics?.synced || cachedLyrics?.unsynced || cachedLyrics?.genius || null;
+			tempState = { ...emptyState, ...cachedLyrics, currentLyrics: baseLyrics, isCached };
+			if (cachedLyrics?.mode) {
+				this.state.explicitMode = cachedLyrics?.mode;
+				tempState = { ...tempState, mode: cachedLyrics?.mode };
 			}
 		} else {
 			this.setState({ ...emptyState, isLoading: true, isCached: false });
@@ -506,7 +508,8 @@ class LyricsContainer extends react.Component {
 			// set wrong lyrics to current track.
 			const isMatch = !resp?.uri || resp.uri === this.currentTrackUri || info.uri === this.currentTrackUri;
 			if (isMatch) {
-				tempState = { ...emptyState, ...resp, isLoading: false, isCached };
+				const baseLyrics = resp?.synced || resp?.unsynced || resp?.genius || null;
+				tempState = { ...emptyState, ...resp, currentLyrics: baseLyrics, isLoading: false, isCached };
 			} else {
 				this.setState({ isLoading: false });
 				return;
@@ -580,6 +583,10 @@ class LyricsContainer extends react.Component {
 			}
 
 			// reset and apply
+			const currentLyricsToApply = (this.state.uri === tempState.uri && this.state.currentLyrics)
+				? this.state.currentLyrics
+				: tempState.currentLyrics;
+
 			this.setState(
 				{
 					furigana: null,
@@ -593,6 +600,7 @@ class LyricsContainer extends react.Component {
 					tw: null,
 					neteaseTranslation: null,
 					...tempState,
+					currentLyrics: currentLyricsToApply,
 					...translationOverrides,
 					language: defaultLanguage,
 				},
@@ -606,7 +614,11 @@ class LyricsContainer extends react.Component {
 			return;
 		}
 
-		this.setState({ ...tempState, ...translationOverrides }, () => {
+		const currentLyricsToApply = (this.state.uri === tempState.uri && this.state.currentLyrics)
+			? this.state.currentLyrics
+			: tempState.currentLyrics;
+
+		this.setState({ ...tempState, currentLyrics: currentLyricsToApply, ...translationOverrides }, () => {
 			this.currentMusixmatchLanguage = CONFIG.visual["musixmatch-translation-language"];
 			if (shouldRefreshMusixmatchTranslation) {
 				this.refreshMusixmatchTranslation();
@@ -643,6 +655,7 @@ class LyricsContainer extends react.Component {
 				if (
 					this.state.currentLyrics[i].text !== newLyrics[i].text ||
 					this.state.currentLyrics[i].text2 !== newLyrics[i].text2 ||
+					this.state.currentLyrics[i].originalText !== newLyrics[i].originalText ||
 					this.state.currentLyrics[i].startTime !== newLyrics[i].startTime ||
 					this.state.currentLyrics[i].endTime !== newLyrics[i].endTime
 				) {

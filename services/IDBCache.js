@@ -150,7 +150,10 @@ const IDBCache = {
                 request.onsuccess = (event) => {
                     const cursor = event.target.result;
                     if (cursor) {
-                        if (cursor.key.includes(pattern)) {
+                        const isMatch = typeof pattern === 'function'
+                            ? pattern(cursor.key)
+                            : (pattern instanceof RegExp ? pattern.test(cursor.key) : cursor.key.includes(pattern));
+                        if (isMatch) {
                             cursor.delete();
                             deletedCount++;
                         }

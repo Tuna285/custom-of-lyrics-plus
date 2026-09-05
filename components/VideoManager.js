@@ -83,137 +83,6 @@ const VideoManager = {
     },
 
     /**
-     * Score search result video by comparing duration and title metadata.
-     * @private
-     * @param {Object} video - Video metadata candidate
-     * @param {string} artist - Track artist name
-     * @param {string} title - Track title
-     * @param {number} targetDurationSec - Target track duration in seconds
-     * @returns {number} - Relevance score
-     */
-    _scoreVideo(video, artist, title, targetDurationSec) {
-        let score = 0;
-        const videoTitle = (video.title || "").toLowerCase();
-        const videoAuthor = (video.author || "").toLowerCase();
-        const cleanArtist = (artist || "").toLowerCase();
-        const cleanTitle = (title || "").toLowerCase();
-
-        // 1. Duration Matching (Sliding Scale Penalty/Boost)
-        if (targetDurationSec > 0 && video.lengthSeconds > 0) {
-            const diff = Math.abs(video.lengthSeconds - targetDurationSec);
-            if (diff <= 6) {
-                score += 150; // Perfect match
-            } else if (diff <= 12) {
-                score += 100; // Close match
-            } else if (diff <= 25) {
-                score += 40;  // Marginal match
-            } else if (diff > 25 && diff <= 45) {
-                score -= 15;  // Slight mismatch
-            } else if (diff > 45 && diff <= 90) {
-                score -= 50;  // Moderate mismatch (live extensions, different cuts)
-            } else if (diff > 90) {
-                score -= 100; // Major mismatch (anime cuts, 1-hour loops)
-            }
-        }
-
-        // 2. Keyword Matching (Title & Author)
-        if (cleanArtist) {
-            // Split multiple artists
-            const artistParts = cleanArtist.split(/,|\s+feat\.?\s+|&/gi).map(a => a.trim()).filter(Boolean);
-            let artistMatched = false;
-            for (const part of artistParts) {
-                if (part.length >= 2 && (videoTitle.includes(part) || videoAuthor.includes(part))) {
-                    score += 50;
-                    artistMatched = true;
-                    break;
-                }
-            }
-            
-            // Handle Japanese/Romaji artist names mappings
-            if (!artistMatched) {
-                const mappings = {
-                    "yorushika": ["ヨルシカ"],
-                    "radwimps": ["ラッドウィンプS", "ラッドウィンプス"],
-                    "lisa": ["リサ"],
-                    "yoasobi": ["ヨアソビ"],
-                    "kanda": ["神田"],
-                    "utada hikaru": ["宇多田ヒカル"],
-                    "kenshi yonezu": ["米津玄師"],
-                    "aimyon": ["あいみょん"]
-                };
-                for (const [eng, japs] of Object.entries(mappings)) {
-                    if (cleanArtist.includes(eng)) {
-                        for (const jap of japs) {
-                            if (videoTitle.includes(jap) || videoAuthor.includes(jap)) {
-                                score += 50;
-                                artistMatched = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (artistMatched) break;
-                }
-            }
-
-            // 3. Official Channel / VEVO Boost (Extremely strong indicators)
-            const cleanPrimaryArtist = artistParts[0] || "";
-            const isVevo = videoAuthor.endsWith("vevo") || videoAuthor.includes("vevo");
-            const normalizedAuthor = videoAuthor.replace(/\s+/g, "");
-            const normalizedArtist = cleanPrimaryArtist.replace(/\s+/g, "");
-            const isOfficialChannel = normalizedAuthor === normalizedArtist || 
-                                      normalizedAuthor === `${normalizedArtist}official` ||
-                                      (isVevo && normalizedAuthor.startsWith(normalizedArtist));
-            
-            if (isOfficialChannel) {
-                score += 80; // Huge boost for VEVO or Official artist channels
-            }
-
-            // Boost Official auto-generated topic channels (always matches Spotify duration and high audio quality)
-            if (videoAuthor.includes("topic")) {
-                score += 120;
-            }
-        }
-
-        // Title match
-        if (cleanTitle && videoTitle.includes(cleanTitle)) {
-            score += 60;
-        }
-
-        // Official Video Indicators
-        const officialKeywords = ["official", "mv", "music video", "official video", "pv", "official audio"];
-        if (officialKeywords.some(kw => videoTitle.includes(kw))) {
-            score += 40;
-        }
-
-        // Grouped negative keywords to aggressively penalize fan covers/remixes while protecting target tracks
-        const severeNegatives = ["cover", "fanmade", "fan-made", "fan edit", "fan-edit", "tự làm"];
-        for (const kw of severeNegatives) {
-            if (videoTitle.includes(kw) && !cleanTitle.includes(kw)) {
-                score -= 300; // Critical penalty: completely sink cover/fanmade matches
-            }
-        }
-
-        const strongNegatives = [
-            "karaoke", "instrumental", "remix", "guitar", "piano", "violin", 
-            "drum", "bass", "synthesia", "1 hour", "loop", "reaction", "react", "tutorial"
-        ];
-        for (const kw of strongNegatives) {
-            if (videoTitle.includes(kw) && !cleanTitle.includes(kw)) {
-                score -= 200; // Strong penalty: sink musical covers & non-official variants
-            }
-        }
-
-        const mildNegatives = ["parody", "live", "concert", "performance", "vietsub", "sub"];
-        for (const kw of mildNegatives) {
-            if (videoTitle.includes(kw) && !cleanTitle.includes(kw)) {
-                score -= 80; // Standard penalty for live versions or fansubs
-            }
-        }
-
-        return score;
-    },
-
-    /**
      * Parse YouTube InnerTube search response to extract videoId, real title, author, and duration.
      * Supports TVHTML5 lockupViewModel and Web/Mobile videoRenderer formats.
      * @private
@@ -542,21 +411,9 @@ const VideoManager = {
             if (candidates && candidates.length > 0) {
                 const filtered = candidates.filter(c => !blacklist.includes(c.videoId));
                 if (filtered.length > 0) {
-                    const targetSec = trackInfo.duration ? (trackInfo.duration > 1000 ? Math.round(trackInfo.duration / 1000) : trackInfo.duration) : 0;
-                    let highestScore = -Infinity;
-                    for (const cand of filtered) {
-                        const score = this._scoreVideo(cand, trackInfo.artist, trackInfo.title, targetSec);
-                        cand.score = score;
-                        if (score > highestScore) {
-                            highestScore = score;
-                            bestVideo = cand;
-                        }
-                    }
-                    if (!bestVideo) bestVideo = filtered[0];
+                    bestVideo = filtered[0];
                 }
             }
-
-
 
             if (bestVideo && bestVideo.videoId) {
                 const videoId = bestVideo.videoId;
@@ -584,7 +441,7 @@ const VideoManager = {
                 
                 if (!isSilent) {
                     this._currentVideo = videoData;
-                    console.log(`[VideoManager] Found video: ${videoId} (score: ${bestVideo.score || 0}, offset: ${syncOffset}s, source: ${source})`);
+                    console.log(`[VideoManager] Found video: ${videoId} (offset: ${syncOffset}s, source: ${source})`);
                 } else {
                     console.log(`[VideoManager] Pre-cached video silently: ${videoId} for: ${trackInfo.title}`);
                 }

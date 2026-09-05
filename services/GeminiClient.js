@@ -1177,7 +1177,7 @@ const GeminiClient = {
 
                 // Adapt streamed result to the shape processResponse expects
                 const data = { choices: [{ message: streamed.message }], usage: streamed.usage };
-                return this.processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime, _isRetry, rawLines, targetLang);
+                return this.processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime, _isRetry, rawLines, targetLang, wantFurigana);
             };
 
             if (disableQueue) {
@@ -1288,7 +1288,7 @@ const GeminiClient = {
         return "";
     },
 
-    processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime, isRetry = false, sourceLines = [], targetLang = "vi") {
+    processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime, isRetry = false, sourceLines = [], targetLang = "vi", wantFurigana = false) {
         // OpenAI-compatible format: always data.choices[0].message.content
         if (!data?.choices?.length) throw new Error("No response from API");
         const message = data.choices[0]?.message;
@@ -1349,6 +1349,15 @@ const GeminiClient = {
             }
             if (meaningfulLines >= 3 && (exactMatches / meaningfulLines) >= 0.5) {
                 throw new Error(`Format validation failed: AI returned untranslated source lyrics (${exactMatches}/${meaningfulLines} lines identical)`);
+            }
+        }
+
+        // CJK Leakage Guard: In Romaji/Romaja/Pinyin mode, ensure ZERO untransliterated CJK characters remain in output
+        if (wantSmartPhonetic && !wantFurigana && Array.isArray(transLines)) {
+            const cjkRegex = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+            const leakedLine = transLines.find(l => cjkRegex.test(l));
+            if (leakedLine && !isRetry) {
+                throw new Error(`Format validation failed: AI returned untransliterated CJK characters in Romaji mode ("${leakedLine.substring(0, 50)}")`);
             }
         }
 

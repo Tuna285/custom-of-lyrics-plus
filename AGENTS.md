@@ -88,6 +88,59 @@ Synced lyrics are rendered by **TWO separate components**:
 
 ---
 
+### F. Target Language & AI Translation Expansion Invariants
+
+Whenever a new target language (`targetLang`) is added or translation logic is modified, all agents and developers **MUST STRICTLY ADHERE** to these architectural invariants to prevent recurring bugs:
+
+#### 1. Namespace Registration Law (`utils/Prompts.js` & `components/OptionsMenu.js`)
+* **Registration:** `Prompts.js` MUST register via `LyricsPlus.register('Prompts', Prompts)` (never just `window.Prompts = Prompts`), ensuring `window.LyricsPlus.Prompts` is always populated.
+* **Consumption:** All UI and service consumers MUST use dual-fallback:
+  ```javascript
+  const Prompts = (window.LyricsPlus && window.LyricsPlus.Prompts) || window.Prompts || {};
+  ```
+* **Menu Fallback:** `getTargetLanguageOptions` in `OptionsMenu.js` MUST include all supported language codes in its default fallback object (e.g. `{ vi: "Tiếng Việt (Vietnamese)", en: "English" }`) to prevent empty menus during early load cycles.
+
+#### 2. Modular `TARGET_LANGUAGES` Registry Schema (`utils/Prompts.js`)
+Every language entry in `TARGET_LANGUAGES` MUST define:
+* `code`: Lowercase ISO code (`"vi"`, `"en"`, etc.).
+* `name` & `label`: Friendly display names for UI.
+* `hasPronouns`: `boolean`. If `false`, `OptionsMenu.js` automatically hides the Pronoun Mode selector. If `true`, provide `pronouns` map and `buildPronounSection`.
+* `styles`: Style object containing localized songwriting guidelines (`smart_adaptive`, `poetic_standard`, `youth_story`, `street_bold`, `vintage_classic`, `literal_study`).
+* `buildGuardrails()`: MUST enforce **Sentence Type Preservation**:
+  * Atmospheric/scenery lines (e.g. "Bầu trời xanh", "雨の夜") MUST be translated as pure imagery. NEVER invent fake subjects ("I see...").
+  * Action lines MUST maintain natural S-V-O clarity without arbitrary pronoun omission.
+* `userPromptPreamble()` & `jsonSchemaUserPrompt()`: MUST include compulsory translation enforcement:
+  *"CRITICAL: Every single line MUST be translated into [Language]. Even if the original text is in Japanese/Korean/Chinese/etc., DO NOT copy or output original text. You MUST output a 100% poetic [Language] translation for each line."*
+
+#### 3. Cache & In-Flight Key Architecture (`TranslationCoordinator.js` & `utils/Cache.js`)
+* **Cache Key Schema:** Non-Vietnamese target languages use:
+  `${uri}:${targetLang}:${mode}:${styleKey}:${pronounKey}` (Vietnamese and phonetic tasks retain `${uri}:${mode}:${styleKey}:${pronounKey}`).
+* **In-Flight Key Matching:** In `isModeInflight`, `cacheKey2` MUST include `targetLang`:
+  ```javascript
+  const targetLang = CONFIG.visual["translate:target-language"] || "vi";
+  const cacheKey2 = (targetLang === "vi" || mode !== "gemini_vi")
+      ? `${currentUri}:${mode}:${styleKey}:${pronounKey}`
+      : `${currentUri}:${targetLang}:${mode}:${styleKey}:${pronounKey}`;
+  ```
+* **Cache Invalidation Law:** In `resetTranslationCache`, **NEVER** use hardcoded key strings. Always use `CacheManager.clearByPattern(isKeyMatching)` with a predicate function matching `uri` and `:${mode}:` to wipe **ALL** languages (`en`, `vi`), styles, and pronouns across L1 RAM, L2 IndexedDB, and legacy localStorage simultaneously.
+* **No Black Screen on Reset:** When clearing cache or re-translating, **NEVER** set `currentLyrics` to `null`. Always fall back to `baseLyrics` (`self.state.synced || self.state.unsynced || self.state.genius || []`).
+
+#### 4. Dual-Mode Timing Race Protection (`utils/TranslationUtils.js` & `index.js`)
+* Mode 2 (Phonetic / Furigana) completes in ~1.5s while Mode 1 (AI Translation) takes ~3-6s.
+* `TranslationUtils.optimizeTranslations(originalLyrics, mode1, mode2, isMode1Pending)`:
+  * While `isMode1Pending === true`, Mode 2 is **strictly forbidden** from promoting to `finalText`.
+  * Original lyrics MUST remain on the main line until Mode 1 (AI Translation) arrives.
+* On song switch, immediately initialize `tempState.currentLyrics = baseLyrics` at lines 480 & 509 of `index.js` to guarantee seamless original lyrics display with zero flickering.
+
+#### 5. Options Modal Reactivity (`components/OptionsMenu.js`)
+* When opening options modal, pass `"translation-menu"` as `eventType`:
+  ```javascript
+  openOptionsModal(getText("contextMenu.conversions"), items, onChange, "translation-menu");
+  ```
+  This ensures `OptionList` receives dynamic `"lyrics-plus"` custom events and instantly reacts (e.g. hiding/showing Pronoun Mode) without closing and reopening the modal.
+
+---
+
 ## 3. Development Commands & Workflow
 
 ```powershell

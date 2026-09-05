@@ -53,9 +53,10 @@ const TranslationUtils = {
      * @param {Array} originalLyrics - Original lyrics
      * @param {Array} mode1 - Translation from Display Mode 1
      * @param {Array} mode2 - Translation from Display Mode 2
+     * @param {boolean} [isMode1Pending=false] - Whether Display Mode 1 is still translating / in-flight
      * @returns {Array} Optimized lyrics with smart deduplication
      */
-    optimizeTranslations(originalLyrics, mode1, mode2) {
+    optimizeTranslations(originalLyrics, mode1, mode2, isMode1Pending = false) {
         if (!Array.isArray(originalLyrics)) return originalLyrics;
 
         // If no translations provided, return original lyrics as-is
@@ -103,7 +104,11 @@ const TranslationUtils = {
             } else {
                 if ((!trans1SameAsOriginal || allowSameAsOriginal) && translation1) finalText = translation1;
                 if ((!trans2SameAsOriginal || allowSameAsOriginal) && translation2) finalText2 = translation2;
-                if (!finalText && finalText2) { finalText = finalText2; finalText2 = null; }
+                // Only promote Mode 2 to main text if Mode 1 is NOT active/pending
+                if (!finalText && finalText2 && !isMode1Pending) {
+                    finalText = finalText2;
+                    finalText2 = null;
+                }
             }
 
             return { ...line, originalText, text: finalText, text2: finalText2 };

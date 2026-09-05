@@ -213,7 +213,8 @@ window.LyricsPlus.TranslationCoordinator = {
 			}
 
 			// Smart deduplication and optimization
-			const optimizedTranslations = TranslationUtils.optimizeTranslations(lyrics, mode1, mode2);
+			const isMode1Pending = Boolean(activeMode1 && !mode1);
+			const optimizedTranslations = TranslationUtils.optimizeTranslations(lyrics, mode1, mode2, isMode1Pending);
 			self._setCurrentLyrics(Array.isArray(optimizedTranslations) ? optimizedTranslations : []);
 		};
 
@@ -237,7 +238,10 @@ window.LyricsPlus.TranslationCoordinator = {
 			if (String(mode).startsWith("gemini")) {
 				const styleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
 				const pronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
-				const cacheKey2 = `${currentUri}:${mode}:${styleKey}:${pronounKey}`;
+				const targetLang = CONFIG.visual["translate:target-language"] || "vi";
+				const cacheKey2 = (targetLang === "vi" || mode !== "gemini_vi")
+					? `${currentUri}:${mode}:${styleKey}:${pronounKey}`
+					: `${currentUri}:${targetLang}:${mode}:${styleKey}:${pronounKey}`;
 				return !!(self._inflightGemini && self._inflightGemini.has(cacheKey2));
 			} else {
 				const cacheKey = `${currentUri}:${mode}`;
@@ -259,6 +263,10 @@ window.LyricsPlus.TranslationCoordinator = {
 
 		if (!missingMode1 && !missingMode2) {
 			// All active modes are cached or in-flight, no need to fetch
+			// If currentLyrics is not yet set or is empty for this song, show base lyrics or cached
+			if (!Array.isArray(self.state.currentLyrics) || self.state.currentLyrics.length === 0 || self.state.uri !== currentUri) {
+				updateCombinedLyrics(true);
+			}
 			return;
 		}
 
@@ -270,7 +278,8 @@ window.LyricsPlus.TranslationCoordinator = {
 
 		// No cache yet - show original lyrics immediately so UI isn't blank while waiting
 		if (!cachedMode1 && !cachedMode2) {
-			const optimizedOriginal = TranslationUtils.optimizeTranslations(lyrics, null, null);
+			const isMode1Pending = Boolean(activeMode1 && !cachedMode1);
+			const optimizedOriginal = TranslationUtils.optimizeTranslations(lyrics, null, null, isMode1Pending);
 			self._setCurrentLyrics(Array.isArray(optimizedOriginal) ? optimizedOriginal : []);
 		}
 
@@ -963,51 +972,52 @@ window.LyricsPlus.TranslationCoordinator = {
 	},
 
 	async resetTranslationCache(self, uri, modesToClear = null) {
-		const styleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
-		const pronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
-		
 		let clearedCount = 0;
 		let geminiClearedCount = 0;
 		
 		if (modesToClear && modesToClear.length > 0) {
-			for (const mode of modesToClear) {
-				if (!mode || mode === "none") continue;
-				const cacheKey = `${uri}:${mode}:${styleKey}:${pronounKey}`;
-				const deleted = await CacheManager.delete(cacheKey);
-				if (deleted) clearedCount++;
-			}
-			
+			// Match any cache key belonging to this song URI and any of the modes being cleared
+			// Keys can be:
+			// - ${uri}:${mode}:${styleKey}:${pronounKey} (vi / phonetic)
+			// - ${uri}:${targetLang}:${mode}:${styleKey}:${pronounKey} (en / others)
+			// - ${uri}:${mode} (traditional)
+			const isKeyMatching = (key) => {
+				if (!key || typeof key !== "string" || !key.includes(uri)) return false;
+				return modesToClear.some(mode => {
+					if (!mode || mode === "none") return false;
+					return key.includes(`:${mode}:`) || key.endsWith(`:${mode}`) || key.includes(`:${mode}`);
+				});
+			};
+
+			clearedCount = await CacheManager.clearByPattern(isKeyMatching);
+
 			try {
 				const persistKey = `${APP_NAME}:gemini-cache`;
 				const persistedCache = JSON.parse(localStorage.getItem(persistKey)) || {};
-				modesToClear.forEach(mode => {
-					if (!mode || mode === "none") return;
-					const cacheKey = `${uri}:${mode}:${styleKey}:${pronounKey}`;
-					if (persistedCache[cacheKey]) {
-						delete persistedCache[cacheKey];
-						geminiClearedCount++;
-					}
+				const keysToDelete = Object.keys(persistedCache).filter(isKeyMatching);
+				keysToDelete.forEach(key => {
+					delete persistedCache[key];
+					geminiClearedCount++;
 				});
-				localStorage.setItem(persistKey, JSON.stringify(persistedCache));
+				if (keysToDelete.length > 0) {
+					localStorage.setItem(persistKey, JSON.stringify(persistedCache));
+				}
 			} catch (e) {
 				console.warn("[Lyrics+] Failed to clear persisted Gemini cache:", e);
 			}
-			
+
 			if (self._dmResults && self._dmResults[uri]) {
-				const mKey = self.modeKey || "gemini";
-				const currentMode1 = CONFIG.visual[`translation-mode:${mKey}`];
-				const currentMode2 = CONFIG.visual[`translation-mode-2:${mKey}`];
-				
 				modesToClear.forEach(mode => {
 					delete self._dmResults[uri][mode];
 				});
 			}
-			
-			self._setCurrentLyrics(null);
+
+			const baseLyrics = self.state.synced || self.state.unsynced || self.state.genius || [];
+			self._setCurrentLyrics(baseLyrics);
 		} else {
 			clearedCount = await CacheManager.clearByUri(uri);
 			await this.deleteLocalLyrics(self, uri);
-			
+
 			try {
 				const persistKey = `${APP_NAME}:gemini-cache`;
 				const persistedCache = JSON.parse(localStorage.getItem(persistKey)) || {};
@@ -1020,7 +1030,7 @@ window.LyricsPlus.TranslationCoordinator = {
 			} catch (e) {
 				console.warn("[Lyrics+] Failed to clear persisted Gemini cache:", e);
 			}
-			
+
 			if (self._dmResults && self._dmResults[uri]) {
 				delete self._dmResults[uri];
 			}
@@ -1029,11 +1039,12 @@ window.LyricsPlus.TranslationCoordinator = {
 		if (self._inflightGemini) {
 			const keysToDelete = [];
 			for (const [key] of self._inflightGemini) {
-				if (modesToClear) {
-					if (modesToClear.some(mode => key.includes(`:${mode}:`))) {
+				if (!key.includes(uri)) continue;
+				if (modesToClear && modesToClear.length > 0) {
+					if (modesToClear.some(mode => key.includes(`:${mode}:`) || key.includes(`:${mode}`))) {
 						keysToDelete.push(key);
 					}
-				} else if (key.includes(uri)) {
+				} else {
 					keysToDelete.push(key);
 				}
 			}

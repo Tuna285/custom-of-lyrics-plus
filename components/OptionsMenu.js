@@ -246,7 +246,7 @@ let adjustmentsDebounceTimeout = null;
 // Define static options outside component to avoid recreation
 const getStaticOptions = () => {
 	const targetLang = CONFIG.visual["translate:target-language"] || "vi";
-	const Prompts = (window.LyricsPlus && window.LyricsPlus.Prompts) || {};
+	const Prompts = (window.LyricsPlus && window.LyricsPlus.Prompts) || window.Prompts || {};
 	const langObj = Prompts.getLanguage ? Prompts.getLanguage(targetLang) : null;
 	const targetLangName = langObj ? langObj.name : "Vietnamese";
 
@@ -291,13 +291,20 @@ const getStaticOptions = () => {
 };
 
 const getTargetLanguageOptions = () => {
-	const Prompts = (window.LyricsPlus && window.LyricsPlus.Prompts) || {};
+	const Prompts = (window.LyricsPlus && window.LyricsPlus.Prompts) || window.Prompts || {};
 	const langs = Prompts.languages || {};
 	const options = {};
 	for (const code of Object.keys(langs)) {
 		options[code] = langs[code].label || langs[code].name || code;
 	}
-	return Object.keys(options).length > 0 ? options : { vi: "Tiếng Việt (Vietnamese)" };
+	return Object.keys(options).length > 0 ? options : {
+		vi: "Tiếng Việt (Vietnamese)",
+		en: "English",
+		ja: "日本語 (Japanese)",
+		ko: "한국어 (Korean)",
+		zh: "中文 (Chinese)",
+		uk: "Українська (Ukrainian)"
+	};
 };
 
 // Dynamic options for Gemini, using localized strings
@@ -327,7 +334,7 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 		const STATIC_OPTIONS = getStaticOptions();
 		const translationDisplayOptions = STATIC_OPTIONS.translationDisplay;
 		const targetLang = CONFIG.visual["translate:target-language"] || "vi";
-		const Prompts = (window.LyricsPlus && window.LyricsPlus.Prompts) || {};
+		const Prompts = (window.LyricsPlus && window.LyricsPlus.Prompts) || window.Prompts || {};
 		const currentLangModule = Prompts.getLanguage ? Prompts.getLanguage(targetLang) : null;
 		const hasPronouns = currentLangModule ? !!currentLangModule.hasPronouns : (targetLang === "vi");
 
@@ -455,7 +462,7 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 			}
 
 			lyricContainerUpdate?.();
-		}, 200);
+		}, "translation-menu");
 	};
 
 	return react.createElement(

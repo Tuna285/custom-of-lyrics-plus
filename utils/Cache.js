@@ -183,16 +183,20 @@ const CacheManager = {
     },
 
     /**
-     * Clear cache entries for a specific URI
-     * @param {string} uri
+     * Clear cache entries matching a pattern or predicate function
+     * @param {string|RegExp|Function} pattern
      * @returns {Promise<number>}
      */
-    async clearByUri(uri) {
+    async clearByPattern(pattern) {
+        if (!pattern) return 0;
         let count = 0;
 
         // Clear from L1
         for (const [key] of this._l1Cache) {
-            if (key.includes(uri)) {
+            const isMatch = typeof pattern === 'function'
+                ? pattern(key)
+                : (pattern instanceof RegExp ? pattern.test(key) : key.includes(pattern));
+            if (isMatch) {
                 this._l1Cache.delete(key);
                 count++;
             }
@@ -201,13 +205,22 @@ const CacheManager = {
         // L2: Clear from IndexedDB too
         try {
             await this._migrate();
-            const l2Count = await IDBCache.deleteByPattern(uri);
+            const l2Count = await IDBCache.deleteByPattern(pattern);
             count += l2Count;
         } catch (e) {
-            console.warn('[Cache] Failed to clear L2 entries for URI:', uri, e);
+            console.warn('[Cache] Failed to clear L2 entries for pattern:', pattern, e);
         }
 
         return count;
+    },
+
+    /**
+     * Clear cache entries for a specific URI
+     * @param {string} uri
+     * @returns {Promise<number>}
+     */
+    async clearByUri(uri) {
+        return this.clearByPattern(uri);
     },
 
     /**
