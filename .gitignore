@@ -20,3 +20,5 @@ scratch/
 *.log
 .gemini/
 graphify-out/
+.agents/
+AGENTS.md

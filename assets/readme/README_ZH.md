@@ -1,7 +1,7 @@
 # Lyric Plus Translate
 
 **Language / 言語 / 언어 / Ngôn ngữ / 语言:**
-[English](../../README.md) | [Tiếng Việt](../../README_VI.md) | [한국어](README_KO.md) | [日本語](README_JA.md) | [中文（简体）](README_ZH.md)
+[English](README_EN.md) | [Tiếng Việt](README_VI.md) | [한국어](README_KO.md) | [日本語](README_JA.md) | [中文（简体）](README_ZH.md)
 
 [![Ko-fi](https://img.shields.io/badge/Donate-Ko--fi-F16061?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/gunjoutuna)
 
@@ -11,10 +11,10 @@
 
 ---
 
-> 专为 Spicetify 打造的 **Lyrics Plus** 定制版本，专注于高质量歌词翻译，主要面向越南用户。可连接任何兼容 OpenAI 的 LLM 端点 —— Google Gemini/Gemma、OpenRouter、OpenAI、DeepSeek、Anthropic Claude 或本地 Ollama。
+> 专为 Spicetify 打造的 **Lyrics Plus** 定制版本，专注于高质量歌词翻译、多语言支持、拼音/注音/罗马字注音、画中画迷你歌词及视频背景。可连接任何兼容 OpenAI 的 LLM 端点 —— Google Gemini/Gemma、OpenRouter、OpenAI、DeepSeek、Anthropic Claude 或本地 Ollama。
 
-> [!NOTE]
-> **目前，翻译功能仅支持越南语（Tiếng Việt）。** 如有需求，未来更新中可能会添加对其他语言的支持。
+> [!TIP]
+> **现已支持 6 种目标语言翻译:** 越南语 (`vi`)、英语 (`en`)、日语 (`ja`)、韩语 (`ko`)、中文 (`zh`) 和乌克兰语 (`uk`)。保持优美流畅的歌词韵律，支持自定义填词风格。
 
 ---
 
@@ -24,37 +24,41 @@
 
 连接任何兼容 OpenAI 的 LLM 端点（Google Gemini/Gemma、OpenRouter、OpenAI、DeepSeek、Anthropic Claude、本地 Ollama 等），自然准确地翻译歌词。
 
-- **内置端点和模型预设** —— 一键选择热门提供商（Gemini/Gemma、OpenRouter、OpenAI、DeepSeek、Claude、Ollama）及精选模型列表；同样支持自定义 URL/模型。
-- **双显示模式** —— 罗马字（日语）、罗马字（韩语）、拼音（中文）+**越南语**翻译 —— 非常适合语言学习。
+- **6 种目标语言** —— 支持翻译成越南语、英语、日语、韩语、中文或乌克兰语，配备专属的歌词风格指南和安全防护规则。
+- **优美歌词韵律 (Lyrical Flow)** —— 100% 忠实保留核心意象、隐喻与叙事脉络，塑造自然的人声演唱韵律，避免因死板数音节或强行押韵而破坏原意。
+- **内置端点和模型预设** —— 一键选择热门提供商（Gemini 3.8/3.7/3.6、Gemma、OpenRouter、OpenAI、DeepSeek、Claude、Ollama）；同样支持自定义 URL/模型。
+- **双显示模式** —— 振假名（日语 `<ruby>`）、罗马字（日语）、罗马字（韩语）、拼音（中文）+ 目标语言 AI 翻译。
 - **翻译风格** —— 6 种风格（智能自适应 / 诗意 / 青春动漫 / 街头说唱 / 复古经典 / 直译）以匹配歌曲氛围。
-- **代词锁定** —— 9 种越南语代词对（自动、Anh-Em、Tớ-Cậu、Tao-Mày…），在整个曲目中保持一致的语气。
+- **代词模式** —— 针对越南语的语境代词映射（自动、Anh-Em、Tớ-Cậu、Tao-Mày…），在整个曲目中保持一致的人称叙事。
+- **多 API 密钥轮询** —— 支持添加多个 API 密钥，具备自动轮询负载均衡和配额/速率限制即时故障转移功能。
+- **动态推理（思考时间）控制** —— 自定义 AI 思考预算（`off`、`low`、`medium`、`high`、`auto`），并提供流式推理过程窗口。
 - **预翻译** —— 在播放前在后台翻译下一首曲目，可调整提前时间。
-- **实时 AI 推理** —— 翻译指示器旁的大脑图标可打开一个可拖动窗口，实时流式显示模型的思考过程（翻译和音标分为独立标签）。
 - **响应格式** —— 选择提示词工程（通用）或 JSON Schema（在支持的模型上更严格解析，不支持时自动回退）。
-- **高质量** —— 针对音乐语境调优的提示词，保留意义和情感。
-
 
 | Japanese → Romaji | Korean → Romaja | Chinese → Pinyin |
 | ----------------- | --------------- | ---------------- |
 |<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/e9b7f1f5-0c3c-474d-8fe1-8e2e37552bfb" />|<img width="1919" height="1018" alt="image" src="https://github.com/user-attachments/assets/e8b56a5e-621e-420f-be68-ffc69e3236c1" />|<img width="1919" height="1019" alt="image" src="https://github.com/user-attachments/assets/a9e36436-9027-4fbe-a31d-2ffc27d97574" />|
 
-### 2. 画中画迷你歌词
+### 2. 统一多源手动搜索
+
+全新升级的手动搜索对话框，支持跨多个提供商（**NetEase**、**LRCLIB** 和 **Musixmatch**）搜索歌词，配备交互式筛选标签、曲目时长匹配打分以及状态徽章（`Synced`、`Unsynced`）。
+
+### 3. 画中画迷你歌词
 
 将同步歌词直接注入 Spotify 原生画中画迷你播放器，让您在使用其他应用时也能跟着歌词唱。从 PiP 设置面板或使用 `Ctrl+Shift+M` 切换。
 
-### 3. 视频背景
+### 4. 视频背景与影院模式
 
-为歌词页面提供 YouTube MV 动态背景。可调节缩放、亮度和模糊 —— 与透明模式和任意 Spicetify 主题完美搭配。
-
+为歌词页面提供 YouTube MV 动态背景。基于 YouTube 原生推荐算法匹配候选视频，自动跳过视频广告，并支持全窗口影院模式（`100vw x 100vh`），可自由调节缩放、暗度和模糊度。
 
 <img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/51520969-7a8f-44e5-bf70-3262e9d658c7" />
 
-### 4. 现代界面与优化体验
+### 5. 现代界面与优化体验
 
 - **透明背景** —— 与任意 Spicetify 主题和谐融合。
+- **多语言界面** —— 完整本地化为 5 种语言：英语、越南语、日语、韩语、简体中文。
 - **自动隐藏控件** —— 设置按钮仅在悬停时显示，最大化显示空间。
-- **流畅过渡** —— 优化的动画实现无缝歌词切换。
-- **完整越南语 UI** —— 为越南用户完整本地化 🇻🇳。
+- **流畅过渡** —— 自适应歌曲节奏的 Apple Music 流体平滑过渡与间奏休止符动画。
 
 ---
 
@@ -101,13 +105,14 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 ## 配置
 
 1. 打开 Spotify，点击头像 → **Lyric Plus Translate config**
-2. 进入 **Translation** 标签并填写：
-   - **API Endpoint** —— 选择预设（Gemini/Gemma、OpenRouter、OpenAI、DeepSeek、Claude、Ollama）或粘贴任意兼容 OpenAI 的 URL。
-   - **Model Name** —— 从精选下拉列表中选择或输入自定义模型名称。
-   - **API Key** —— 提供商的密钥（[Google AI Studio](https://aistudio.google.com/) 提供免费额度）。支持最多 2 个密钥轮询。
-   - **Response Format** —— *提示词工程*（适用于所有模型）或 *JSON Schema*（在不支持的模型上自动回退到提示词工程）。
-   - **Pre-translation** —— 开启/关闭并设置提前时间（当前歌曲结束前多少秒开始翻译下一首）。
-3. 将鼠标悬停在歌词上，点击翻译图标（⇄）自定义**显示模式**、**翻译风格**和**代词**。
+2. 进入 **Translation** 标签并配置：
+   - **API Endpoint** —— 选择预设（Gemini、OpenRouter、OpenAI、DeepSeek、Claude、Ollama）或粘贴任意兼容 OpenAI 的 URL。
+   - **Model Name** —— 从预设（`gemini-3.8-flash`、`gemini-3.7-flash` 等）中选择或输入自定义模型名称。
+   - **API Keys** —— 添加一个或多个 API 密钥（[Google AI Studio](https://aistudio.google.com/) 提供免费额度）。支持多密钥轮询及配额不足时自动切换。
+   - **Reasoning Effort** —— 调节思考预算（`off`、`low`、`medium`、`high`、`auto`）。
+   - **Response Format** —— *Prompt Engineering*（通用）或 *JSON Schema*。
+   - **Pre-translation** —— 开启/关闭并设置提前时间。
+3. 将鼠标悬停在歌词上，点击翻译图标（⇄）自定义**目标语言**、**显示模式**、**翻译风格**和**代词**。
 4. *（可选）* 在播放曲目时按 `Ctrl+Shift+M` 切换画中画迷你歌词。
 
 ---
@@ -124,12 +129,12 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 
 ### AI 模式（LLM 翻译）
 
-| 源语言             | 显示模式 1                      | 显示模式 2 |
-| ------------------ | ------------------------------- | ---------- |
-| 日语 (日本語)       | 罗马字（AI），含本地模式         | 越南语     |
-| 韩语 (한국어)       | 罗马字（AI），含本地模式         | 越南语     |
-| 中文 (中文)         | 拼音（AI），含本地模式           | 越南语     |
-| 其他               | —                               | 越南语     |
+| 源语言             | 显示模式 1                      | 显示模式 2 (目标语言)        |
+| ------------------ | ------------------------------- | ---------------------------- |
+| 日语 (日本語)       | 振假名 (AI)、罗马字 (AI)        | 越南语、英语、日语、         |
+| 韩语 (한국어)       | 罗马字 (AI)                     | 韩语、中文、乌克兰语         |
+| 中文 (中文)         | 拼音 (AI)                       |                              |
+| 所有语言           | 本地模式注音                    |                              |
 
 ---
 
@@ -156,4 +161,5 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 ---
 
 *本项目正在积极开发中。欢迎报告任何问题或提出功能建议！*
+
 
