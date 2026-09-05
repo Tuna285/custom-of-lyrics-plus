@@ -701,8 +701,8 @@ const GeminiClient = {
         const localController = new AbortController();
         let earlyAbortReason = null; // Set when we abort proactively (vs. timeout / user cancel)
         if (signal) {
-            if (signal.aborted) localController.abort();
-            else signal.addEventListener("abort", () => localController.abort(), { once: true });
+            if (signal.aborted) localController.abort(signal.reason);
+            else signal.addEventListener("abort", () => localController.abort(signal.reason), { once: true });
         }
 
         const response = await fetch(endpoint, {
@@ -1142,14 +1142,14 @@ const GeminiClient = {
                     let idleTimer = setTimeout(() => {
                         idleAbort = true;
                         if (!hasReceivedFirstChunk) isStalledConnect = true;
-                        try { controller.abort(); } catch (_) {}
+                        try { controller.abort(new DOMException("Initial connection timed out", "AbortError")); } catch (_) {}
                     }, CONNECT_TIMEOUT_MS);
 
                     const resetIdle = () => {
                         if (idleAbort) return;
                         hasReceivedFirstChunk = true;
                         clearTimeout(idleTimer);
-                        idleTimer = setTimeout(() => { idleAbort = true; try { controller.abort(); } catch (_) {} }, STREAM_IDLE_MS);
+                        idleTimer = setTimeout(() => { idleAbort = true; try { controller.abort(new DOMException("Stream idle timed out", "AbortError")); } catch (_) {} }, STREAM_IDLE_MS);
                     };
                     try {
                         return await this.streamChatCompletion({
@@ -1218,7 +1218,9 @@ const GeminiClient = {
             if (!error.status) {
                 if (error.name === 'AbortError') {
                     userMessage = error.idleAbort
-                        ? `Request timed out: no response from API for 90s. The model may be overloaded or stuck.`
+                        ? (error.isStalledConnect 
+                            ? `Connection stalled: no response from API for 15s. The model may be overloaded.`
+                            : `Request timed out: no response from API for 45s. The model may be overloaded or stuck.`)
                         : `Request cancelled.`;
                 } else if (error.message?.includes('fetch') || error.message?.includes('network') || error.message?.includes('Failed to fetch')) {
                     userMessage = `Network Error. Check your internet connection and API endpoint: ${endpoint}`;
