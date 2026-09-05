@@ -128,12 +128,13 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 
 ### AI Mode (LLM Translation)
 
-| Source Language   | Display Mode 1                  | Display Mode 2 (Target Languages) |
-| ----------------- | ------------------------------- | --------------------------------- |
-| Japanese (日本語)  | Furigana (AI), Romaji (AI)      | Vietnamese, English, Japanese,    |
-| Korean (한국어)    | Romaja (AI)                     | Korean, Chinese, Ukrainian        |
-| Chinese (中文)    | Pinyin (AI)                     |                                   |
-| Any Language      | Local Mode Phonetics            |                                   |
+| Source Language   | Display Mode 1 (Phonetics)      | Display Mode 2 (Target Translation) |
+| ----------------- | ------------------------------- | ----------------------------------- |
+| Japanese (日本語)  | Furigana (AI), Romaji (AI)      | Vietnamese, English, Japanese, Korean, Chinese, Ukrainian |
+| Korean (한국어)    | Romaja (AI)                     | Vietnamese, English, Japanese, Korean, Chinese, Ukrainian |
+| Chinese (中文)    | Pinyin (AI)                     | Vietnamese, English, Japanese, Korean, Chinese, Ukrainian |
+| Any Language      | Local Mode Phonetics            | Vietnamese, English, Japanese, Korean, Chinese, Ukrainian |
+
 
 ---
 

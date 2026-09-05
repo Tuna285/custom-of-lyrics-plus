@@ -128,10 +128,11 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 
 | Ngôn ngữ gốc      | Kiểu hiển thị 1                 | Kiểu hiển thị 2 (Ngôn ngữ dịch)   |
 | ----------------- | ------------------------------- | --------------------------------- |
-| Tiếng Nhật (日本語) | Furigana (AI), Romaji (AI)      | Tiếng Việt, Tiếng Anh, Tiếng Nhật |
-| Tiếng Hàn (한국어)  | Romaja (AI)                     | Tiếng Hàn, Tiếng Trung, Ukraina   |
-| Tiếng Trung (中文)  | Pinyin (AI)                     |                                   |
-| Mọi ngôn ngữ khác | Phiên âm chế độ Local           |                                   |
+| Tiếng Nhật (日本語) | Furigana (AI), Romaji (AI)      | Tiếng Việt, Tiếng Anh, Tiếng Nhật, Tiếng Hàn, Tiếng Trung, Tiếng Ukraina |
+| Tiếng Hàn (한국어)  | Romaja (AI)                     | Tiếng Việt, Tiếng Anh, Tiếng Nhật, Tiếng Hàn, Tiếng Trung, Tiếng Ukraina |
+| Tiếng Trung (中文)  | Pinyin (AI)                     | Tiếng Việt, Tiếng Anh, Tiếng Nhật, Tiếng Hàn, Tiếng Trung, Tiếng Ukraina |
+| Mọi ngôn ngữ khác | Phiên âm chế độ Local           | Tiếng Việt, Tiếng Anh, Tiếng Nhật, Tiếng Hàn, Tiếng Trung, Tiếng Ukraina |
+
 
 
 ---
