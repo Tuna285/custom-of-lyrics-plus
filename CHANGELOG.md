@@ -9,16 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **6-Language AI Translation Expansion** — Added full support for translating lyrics into 6 languages: Vietnamese (`vi`), English (`en`), Japanese (`ja`), Korean (`ko`), Chinese (`zh`), and Ukrainian (`uk`), with dedicated localized style guidelines and guardrails.
-- **Faithful Lyrical Translation Framework** — Established the Semantic & Imagery Fidelity Law across all prompt engines to preserve 100% of core imagery, metaphors, and narrative structure while adapting natural lyrical flow and vocal phrasing.
-- **Model Presets: Gemini 3.8 Flash & Gemini 3.7 Flash** — Added `gemini-3.8-flash` (state-of-the-art deep reasoning) and `gemini-3.7-flash` (high-performance hybrid reasoning) to settings model selector.
-- **Unified Multi-Provider Manual Search** — Upgraded the manual search dialog into a unified multi-provider search interface with interactive filter chips (`All`, `NetEase`, `LRCLIB`, `Musixmatch`), candidate track scoring, and status badges (`Synced`, `Unsynced`).
-- **Dynamic Reasoning Effort & Thinking Budget** — Added user-configurable AI reasoning effort (`auto`, `low`, `medium`, `high`, `off`) with robust unclosed thought tag stripping and format validation fallbacks.
+- **6-Language AI Translation Expansion** — Added full translation support for 6 target languages: Vietnamese (`vi`), English (`en`), Japanese (`ja`), Korean (`ko`), Chinese (`zh`), and Ukrainian (`uk`). Each language features dedicated songwriting style presets (`smart_adaptive`, `poetic_standard`, `youth_story`, `street_bold`, `vintage_classic`, `literal_study`), grammar guidelines, and custom pronoun mapping.
+- **Faithful Lyrical Translation Framework** — Established the Semantic & Imagery Fidelity Law across all prompt engines to preserve 100% of core imagery, metaphors, and narrative structure while adapting natural lyrical flow and vocal prosody without rigid syllable-counting or forced rhymes that distort meaning.
+- **Unified Multi-Provider Manual Search** — Upgraded the manual search dialog into a unified multi-provider search interface (`NetEase`, `LRCLIB`, `Musixmatch`) with interactive filter chips, track duration scoring, and status badges (`Synced`, `Unsynced`).
+- **Model Presets: Gemini 3.8 Flash & Gemini 3.7 Flash** — Added Google's latest models (`gemini-3.8-flash` and `gemini-3.7-flash`) as clean model presets in the settings selector.
+- **Dynamic Reasoning Effort & Thinking Budget** — Added user-configurable AI reasoning effort (`off`, `low`, `medium`, `high`, `auto`) in Settings, with automated stripping of unclosed thought blocks (`<thought>`, `<think>`) to eliminate reasoning leakage.
+- **Modernized Update Service** — Added automated update checks on startup, bilingual release notifications, and a manual check button in Settings → Advanced.
+- **Dedicated Cloudflare Worker CORS Proxy** — Integrated a secure dedicated proxy as the default gateway for NetEase and lyrics APIs, resolving CORS restrictions and code -462 errors.
 
 ### Changed
 
-- **Video Background Search & YouTube Ad Bypass** — Refined YouTube video candidate scoring to closely mirror YouTube's native recommendation algorithm, and enhanced YouTube ad bypass with automated seek offsets and fast-forward reloading.
-- **Modular Conversions Modal & Reactivity** — Redesigned the conversions modal to dynamically react to target language switching and preserve smooth original lyrics display with zero flickering.
+- **YouTube Video Background Recommendation & Cinema Mode** — Refined candidate scoring to closely mirror YouTube's native recommendation algorithm (official channel verification, title normalization); added full-window cinema mode (`100vw x 100vh`) with disabled iframe pointer events to prevent hover overlays.
+- **YouTube Ad-Bypass Engine** — Automatically bypasses YouTube video ads using start offset seeking and fast-forward stream reloads, keeping background playback in sync with audio.
+- **Reactive Conversions Modal** — Redesigned conversions modal to dynamically react to target language switching without modal reloads, with dual-mode timing race protection preventing fast phonetic results from prematurely replacing main lines before full translation completes.
 
 ### Fixed
 
