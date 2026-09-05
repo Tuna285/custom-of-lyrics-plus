@@ -214,6 +214,130 @@ const VideoManager = {
     },
 
     /**
+     * Parse YouTube InnerTube search response to extract videoId, real title, author, and duration.
+     * Supports TVHTML5 lockupViewModel and Web/Mobile videoRenderer formats.
+     * @private
+     * @param {string|Object} rawData - Raw API response
+     * @param {string} fallbackQuery - Fallback query for title if unparseable
+     * @returns {Array<{videoId: string, title: string, author: string, lengthSeconds: number}>}
+     */
+    _parseYoutubeSearchResults(rawData, fallbackQuery = "") {
+        try {
+            const json = typeof rawData === "string" ? JSON.parse(rawData) : rawData;
+            const candidates = [];
+            const seenIds = new Set();
+
+            const findBadgeText = (obj) => {
+                if (!obj || typeof obj !== "object") return null;
+                if (obj.thumbnailBadgeViewModel?.text && typeof obj.thumbnailBadgeViewModel.text === "string") {
+                    return obj.thumbnailBadgeViewModel.text;
+                }
+                for (const k of Object.keys(obj)) {
+                    const found = findBadgeText(obj[k]);
+                    if (found) return found;
+                }
+                return null;
+            };
+
+            const parseTimeSeconds = (timeStr) => {
+                if (!timeStr || typeof timeStr !== "string" || !timeStr.includes(":")) return 0;
+                const parts = timeStr.split(":").map(Number);
+                if (parts.length === 2) return (parts[0] * 60) + parts[1];
+                if (parts.length === 3) return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+                return 0;
+            };
+
+            const traverse = (node) => {
+                if (!node || typeof node !== "object") return;
+
+                let videoId = null;
+                let title = "";
+                let author = "";
+                let lengthSeconds = 0;
+
+                // Pattern 1: lockupViewModel (TVHTML5)
+                if (node.lockupViewModel) {
+                    const lvm = node.lockupViewModel;
+                    videoId = lvm.contentId;
+                    const meta = lvm.metadata?.lockupMetadataViewModel;
+                    if (meta?.title?.content) {
+                        title = meta.title.content;
+                    }
+                    const rows = meta?.metadata?.contentMetadataViewModel?.metadataRows;
+                    if (rows?.[0]?.metadataParts?.[0]?.text?.content) {
+                        author = rows[0].metadataParts[0].text.content;
+                    }
+                    const timeStr = findBadgeText(lvm.contentImage);
+                    lengthSeconds = parseTimeSeconds(timeStr);
+                }
+
+                // Pattern 2: videoRenderer (Standard Web / Mobile)
+                if (node.videoRenderer) {
+                    const vr = node.videoRenderer;
+                    videoId = vr.videoId;
+                    if (vr.title?.runs) title = vr.title.runs.map(r => r.text).join("");
+                    else if (vr.title?.simpleText) title = vr.title.simpleText;
+
+                    if (vr.ownerText?.runs) author = vr.ownerText.runs.map(r => r.text).join("");
+                    else if (vr.shortBylineText?.runs) author = vr.shortBylineText.runs.map(r => r.text).join("");
+
+                    if (vr.lengthText?.simpleText) {
+                        lengthSeconds = parseTimeSeconds(vr.lengthText.simpleText);
+                    }
+                }
+
+                // Pattern 3: compactVideoRenderer
+                if (node.compactVideoRenderer) {
+                    const cvr = node.compactVideoRenderer;
+                    videoId = cvr.videoId;
+                    if (cvr.title?.runs) title = cvr.title.runs.map(r => r.text).join("");
+                    else if (cvr.title?.simpleText) title = cvr.title.simpleText;
+
+                    if (cvr.shortBylineText?.runs) author = cvr.shortBylineText.runs.map(r => r.text).join("");
+                    if (cvr.lengthText?.simpleText) {
+                        lengthSeconds = parseTimeSeconds(cvr.lengthText.simpleText);
+                    }
+                }
+
+                if (videoId && /^[a-zA-Z0-9_-]{11}$/.test(videoId) && !seenIds.has(videoId)) {
+                    if (title) {
+                        seenIds.add(videoId);
+                        candidates.push({
+                            videoId,
+                            title,
+                            author,
+                            lengthSeconds
+                        });
+                    }
+                }
+
+                for (const k of Object.keys(node)) {
+                    traverse(node[k]);
+                }
+            };
+
+            traverse(json);
+            if (candidates.length > 0) {
+                return candidates.slice(0, 10);
+            }
+        } catch (_) {}
+
+        // Fallback: regex extraction if structured JSON traversal yielded no candidates
+        const watchMatches = [...rawData.matchAll(/"videoId"\s*:\s*"([a-zA-Z0-9_-]{11})"/g)];
+        if (watchMatches.length > 0) {
+            const uniqueIds = [...new Set(watchMatches.map(m => m[1]))];
+            return uniqueIds.slice(0, 5).map(id => ({
+                videoId: id,
+                title: fallbackQuery,
+                author: "",
+                lengthSeconds: 0
+            }));
+        }
+
+        return [];
+    },
+
+    /**
      * Search YouTube via InnerTube TVHTML5 Client API (SmartTube / TVHTML5 Client)
      * @private
      * @param {string} query - Cleaned search query
@@ -273,18 +397,10 @@ const VideoManager = {
                     }
 
                     if (rawData && !rawData.includes("403 Forbidden") && !rawData.includes("<!DOCTYPE")) {
-                        const watchMatches = [...rawData.matchAll(/"videoId"\s*:\s*"([a-zA-Z0-9_-]{11})"/g)];
-                        if (watchMatches.length > 0) {
-                            const uniqueIds = [...new Set(watchMatches.map(m => m[1]))];
-                            // Take only the top 5 most relevant search results (dropping bottom recommended feed)
-                            const topCandidates = uniqueIds.slice(0, 5);
-                            console.log(`[VideoManager] TVHTML5 InnerTube search via proxy returned top ${topCandidates.length} relevant YouTube videos.`);
-                            return topCandidates.map(id => ({
-                                videoId: id,
-                                title: query,
-                                author: "",
-                                lengthSeconds: 0
-                            }));
+                        const parsedVideos = this._parseYoutubeSearchResults(rawData, query);
+                        if (parsedVideos.length > 0) {
+                            console.log(`[VideoManager] TVHTML5 InnerTube search returned ${parsedVideos.length} YouTube videos with parsed metadata.`);
+                            return parsedVideos;
                         }
                     }
                 } catch (proxyErr) {
@@ -426,7 +542,16 @@ const VideoManager = {
             if (candidates && candidates.length > 0) {
                 const filtered = candidates.filter(c => !blacklist.includes(c.videoId));
                 if (filtered.length > 0) {
-                    bestVideo = filtered[0];
+                    const targetSec = trackInfo.duration ? (trackInfo.duration > 1000 ? Math.round(trackInfo.duration / 1000) : trackInfo.duration) : 0;
+                    let highestScore = -Infinity;
+                    for (const cand of filtered) {
+                        const score = this._scoreVideo(cand, trackInfo.artist, trackInfo.title, targetSec);
+                        if (score > highestScore) {
+                            highestScore = score;
+                            bestVideo = cand;
+                        }
+                    }
+                    if (!bestVideo) bestVideo = filtered[0];
                 }
             }
 

@@ -1177,7 +1177,7 @@ const GeminiClient = {
 
                 // Adapt streamed result to the shape processResponse expects
                 const data = { choices: [{ message: streamed.message }], usage: streamed.usage };
-                return this.processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime, _isRetry, rawLines);
+                return this.processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime, _isRetry, rawLines, targetLang);
             };
 
             if (disableQueue) {
@@ -1286,7 +1286,7 @@ const GeminiClient = {
         return "";
     },
 
-    processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime, isRetry = false, sourceLines = []) {
+    processResponse(data, responseMode, wantSmartPhonetic, lineCount, startTime, isRetry = false, sourceLines = [], targetLang = "vi") {
         // OpenAI-compatible format: always data.choices[0].message.content
         if (!data?.choices?.length) throw new Error("No response from API");
         const message = data.choices[0]?.message;
@@ -1377,12 +1377,15 @@ const GeminiClient = {
             result.phonetic = transLines.join('\n');
             result.translation = transLines;
             result.vi = transLines;
+            if (targetLang) {
+                result[targetLang] = transLines;
+            }
         }
         // Log translation results for debugging
         if (wantSmartPhonetic) {
             DebugLogger.log(`Phonetic result:`, transLines);
         } else {
-            DebugLogger.log(`${targetLang} result:`, transLines);
+            DebugLogger.log(`${targetLang || "vi"} result:`, transLines);
         }
 
         DebugLogger.log(`Completed in ${duration}ms.`);
