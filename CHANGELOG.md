@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-09-05
+
+### Added
+
+- **6-Language AI Translation Expansion** — Added full support for translating lyrics into 6 languages: Vietnamese (`vi`), English (`en`), Japanese (`ja`), Korean (`ko`), Chinese (`zh`), and Ukrainian (`uk`), with dedicated localized style guidelines and guardrails.
+- **Faithful Lyrical Translation Framework** — Established the Semantic & Imagery Fidelity Law across all prompt engines to preserve 100% of core imagery, metaphors, and narrative structure while adapting natural lyrical flow and vocal phrasing.
+- **Unified Multi-Provider Manual Search** — Upgraded the manual search dialog into a unified multi-provider search interface with interactive filter chips (`All`, `NetEase`, `LRCLIB`, `Musixmatch`), candidate track scoring, and status badges (`Synced`, `Unsynced`).
+- **Dynamic Reasoning Effort & Thinking Budget** — Added user-configurable AI reasoning effort (`auto`, `low`, `medium`, `high`, `off`) with robust unclosed thought tag stripping and format validation fallbacks.
+
+### Changed
+
+- **Video Background Search & YouTube Ad Bypass** — Refined YouTube video candidate scoring to closely mirror YouTube's native recommendation algorithm, and enhanced YouTube ad bypass with automated seek offsets and fast-forward reloading.
+- **Modular Conversions Modal & Reactivity** — Redesigned the conversions modal to dynamically react to target language switching and preserve smooth original lyrics display with zero flickering.
+
+### Fixed
+
+- **Romaji CJK Character Leakage Guard** — Added post-processing sanity check ensuring Japanese/Chinese characters never leak into Romanized output.
+- **Abort Reason & Timeout Calibration** — Improved AbortSignal error forwarding and timeout notifications during network retries and API key failover.
+- **Instrumental Candidate Penalty** — Enhanced NetEase track candidate selection to penalize instrumental tracks when searching for lyrical songs.
+
 ## [1.8.0] - 2026-07-22
 
 ### Added
