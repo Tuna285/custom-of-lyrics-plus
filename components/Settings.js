@@ -657,8 +657,10 @@ const ConfigHelper = () => {
 
 	const MODEL_PRESETS = [
 		// Google Gemini 3.x series
-		{ value: "gemini-3.6-flash", label: "Gemini 3.6 Flash — Highest quality model" },
-		{ value: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite — Ultra fast, 500 RPD free quota" },
+		"gemini-3.8-flash",
+		"gemini-3.7-flash",
+		"gemini-3.6-flash",
+		"gemini-3.5-flash-lite",
 		"gemini-3.5-flash",
 		"gemini-3.1-flash-lite",
 		// Google Gemma 4 series

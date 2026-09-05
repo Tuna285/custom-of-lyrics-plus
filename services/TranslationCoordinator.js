@@ -100,10 +100,12 @@ window.LyricsPlus.TranslationCoordinator = {
 				if (prog?.type === "progress" && prog?.trackUri === self.state.uri) {
 					self.setState({ translationStatus: null });
 				}
-				const targetLang = CONFIG.visual["translate:target-language"] || "vi";
-				const langName = (typeof Prompts !== "undefined" && Prompts.getLanguage) ? Prompts.getLanguage(targetLang).name : "Translation";
-				const modeDisplayName = mode === "gemini_romaji" ? "Romaji, Romaja, Pinyin translation" : (mode === "gemini_furigana" ? "Furigana translation" : `${langName} translation`);
-				Spicetify.showNotification(getText("notifications.translationFailedWithReason", { mode: modeDisplayName, reason: error.message || "Unknown error" }), true, 4000);
+				if (!error?._notified) {
+					const targetLang = CONFIG.visual["translate:target-language"] || "vi";
+					const langName = (typeof Prompts !== "undefined" && Prompts.getLanguage) ? Prompts.getLanguage(targetLang).name : "Translation";
+					const modeDisplayName = mode === "gemini_romaji" ? "Romaji, Romaja, Pinyin translation" : (mode === "gemini_furigana" ? "Furigana translation" : `${langName} translation`);
+					Spicetify.showNotification(getText("notifications.translationFailedWithReason", { mode: modeDisplayName, reason: error.message || "Unknown error" }), true, 4000);
+				}
 				return null; // Return null on failure
 			}
 		};
@@ -644,6 +646,18 @@ window.LyricsPlus.TranslationCoordinator = {
 							trackUri,
 						},
                     });
+                    try {
+                        const targetLang = CONFIG.visual?.["translate:target-language"] || "vi";
+                        const Prompts = (window.LyricsPlus && window.LyricsPlus.Prompts) || window.Prompts;
+                        const langName = Prompts?.getLanguage ? Prompts.getLanguage(targetLang).name : "Translation";
+                        const modeDisplayName = wantSmartPhonetic ? (wantFurigana ? "Furigana" : "Phonetic") : `${langName} translation`;
+                        const failReason = err.message || "Unknown error";
+                        const failMsg = typeof getText === "function"
+                            ? getText("notifications.translationFailedWithReason", { mode: modeDisplayName, reason: failReason })
+                            : `${modeDisplayName} failed: ${failReason}`;
+                        Spicetify.showNotification(failMsg, true, 4000);
+                        err._notified = true;
+                    } catch (_) {}
                     setTimeout(() => {
 						self.setState((s) =>
 							s.translationStatus?.trackUri === trackUri ? { translationStatus: null } : {}

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **6-Language AI Translation Expansion** — Added full support for translating lyrics into 6 languages: Vietnamese (`vi`), English (`en`), Japanese (`ja`), Korean (`ko`), Chinese (`zh`), and Ukrainian (`uk`), with dedicated localized style guidelines and guardrails.
 - **Faithful Lyrical Translation Framework** — Established the Semantic & Imagery Fidelity Law across all prompt engines to preserve 100% of core imagery, metaphors, and narrative structure while adapting natural lyrical flow and vocal phrasing.
+- **Model Presets: Gemini 3.8 Flash & Gemini 3.7 Flash** — Added `gemini-3.8-flash` (state-of-the-art deep reasoning) and `gemini-3.7-flash` (high-performance hybrid reasoning) to settings model selector.
 - **Unified Multi-Provider Manual Search** — Upgraded the manual search dialog into a unified multi-provider search interface with interactive filter chips (`All`, `NetEase`, `LRCLIB`, `Musixmatch`), candidate track scoring, and status badges (`Synced`, `Unsynced`).
 - **Dynamic Reasoning Effort & Thinking Budget** — Added user-configurable AI reasoning effort (`auto`, `low`, `medium`, `high`, `off`) with robust unclosed thought tag stripping and format validation fallbacks.
 
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **API Error Notification Visibility** — Fixed suppressed error notifications on API failures. Spotify now surfaces clear toast notifications for Rate Limit Exceeded (429), Service Unavailable / High Demand (503), Request Timeouts, and Authentication errors instead of only logging them to the DevTools console.
 - **Romaji CJK Character Leakage Guard** — Added post-processing sanity check ensuring Japanese/Chinese characters never leak into Romanized output.
 - **Abort Reason & Timeout Calibration** — Improved AbortSignal error forwarding and timeout notifications during network retries and API key failover.
 - **Instrumental Candidate Penalty** — Enhanced NetEase track candidate selection to penalize instrumental tracks when searching for lyrical songs.
