@@ -42,6 +42,7 @@ Connects to Google Gemini API to translate lyrics naturally and accurately.
 Animated YouTube music-video backdrops for the lyrics page. Automatically skips ads, supports full-window Cinema Mode, with adjustable scale, dim, and blur — pairs nicely with transparent mode and any Spicetify theme.
 
 <img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/51520969-7a8f-44e5-bf70-3262e9d658c7" />
+<img width="1919" height="1080" alt="image" src="https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/assets/Shintakarajima-Sakanaction.png" />
 
 ### 3. Modern Interface & Optimized Experience
 
