@@ -546,6 +546,7 @@ const VideoManager = {
                     let highestScore = -Infinity;
                     for (const cand of filtered) {
                         const score = this._scoreVideo(cand, trackInfo.artist, trackInfo.title, targetSec);
+                        cand.score = score;
                         if (score > highestScore) {
                             highestScore = score;
                             bestVideo = cand;
