@@ -48,51 +48,83 @@ const ProviderNetease = (() => {
         if (!query || !query.trim()) return [];
         const cleanQ = query.trim();
 
+        // Check IndexedDB cache first to save Cloudflare Worker requests across Auto & Manual searches
+        if (typeof IDBCache !== "undefined") {
+            try {
+                const cached = await IDBCache.get(`netease:search:${cleanQ}`);
+                if (Array.isArray(cached) && cached.length) return cached;
+            } catch (_) {}
+        }
+
+        let songs = [];
+
         // 1. Primary: interface.music.163.com cloudsearch/pc
         try {
             const urlPrimary = `https://interface.music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
             const json = await fetchNetEase(urlPrimary);
             if (json && json.code === 200 && Array.isArray(json?.result?.songs)) {
-                return json.result.songs;
+                songs = json.result.songs;
             }
         } catch (_) {}
 
-        // 2. Secondary: interface.music.163.com search/get/web
-        try {
-            const urlSecondary = `https://interface.music.163.com/api/search/get/web?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
-            const json2 = await fetchNetEase(urlSecondary);
-            if (json2 && json2.code === 200 && Array.isArray(json2?.result?.songs)) {
-                return json2.result.songs;
-            }
-        } catch (_) {}
+        // 2. Secondary: interface.music.163.com search/get/web (only if primary failed/empty)
+        if (!songs.length) {
+            try {
+                const urlSecondary = `https://interface.music.163.com/api/search/get/web?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
+                const json2 = await fetchNetEase(urlSecondary);
+                if (json2 && json2.code === 200 && Array.isArray(json2?.result?.songs)) {
+                    songs = json2.result.songs;
+                }
+            } catch (_) {}
+        }
 
-        // 3. Tertiary: music.163.com cloudsearch/pc
-        try {
-            const urlTertiary = `https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
-            const json3 = await fetchNetEase(urlTertiary);
-            if (json3 && json3.code === 200 && Array.isArray(json3?.result?.songs)) {
-                return json3.result.songs;
-            }
-        } catch (_) {}
+        // 3. Tertiary: music.163.com cloudsearch/pc (only if previous endpoints failed)
+        if (!songs.length) {
+            try {
+                const urlTertiary = `https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
+                const json3 = await fetchNetEase(urlTertiary);
+                if (json3 && json3.code === 200 && Array.isArray(json3?.result?.songs)) {
+                    songs = json3.result.songs;
+                }
+            } catch (_) {}
+        }
 
-        return [];
+        if (songs.length && typeof IDBCache !== "undefined") {
+            IDBCache.set(`netease:search:${cleanQ}`, songs, 30 * 24 * 60 * 60 * 1000).catch(() => {});
+        }
+
+        return songs;
     }
 
     async function fetchLyricsById(id) {
         if (!id) return null;
+        if (typeof IDBCache !== "undefined") {
+            try {
+                const cached = await IDBCache.get(`netease:raw_lyric:${id}`);
+                if (cached) return cached;
+            } catch (_) {}
+        }
+
+        let result = null;
         try {
             const url = `https://interface.music.163.com/api/song/lyric?id=${id}&lv=-1&kv=-1&tv=-1`;
             const json = await fetchNetEase(url);
-            if (json && json.code === 200) return json;
+            if (json && json.code === 200) result = json;
         } catch (_) {}
 
-        try {
-            const fallbackUrl = `https://music.163.com/api/song/lyric?id=${id}&lv=-1&kv=-1&tv=-1`;
-            const json2 = await fetchNetEase(fallbackUrl);
-            if (json2 && json2.code === 200) return json2;
-        } catch (_) {}
+        if (!result) {
+            try {
+                const fallbackUrl = `https://music.163.com/api/song/lyric?id=${id}&lv=-1&kv=-1&tv=-1`;
+                const json2 = await fetchNetEase(fallbackUrl);
+                if (json2 && json2.code === 200) result = json2;
+            } catch (_) {}
+        }
 
-        return null;
+        if (result && typeof IDBCache !== "undefined") {
+            IDBCache.set(`netease:raw_lyric:${id}`, result, 30 * 24 * 60 * 60 * 1000).catch(() => {});
+        }
+
+        return result;
     }
 
     function levenshtein(a, b) {
@@ -120,9 +152,16 @@ const ProviderNetease = (() => {
 
         const artistStr = (candidate.ar || candidate.artists || []).map(a => a.name).join(" ");
         const titleSim  = levenshtein(candidate.name, info.title);
-        const artistSim = levenshtein(artistStr, info.artist);
+        let artistSim   = levenshtein(artistStr, info.artist);
         const deltaMs   = Math.abs((candidate.dt || candidate.duration || 0) - (info.duration || 0));
         const durScore  = Math.max(0, 1 - deltaMs / 10000);
+
+        // Cross-script tolerance: When title matches tightly and duration is near-exact,
+        // do not let script mismatch (e.g. Romaji "Atarayo" vs Kanji/Kana "あたらよ") zero out candidate score
+        if (titleSim >= 0.85 && deltaMs < 4000 && artistSim < 0.4) {
+            artistSim = 0.4;
+        }
+
         return Math.max(0, titleSim * 0.4 + artistSim * 0.3 + durScore * 0.3 - penalty);
     }
 
@@ -139,7 +178,7 @@ const ProviderNetease = (() => {
         const lines = lrcText.split("\n");
         const synced = [];
         const unsynced = [];
-        const metadataRegex = /^(作词|作曲|编曲|演唱|制作|人声|后期|混音|母带|作詞|作曲|編曲|歌詞|Lyricist|Composer|Arranger|Producer|Lyrics|Vocals|Mixer|Mastering|Lời|Nhạc|Phối khí|Trình bày|Sáng tác)\s*[:：]/i;
+        const metadataRegex = /^(作词|作曲|编曲|演唱|制作|人声|后期|混音|母带|作詞|作曲|編曲|歌詞|演奏|歌|唄|唱|アーティスト|歌手|吉他|贝斯|鼓|弦乐|和音|录音|混音师|母带工程师|Lyricist|Composer|Arranger|Producer|Lyrics|Vocals|Mixer|Mastering|Guitar|Bass|Drums|Strings|Recording|Artist|Singer|Lời|Nhạc|Phối khí|Trình bày|Sáng tác|Hòa âm)\s*[:：]|^(Written by|Composed by|Arranged by|Produced by|Mixed by|Mastered by|Recorded by|Sound Produced by|Directed by|Performed by|Vocals by|Music by|Lyrics by)\b|(テーマソング|主題歌|オープニングテーマ|エンディングテーマ|挿入歌|イメージソング|テーマ曲|\bTheme Song\b|\bOpening Theme\b|\bEnding Theme\b|\bInsert Song\b)|^(LRC|Lrc|lrc|Offset|offset|by|By|提供|字幕|翻译|翻譯|校对|潤色)\s*[:：]/i;
 
         for (const raw of lines) {
             const m = raw.match(/^\[(\d{1,2}):(\d{2})[:\.](\d{2,3})\](.*)/);
@@ -166,6 +205,17 @@ const ProviderNetease = (() => {
         const err = (msg) => ({ error: msg, uri: info.uri });
 
         try {
+            // Check IndexedDB cache first to save Cloudflare Worker requests on repeat plays
+            if (typeof IDBCache !== "undefined" && info.uri) {
+                try {
+                    const cached = await IDBCache.get(`netease:lyrics:${info.uri}`);
+                    if (cached && (cached.synced || cached.unsynced)) {
+                        DebugLogger.log(`[NetEase] IndexedDB cache hit for "${info.title}"`);
+                        return cached;
+                    }
+                } catch (_) {}
+            }
+
             const U = typeof Utils !== "undefined" ? Utils : (window.LyricsPlus?.Utils || {});
             // Clean title and extract primary artist to optimize NetEase's search engine
             const cleanTitle = U.removeSongFeat ? U.removeSongFeat(U.removeExtraInfo(info.title)) : info.title;
@@ -210,7 +260,9 @@ const ProviderNetease = (() => {
             );
 
             // Iterate through top candidates to find one with actual lyrics
-            for (const item of scored.slice(0, 5)) {
+            let bestUnsyncedResult = null;
+
+            for (const item of scored.slice(0, 3)) {
                 let threshold = SCORE_THRESHOLD;
                 const cand = item.c;
                 const deltaMs = Math.abs((cand.dt || cand.duration || 0) - (info.duration || 0));
@@ -221,6 +273,12 @@ const ProviderNetease = (() => {
                 }
 
                 if (item.score < threshold) continue;
+
+                // Optimization: Don't waste Cloudflare proxy requests fetching lyrics for candidates with absurd duration mismatch (> 45s)
+                if (info.duration > 0 && deltaMs > 45000) continue;
+
+                // If an unsynced match already exists and this candidate is significantly misaligned (> 15s), skip to save requests
+                if (bestUnsyncedResult && deltaMs > 15000) continue;
 
                 const songId  = cand.id;
                 const lyricData = await fetchLyricsById(songId);
@@ -250,7 +308,7 @@ const ProviderNetease = (() => {
                     }
                 }
 
-                return {
+                const result = {
                     uri:               info.uri,
                     provider:          "netease",
                     copyright:         "网易云音乐 (NetEase Cloud Music)",
@@ -261,6 +319,26 @@ const ProviderNetease = (() => {
                     _neteaseId:        songId,
                     _neteaseScore:     item.score,
                 };
+
+                // Priority: Synced lyrics win immediately
+                if (synced) {
+                    if (typeof IDBCache !== "undefined" && info.uri) {
+                        IDBCache.set(`netease:lyrics:${info.uri}`, result, 30 * 24 * 60 * 60 * 1000).catch(() => {});
+                    }
+                    return result;
+                }
+
+                // Fallback: Retain highest-scored unsynced result if no synced candidate is found
+                if (!bestUnsyncedResult) {
+                    bestUnsyncedResult = result;
+                }
+            }
+
+            if (bestUnsyncedResult) {
+                if (typeof IDBCache !== "undefined" && info.uri) {
+                    IDBCache.set(`netease:lyrics:${info.uri}`, bestUnsyncedResult, 30 * 24 * 60 * 60 * 1000).catch(() => {});
+                }
+                return bestUnsyncedResult;
             }
 
             return err("NetEase: no valid lyrics found across top candidates");

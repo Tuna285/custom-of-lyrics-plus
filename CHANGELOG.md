@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2026-09-09
+
+### Added
+
+- **Track Audio Context**: Uses real-time track metadata (BPM, key, release year, album) from Spotify Player to provide accurate musical context for AI translations.
+- **Reload Options Menu**: Replaced the single reset cache button with a dropdown menu to refresh translation, phonetics, or both independently.
+
+### Changed
+
+- **Lyrical Style & Tone**: AI translations now adapt to the original artist's genre and energy (Rock, Indie, Pop) rather than defaulting to generic ballad phrasing.
+- **Repetition & Timing**: Enforced consistent repetition for repeated lyric lines to match vocal delivery and real-time playback across all supported languages.
+- **YouTube Background Ad-Bypass**: Improved ad-handling to skip non-skippable YouTube video ads without stuttering or desyncing background playback.
+- **Pre-translation Throttling**: Added a delay guard to avoid redundant API requests when quickly skipping through songs.
+
+### Fixed
+
+- **Lyrics Metadata Filtering**: Stripped song credits, theme labels (OP/ED), and arranger tags from NetEase and LRC lyrics before rendering.
+- **Pronoun Consistency**: Fixed character pronouns shifting between verses and choruses in Auto mode.
+
 ## [1.9.0] - 2026-09-05
 
 ### Added

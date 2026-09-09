@@ -47,6 +47,8 @@ const LyricsFetcher = {
         if (!meta) {
             return null;
         }
+        const year = meta.year || (meta.release_date ? meta.release_date.slice(0, 4) : null);
+        const isExplicit = meta.is_explicit === "true" || meta.is_explicit === true;
         return {
             duration: Number(meta.duration),
             album: meta.album_title,
@@ -54,6 +56,8 @@ const LyricsFetcher = {
             title: meta.title,
             uri: track.uri,
             image: meta.image_url,
+            year: year || null,
+            isExplicit: !!isExplicit,
         };
     },
 

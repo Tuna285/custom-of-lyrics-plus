@@ -56,6 +56,48 @@ const ConfigUtils = {
     }
 };
 
+const TrackSettings = {
+    _cache: null,
+    _STORAGE_KEY: "lyrics-plus:track-pronouns",
+
+    _getAll() {
+        if (this._cache) return this._cache;
+        try {
+            const raw = localStorage.getItem(this._STORAGE_KEY);
+            this._cache = raw ? JSON.parse(raw) : {};
+        } catch (_) {
+            this._cache = {};
+        }
+        return this._cache;
+    },
+
+    getPronoun(uri) {
+        if (!uri) return "default";
+        const all = this._getAll();
+        return all[uri] || "default";
+    },
+
+    setPronoun(uri, pronounKey) {
+        if (!uri) return;
+        const all = this._getAll();
+        if (!pronounKey || pronounKey === "default") {
+            delete all[uri];
+        } else {
+            all[uri] = pronounKey;
+        }
+        try {
+            localStorage.setItem(this._STORAGE_KEY, JSON.stringify(all));
+        } catch (e) {
+            console.warn("[Lyrics+] Failed to save track pronoun:", e);
+        }
+    }
+};
+
+window.TrackSettings = TrackSettings;
+if (window.LyricsPlus) {
+    window.LyricsPlus.TrackSettings = TrackSettings;
+}
+
 // Auto-initialize default CORS proxy template if empty or legacy corsproxy.io
 try {
     const curProxy = localStorage.getItem("spicetify:corsProxyTemplate");
@@ -132,7 +174,7 @@ const CONFIG = {
         "translate:display-mode": ConfigUtils.getPersisted("lyrics-plus:visual:translate:display-mode") || "replace",
         "translate:detect-language-override": ConfigUtils.getPersisted("lyrics-plus:visual:translate:detect-language-override") || "off",
         "translate:translation-style": ConfigUtils.getPersisted("lyrics-plus:visual:translate:translation-style") || "smart_adaptive",
-        "translate:pronoun-mode": ConfigUtils.getPersisted("lyrics-plus:visual:translate:pronoun-mode") || "default",
+        "translate:pronoun-mode": "default",
         "translation-mode:japanese": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode:japanese") || "none",
         "translation-mode:korean": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode:korean") || "none",
         "translation-mode:chinese": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode:chinese") || "none",
@@ -234,11 +276,21 @@ try {
     CONFIG.providersOrder = JSON.parse(CONFIG.providersOrder);
     if (!Array.isArray(CONFIG.providersOrder)) throw "";
 
-    // Migration for existing users: Ensure netease is at 3rd position and turned ON
+    // Migration for existing users: Ensure netease is included and turned ON
     if (!CONFIG.providersOrder.includes("netease")) {
-        CONFIG.providersOrder.splice(2, 0, "netease");
+        CONFIG.providersOrder.push("netease");
         CONFIG.providers.netease.on = true;
         localStorage.setItem("lyrics-plus:provider:netease:on", "true");
+        localStorage.setItem("lyrics-plus:services-order", JSON.stringify(CONFIG.providersOrder));
+    }
+
+    // Cloudflare optimization migration: Ensure lrclib is ordered ahead of netease to save proxy requests
+    const idxNetease = CONFIG.providersOrder.indexOf("netease");
+    const idxLrclib = CONFIG.providersOrder.indexOf("lrclib");
+    if (idxNetease !== -1 && idxLrclib !== -1 && idxNetease < idxLrclib) {
+        CONFIG.providersOrder.splice(idxNetease, 1);
+        const newLrclibIdx = CONFIG.providersOrder.indexOf("lrclib");
+        CONFIG.providersOrder.splice(newLrclibIdx + 1, 0, "netease");
         localStorage.setItem("lyrics-plus:services-order", JSON.stringify(CONFIG.providersOrder));
     }
 
@@ -249,8 +301,8 @@ try {
         localStorage.setItem("lyrics-plus:services-order", JSON.stringify(CONFIG.providersOrder));
     }
 } catch {
-    // Default order for new users
-    CONFIG.providersOrder = ["spotify", "musixmatch", "netease", "lrclib", "local"];
+    // Default order for new users (lrclib ahead of netease to minimize Cloudflare proxy usage)
+    CONFIG.providersOrder = ["spotify", "musixmatch", "lrclib", "netease", "local"];
     
     // Ensure all providers are turned ON by default for new users
     Object.keys(CONFIG.providers).forEach(p => {
@@ -279,6 +331,7 @@ const emptyState = {
     currentLyrics: null,
     visualizerGranularity: "medium", // low, medium, high
     preTranslated: false,
+    preTranslateChip: null,
 };
 
 // Expose to global scope for other modules

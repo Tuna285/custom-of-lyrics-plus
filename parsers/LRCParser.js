@@ -18,9 +18,9 @@ const LRCParser = {
         // Handle newlines for both Windows (\r\n) and Unix (\n), remove empty lines
         const lines = rawLines.replace(/\r\n/g, "\n").split("\n").map(line => line.trim()).filter(line => {
             if (!line) return false;
-            // Remove metadata lines (credits/composer etc.)
+            // Remove metadata lines (credits/composer/theme song/anime OP/ED etc.)
             const textOnly = line.replace(/\[[^\]]+\]/g, "").trim();
-            const isMetadata = /^(作词|作曲|编曲|演唱|制作|人声|后期|混音|母带|作詞|作曲|編曲|歌詞|Lyricist|Composer|Arranger|Producer|Lyrics|Vocals|Mixer|Mastering|Lời|Nhạc|Phối khí|Trình bày|Sáng tác)\s*[:：]/i.test(textOnly);
+            const isMetadata = /^(作词|作曲|编曲|演唱|制作|人声|后期|混音|母带|作詞|作曲|編曲|歌詞|演奏|歌|唄|唱|アーティスト|歌手|吉他|贝斯|鼓|弦乐|和音|录音|混音师|母带工程师|Lyricist|Composer|Arranger|Producer|Lyrics|Vocals|Mixer|Mastering|Guitar|Bass|Drums|Strings|Recording|Artist|Singer|Lời|Nhạc|Phối khí|Trình bày|Sáng tác|Hòa âm)\s*[:：]|^(Written by|Composed by|Arranged by|Produced by|Mixed by|Mastered by|Recorded by|Sound Produced by|Directed by|Performed by|Vocals by|Music by|Lyrics by)\b|(テーマソング|主題歌|オープニングテーマ|エンディングテーマ|挿入歌|イメージソング|テーマ曲|\bTheme Song\b|\bOpening Theme\b|\bEnding Theme\b|\bInsert Song\b)|^(LRC|Lrc|lrc|Offset|offset|by|By|提供|字幕|翻译|翻譯|校对|潤色)\s*[:：]/i.test(textOnly);
             return !isMetadata;
         });
 

@@ -290,6 +290,22 @@ const getStaticOptions = () => {
 	};
 };
 
+const getDisplayModeOptionLabel = (mode, friendlyLanguage) => {
+	if (!mode || mode === "none") return "";
+	const STATIC_OPTIONS = getStaticOptions();
+	if (STATIC_OPTIONS.geminiModes[mode]) {
+		return STATIC_OPTIONS.geminiModes[mode];
+	}
+	if (friendlyLanguage && STATIC_OPTIONS.languageModes[friendlyLanguage]?.[mode]) {
+		return `${STATIC_OPTIONS.languageModes[friendlyLanguage][mode]} (Local)`;
+	}
+	return mode.charAt(0).toUpperCase() + mode.slice(1);
+};
+
+if (window.LyricsPlus) {
+	window.LyricsPlus.getDisplayModeOptionLabel = getDisplayModeOptionLabel;
+}
+
 const getTargetLanguageOptions = () => {
 	const Prompts = (window.LyricsPlus && window.LyricsPlus.Prompts) || window.Prompts || {};
 	const langs = Prompts.languages || {};
@@ -425,7 +441,15 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 			}
 
 			CONFIG.visual[name] = value;
-			localStorage.setItem(`${APP_NAME}:visual:${name}`, value);
+			if (name === "translate:pronoun-mode") {
+				const currentUri = window.lyricContainer?.currentTrackUri || Spicetify.Player?.data?.item?.uri;
+				const TrackSettings = window.LyricsPlus?.TrackSettings || window.TrackSettings;
+				if (currentUri && TrackSettings) {
+					TrackSettings.setPronoun(currentUri, value);
+				}
+			} else {
+				localStorage.setItem(`${APP_NAME}:visual:${name}`, value);
+			}
 
 			// Force re-detection of language when language override changes
 			if (name === "translate:detect-language-override" && window.lyricContainer) {
@@ -517,7 +541,7 @@ const AdjustmentsMenu = react.memo(({ mode }) => {
 					try { localStorage.setItem(`lyrics-delay:${uri}`, String(value)); } catch { }
 				}
 			}
-			if (name.startsWith("translation-mode:") && window.lyricContainer) {
+			if ((name.startsWith("translation-mode:") || name.startsWith("translation-mode-2:")) && window.lyricContainer) {
 				window.lyricContainer.lastProcessedUri = null;
 				window.lyricContainer.lastProcessedMode = null;
 				window.lyricContainer.forceUpdate();

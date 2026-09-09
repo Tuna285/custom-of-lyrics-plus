@@ -23,20 +23,47 @@ const ProviderLRCLIB = (() => {
 			}
 		} catch (_) { }
 
-		// Fallback: search endpoint for fuzzy/non-exact duration & album match
+		// Fallback 1: search endpoint with title + primary artist
 		try {
 			const searchURL = `https://lrclib.net/api/search?q=${encodeURIComponent(`${cleanTitle} ${primaryArtist}`)}`;
 			const searchRes = await fetch(searchURL);
 			if (searchRes.status === 200) {
 				const list = await searchRes.json();
 				if (Array.isArray(list) && list.length > 0) {
-					// Pick the candidate closest in duration
-					const best = list
-						.filter(item => item.syncedLyrics || item.plainLyrics)
-						.sort((a, b) => Math.abs((a.duration || 0) - durr) - Math.abs((b.duration || 0) - durr))[0];
+					const valid = list.filter(item => (item.syncedLyrics || item.plainLyrics) && Math.abs((item.duration || 0) - durr) < 15);
+					if (valid.length > 0) {
+						// Prioritize synced lyrics within 5s duration delta
+						const syncedBest = valid
+							.filter(item => item.syncedLyrics && Math.abs((item.duration || 0) - durr) < 5)
+							.sort((a, b) => Math.abs((a.duration || 0) - durr) - Math.abs((b.duration || 0) - durr))[0];
+						if (syncedBest) {
+							return syncedBest;
+						}
+						valid.sort((a, b) => Math.abs((a.duration || 0) - durr) - Math.abs((b.duration || 0) - durr));
+						return valid[0];
+					}
+				}
+			}
+		} catch (_) { }
 
-					if (best && Math.abs((best.duration || 0) - durr) < 15) {
-						return best;
+		// Fallback 2: search by track_name alone if artist query failed (e.g. Romanized vs CJK script mismatch)
+		try {
+			const trackSearchURL = `https://lrclib.net/api/search?track_name=${encodeURIComponent(cleanTitle)}`;
+			const trackSearchRes = await fetch(trackSearchURL);
+			if (trackSearchRes.status === 200) {
+				const list = await trackSearchRes.json();
+				if (Array.isArray(list) && list.length > 0) {
+					// Require tight duration match (< 4s) when searching by track_name alone
+					const valid = list.filter(item => (item.syncedLyrics || item.plainLyrics) && Math.abs((item.duration || 0) - durr) < 4);
+					if (valid.length > 0) {
+						const syncedBest = valid
+							.filter(item => item.syncedLyrics)
+							.sort((a, b) => Math.abs((a.duration || 0) - durr) - Math.abs((b.duration || 0) - durr))[0];
+						if (syncedBest) {
+							return syncedBest;
+						}
+						valid.sort((a, b) => Math.abs((a.duration || 0) - durr) - Math.abs((b.duration || 0) - durr));
+						return valid[0];
 					}
 				}
 			}

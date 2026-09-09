@@ -44,8 +44,14 @@ const CacheButton = () => {
 		setIsLoading(true);
 		try {
 			await CacheManager.clear();
+			if (typeof DBManager !== "undefined" && typeof DBManager.clear === "function") {
+				await DBManager.clear();
+			}
 			localStorage.removeItem("lyrics-plus:local-lyrics");
 			localStorage.removeItem("lyrics-plus:cached-uris"); // Clear count proxy
+			if (typeof CACHE !== "undefined") {
+				for (const k in CACHE) delete CACHE[k];
+			}
 			setCount(0);
 			Spicetify.showNotification(getText("notifications.cacheClearedShort"), false, 2000);
 		} catch (e) {
@@ -796,7 +802,7 @@ const ConfigHelper = () => {
 						}
 					},
 						react.createElement("div", null,
-							react.createElement("div", { style: { fontWeight: "bold", fontSize: "14px", color: "var(--spice-text)" } }, `Lyric Plus Translate v${window.UpdateService?.CURRENT_VERSION || "1.9.0"}`),
+							react.createElement("div", { style: { fontWeight: "bold", fontSize: "14px", color: "var(--spice-text)" } }, `Lyric Plus Translate v${window.UpdateService?.CURRENT_VERSION || "1.9.1"}`),
 							react.createElement("div", { style: { fontSize: "12px", color: "var(--spice-subtext)", marginTop: "2px" } }, getText("settings.updateAppSubtitle"))
 						),
 						react.createElement("button", {

@@ -1,10 +1,9 @@
 // components/VideoManager.js
-// Simplified Video Background using ivLyrics API (Client-Only, No Server Required)
+// Video Background Search via Direct YouTube InnerTube TVHTML5 API (Client-Only, No Third-Party Server)
 
 const VideoManager = {
     _lastFetchUri: null,
     _currentVideo: null,
-    _userHash: null,
     _retryAbortController: null,
     _lastSearchUri: null,
     _lastSearchQuery: null,
@@ -14,29 +13,15 @@ const VideoManager = {
     MAX_RETRIES: 3,
     RETRY_DELAY_MS: 5000, // 5 seconds between retries
     TOTAL_TIMEOUT_MS: 31000, // 31 seconds total limit for video search
-    
-    /**
-     * Generate consistent user hash for ivLyrics API
-     */
-    _generateUserHash() {
-        if (this._userHash) return this._userHash;
-        
-        // Use a stable identifier based on localStorage or generate new one
-        let stored = localStorage.getItem('ivlyrics-user-hash');
-        if (!stored) {
-            stored = Math.random().toString(36).substring(2, 18);
-            localStorage.setItem('ivlyrics-user-hash', stored);
-        }
-        this._userHash = stored;
-        return this._userHash;
-    },
 
     /**
      * Initialize the Video Manager
      */
     init() {
-        this._generateUserHash();
-        console.log("[VideoManager] Initialized (ivLyrics Client-Only Mode with Retry)");
+        try {
+            localStorage.removeItem('ivlyrics-user-hash');
+        } catch (_) {}
+        console.log("[VideoManager] Initialized (Client-Only Direct YouTube Mode with Retry)");
     },
 
 
@@ -62,6 +47,16 @@ const VideoManager = {
         // Take primary artist to simplify query (works better on YouTube search engines)
         const cleanArtist = artist.split(/,|\s+feat\.?\s+|&/gi)[0].trim();
         return `${cleanTitle.trim()} - ${cleanArtist}`;
+    },
+
+    /**
+     * Generate normalized metadata cache key for cross-release deduplication (Single vs Album vs Deluxe)
+     * @private
+     */
+    _getMetaKey(artist, title) {
+        if (!artist && !title) return null;
+        const normalized = this._cleanQuery(artist || "", title || "").toLowerCase().trim();
+        return normalized ? `video-meta:${normalized}` : null;
     },
 
     /**
@@ -377,7 +372,12 @@ const VideoManager = {
         }
 
         // Check for cached automatic search result SECOND
-        const cachedAuto = await this.getAutoVideo(trackInfo.uri);
+        const cachedAuto = await this.getAutoVideo(trackInfo.uri, trackInfo);
+        if (cachedAuto?.notFound) {
+            console.log(`[VideoManager] Cached "no video" hit for: ${trackInfo.title}`);
+            if (!isSilent) this._currentVideo = null;
+            return null;
+        }
         if (cachedAuto && !blacklist.includes(cachedAuto.videoId)) {
             const savedOffset = (await this.getOffset(trackInfo.uri)) || 0;
             const videoData = {
@@ -420,8 +420,8 @@ const VideoManager = {
                 const videoTitle = bestVideo.title || `${trackInfo.artist} - ${trackInfo.title}`;
                 let syncOffset = 0; // Default offset
                 
-                // Cache this successful automatic search in IndexedDB
-                await this.saveAutoVideo(trackInfo.uri, videoId, videoTitle);
+                // Cache this successful automatic search in IndexedDB (dual-key: URI + metadata)
+                await this.saveAutoVideo(trackInfo.uri, videoId, videoTitle, trackInfo);
 
                 // Check for user-saved offset override
                 const savedOffset = await this.getOffset(trackInfo.uri);
@@ -448,6 +448,7 @@ const VideoManager = {
                 return videoData;
             } else {
                 console.log("[VideoManager] No video found on any channels");
+                await this.saveAutoVideoNotFound(trackInfo.uri, trackInfo);
             }
         } catch (e) {
             console.error(`[VideoManager] Video search failed:`, e.message);
@@ -488,8 +489,9 @@ const VideoManager = {
     /**
      * Reset video state and optionally clear IndexedDB keys for a specific track
      * @param {string} [trackUri] - Spotify track URI to completely reset
+     * @param {Object} [trackInfo] - Optional track metadata to clear secondary cache keys
      */
-    async reset(trackUri = null) {
+    async reset(trackUri = null, trackInfo = null) {
         // Abort any pending retries
         if (this._retryAbortController) {
             this._retryAbortController.abort();
@@ -506,6 +508,10 @@ const VideoManager = {
                 await IDBCache.delete(offsetKey);
                 await IDBCache.delete(autoKey);
                 await IDBCache.delete(blacklistKey);
+                if (trackInfo?.artist || trackInfo?.title) {
+                    const metaKey = this._getMetaKey(trackInfo.artist, trackInfo.title);
+                    if (metaKey) await IDBCache.delete(metaKey);
+                }
                 console.log(`[VideoManager] Cleared DB cache, manual configs, and blacklist for: ${trackUri.split(':').pop()}`);
             } catch (e) {
                 console.warn("[VideoManager] Failed to clear DB for track:", e);
@@ -526,16 +532,25 @@ const VideoManager = {
      * @param {string} trackUri - Spotify track URI
      * @param {string} videoId - YouTube Video ID
      * @param {string} title - YouTube Video Title
+     * @param {Object} [trackInfo] - Optional track metadata for cross-release deduplication
      * @returns {Promise<boolean>}
      */
-    async saveAutoVideo(trackUri, videoId, title) {
+    async saveAutoVideo(trackUri, videoId, title, trackInfo = null) {
         if (!trackUri || !videoId) return false;
         
         const key = `video-auto:${trackUri}`;
         const oneYear = 365 * 24 * 60 * 60 * 1000;
         
         try {
-            await IDBCache.set(key, { videoId, title, savedAt: Date.now() }, oneYear);
+            const payload = { videoId, title, savedAt: Date.now() };
+            await IDBCache.set(key, payload, oneYear);
+
+            if (trackInfo?.artist || trackInfo?.title) {
+                const metaKey = this._getMetaKey(trackInfo.artist, trackInfo.title);
+                if (metaKey) {
+                    await IDBCache.set(metaKey, payload, oneYear);
+                }
+            }
             console.log(`[VideoManager] Cached auto video ${videoId} for: ${trackUri.split(':').pop()}`);
             return true;
         } catch (e) {
@@ -547,22 +562,74 @@ const VideoManager = {
     /**
      * Get auto-discovered video details from IndexedDB
      * @param {string} trackUri - Spotify track URI
+     * @param {Object} [trackInfo] - Optional track metadata for fallback matching
      * @returns {Promise<Object|null>} - Video details { videoId, title } or null
      */
-    async getAutoVideo(trackUri) {
-        if (!trackUri) return null;
+    async getAutoVideo(trackUri, trackInfo = null) {
+        if (!trackUri && !trackInfo) return null;
         
-        const key = `video-auto:${trackUri}`;
+        const key = trackUri ? `video-auto:${trackUri}` : null;
         
         try {
-            const data = await IDBCache.get(key);
-            if (data?.videoId) {
-                return data;
+            if (key) {
+                const data = await IDBCache.get(key);
+                if (data?.notFound) {
+                    return { notFound: true };
+                }
+                if (data?.videoId) {
+                    return data;
+                }
+            }
+
+            // Fallback to metadata-based cache (Single vs Album vs Deluxe matching)
+            if (trackInfo?.artist || trackInfo?.title) {
+                const metaKey = this._getMetaKey(trackInfo.artist, trackInfo.title);
+                if (metaKey) {
+                    const metaData = await IDBCache.get(metaKey);
+                    if (metaData?.notFound) {
+                        return { notFound: true };
+                    }
+                    if (metaData?.videoId) {
+                        console.log(`[VideoManager] Cache hit via metadata key (${metaKey}) for: ${trackInfo.title}`);
+                        if (key) {
+                            IDBCache.set(key, metaData, 365 * 24 * 60 * 60 * 1000).catch(() => {});
+                        }
+                        return metaData;
+                    }
+                }
             }
         } catch (e) {
             console.warn('[VideoManager] Failed to get auto video from cache:', e);
         }
         return null;
+    },
+
+    /**
+     * Cache negative search result ("no video found") for 3 days to avoid repeat Cloudflare Worker requests
+     * @param {string} trackUri - Spotify track URI
+     * @param {Object} [trackInfo] - Optional track metadata
+     * @returns {Promise<boolean>}
+     */
+    async saveAutoVideoNotFound(trackUri, trackInfo = null) {
+        if (!trackUri && !trackInfo) return false;
+        const key = trackUri ? `video-auto:${trackUri}` : null;
+        const threeDays = 3 * 24 * 60 * 60 * 1000;
+        try {
+            const payload = { notFound: true, savedAt: Date.now() };
+            if (key) {
+                await IDBCache.set(key, payload, threeDays);
+            }
+            if (trackInfo?.artist || trackInfo?.title) {
+                const metaKey = this._getMetaKey(trackInfo.artist, trackInfo.title);
+                if (metaKey) {
+                    await IDBCache.set(metaKey, payload, threeDays);
+                }
+            }
+            console.log(`[VideoManager] Cached "no video found" for: ${trackUri ? trackUri.split(':').pop() : 'track'}`);
+            return true;
+        } catch (e) {
+            return false;
+        }
     },
 
     /**

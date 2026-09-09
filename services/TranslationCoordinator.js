@@ -126,6 +126,12 @@ window.LyricsPlus.TranslationCoordinator = {
 			self._dmResults[currentUri] = {};
 		}
 
+		// Ensure pronoun mode matches current track's setting (per-track memory with Auto default)
+		const TrackSettings = window.LyricsPlus?.TrackSettings || window.TrackSettings;
+		if (TrackSettings && currentUri) {
+			CONFIG.visual["translate:pronoun-mode"] = TrackSettings.getPronoun(currentUri);
+		}
+
 		// Settings change detection logic adjusted to ignore initial undefined state
 		const currentTargetLang = CONFIG.visual["translate:target-language"] || "vi";
 		const currentStyleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
@@ -141,10 +147,9 @@ window.LyricsPlus.TranslationCoordinator = {
 		const settingsChanged = (self._lastTargetLang !== currentTargetLang || self._lastStyleKey !== currentStyleKey || self._lastPronounKey !== currentPronounKey);
 
 		if (settingsChanged && self._dmResults[currentUri]) {
-			// Clear cached results for this URI to force re-fetch with new settings
-			// Old translation continues to display via currentLyrics until new arrives
-			self._dmResults[currentUri] = {};
-			console.log(`[Lyrics+] Settings changed (${self._lastTargetLang}/${self._lastStyleKey}/${self._lastPronounKey} → ${currentTargetLang}/${currentStyleKey}/${currentPronounKey}), re-fetching...`);
+			// Clear only target language translation (gemini_vi), KEEP phonetic (furigana/romaji) intact
+			delete self._dmResults[currentUri]["gemini_vi"];
+			console.log(`[Lyrics+] Translation settings changed (${self._lastTargetLang}/${self._lastStyleKey}/${self._lastPronounKey} → ${currentTargetLang}/${currentStyleKey}/${currentPronounKey}), re-fetching translation...`);
 		}
 		
 		// Update tracking for next call
@@ -158,22 +163,33 @@ window.LyricsPlus.TranslationCoordinator = {
 			try {
 				const styleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
 				const pronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
-				const targetLang = CONFIG.visual["translate:target-language"] || "vi";
-				// Backward compatibility: keep exact legacy format for Vietnamese ('vi') and phonetic tasks
-				const cacheKey2 = (targetLang === "vi" || mode !== "gemini_vi")
-					? `${currentUri}:${mode}:${styleKey}:${pronounKey}`
-					: `${currentUri}:${targetLang}:${mode}:${styleKey}:${pronounKey}`;
+				const targetLang = currentTargetLang || CONFIG.visual["translate:target-language"] || "vi";
+				const isPhonetic = (mode === "gemini_romaji" || mode === "gemini_furigana");
+				// Phonetic tasks are independent of translation style and pronoun
+				const cacheKey2 = isPhonetic
+					? `${currentUri}:${mode}`
+					: (targetLang === "vi"
+						? `${currentUri}:${mode}:${styleKey}:${pronounKey}`
+						: `${currentUri}:${targetLang}:${mode}:${styleKey}:${pronounKey}`);
 
 				// Check cache first (async - L1 then L2)
-				const memCached = await CacheManager.get(cacheKey2);
+				let memCached = await CacheManager.get(cacheKey2);
+				if (!memCached && isPhonetic) {
+					// Fallback to legacy phonetic key (which included style:pronoun)
+					const legacyKey = `${currentUri}:${mode}:${styleKey}:${pronounKey}`;
+					memCached = await CacheManager.get(legacyKey);
+					if (memCached) {
+						CacheManager.set(cacheKey2, memCached);
+					}
+				}
 				if (memCached) return memCached;
 
 				// Check persistent localStorage (legacy fallback)
 				const persistKey = `${APP_NAME}:gemini-cache`;
 				const persistedCache = JSON.parse(localStorage.getItem(persistKey)) || {};
-				const persisted = persistedCache[cacheKey2];
+				const persisted = persistedCache[cacheKey2] || (isPhonetic ? persistedCache[`${currentUri}:${mode}:${styleKey}:${pronounKey}`] : null);
 
-				if (persisted?.data && persisted.styleKey === styleKey && persisted.pronounKey === pronounKey) {
+				if (persisted?.data && (isPhonetic || (persisted.styleKey === styleKey && persisted.pronounKey === pronounKey))) {
 					CacheManager.set(cacheKey2, persisted.data); // Load into session cache
 					return persisted.data;
 				}
@@ -241,9 +257,12 @@ window.LyricsPlus.TranslationCoordinator = {
 				const styleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
 				const pronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
 				const targetLang = CONFIG.visual["translate:target-language"] || "vi";
-				const cacheKey2 = (targetLang === "vi" || mode !== "gemini_vi")
-					? `${currentUri}:${mode}:${styleKey}:${pronounKey}`
-					: `${currentUri}:${targetLang}:${mode}:${styleKey}:${pronounKey}`;
+				const isPhonetic = (mode === "gemini_romaji" || mode === "gemini_furigana");
+				const cacheKey2 = isPhonetic
+					? `${currentUri}:${mode}`
+					: (targetLang === "vi"
+						? `${currentUri}:${mode}:${styleKey}:${pronounKey}`
+						: `${currentUri}:${targetLang}:${mode}:${styleKey}:${pronounKey}`);
 				return !!(self._inflightGemini && self._inflightGemini.has(cacheKey2));
 			} else {
 				const cacheKey = `${currentUri}:${mode}`;
@@ -436,13 +455,23 @@ window.LyricsPlus.TranslationCoordinator = {
 		const pronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
 		const targetLang = CONFIG.visual["translate:target-language"] || "vi";
 		const cacheKey = mode;
-		// Backward compatibility: keep exact legacy format for Vietnamese ('vi') and phonetic tasks
-		const cacheKey2 = (targetLang === "vi" || wantSmartPhonetic)
-			? `${lyricsState.uri}:${cacheKey}:${styleKey}:${pronounKey}`
-			: `${lyricsState.uri}:${targetLang}:${cacheKey}:${styleKey}:${pronounKey}`;
+		// Phonetic tasks are independent of translation style and pronoun
+		const cacheKey2 = wantSmartPhonetic
+			? `${lyricsState.uri}:${cacheKey}`
+			: (targetLang === "vi"
+				? `${lyricsState.uri}:${cacheKey}:${styleKey}:${pronounKey}`
+				: `${lyricsState.uri}:${targetLang}:${cacheKey}:${styleKey}:${pronounKey}`);
 
 		// Await Cache (L1 -> L2 logic inside CacheManager)
-		const cached = await CacheManager.get(cacheKey2);
+		let cached = await CacheManager.get(cacheKey2);
+		if (!cached && wantSmartPhonetic) {
+			// Fallback to legacy phonetic key (which included style:pronoun)
+			const legacyKey = `${lyricsState.uri}:${cacheKey}:${styleKey}:${pronounKey}`;
+			cached = await CacheManager.get(legacyKey);
+			if (cached && Array.isArray(cached) && cached.length === lyrics.length) {
+				CacheManager.set(cacheKey2, cached);
+			}
+		}
 		if (cached && Array.isArray(cached)) {
 			if (cached.length !== lyrics.length) {
 				console.warn(`[Lyrics+] Cache length mismatch! Cached: ${cached.length}, Current lyrics: ${lyrics.length}. Invalidating stale cache.`);
@@ -525,6 +554,25 @@ window.LyricsPlus.TranslationCoordinator = {
                     });
                 };
 
+				// Wait for tempo/tonality detection if pending for this track
+				if (trackUri === self.state.uri && self._tempoPromise) {
+					try {
+						await Promise.race([self._tempoPromise, new Promise((r) => setTimeout(r, 400))]);
+					} catch (_) {}
+				}
+
+				const isCurrentTrack = trackUri === self.state.uri;
+				const trackInfo = isCurrentTrack ? (self.currentTrackInfo || {}) : {};
+				const trackMetadata = {
+					title: lyricsState.title || (isCurrentTrack ? self.state.title : null) || trackInfo.title,
+					artist: lyricsState.artist || (isCurrentTrack ? self.state.artist : null) || trackInfo.artist,
+					album: lyricsState.album || (isCurrentTrack ? self.state.album : null) || trackInfo.album,
+					year: lyricsState.year || (isCurrentTrack ? self.state.year : null) || trackInfo.year,
+					isExplicit: lyricsState.isExplicit ?? (isCurrentTrack ? self.state.isExplicit : null) ?? trackInfo.isExplicit,
+					tempo: (isCurrentTrack ? self.state.tempoBpm : null) ?? lyricsState.tempoBpm ?? null,
+					tonality: (isCurrentTrack ? self.state.tonality : null) ?? lyricsState.tonality ?? null,
+				};
+
 				// Core rotation and retry loop
 				let result = null;
 				let lastError = null;
@@ -554,6 +602,7 @@ window.LyricsPlus.TranslationCoordinator = {
 							priority: inflight.uiWanted,
 							taskId: cacheKey2,
 							onReasoningProgress: handleReasoningProgress,
+							trackMetadata,
 						});
 						
 						// If successful, break the retry loop
@@ -1026,8 +1075,10 @@ window.LyricsPlus.TranslationCoordinator = {
 				});
 			}
 
-			const baseLyrics = self.state.synced || self.state.unsynced || self.state.genius || [];
-			self._setCurrentLyrics(baseLyrics);
+			if (!modesToClear || modesToClear.length > 1) {
+				const baseLyrics = self.state.synced || self.state.unsynced || self.state.genius || [];
+				self._setCurrentLyrics(baseLyrics);
+			}
 		} else {
 			clearedCount = await CacheManager.clearByUri(uri);
 			await this.deleteLocalLyrics(self, uri);
@@ -1145,8 +1196,13 @@ window.LyricsPlus.TranslationCoordinator = {
 		if (!uri) return;
 		const hasInflight = self._inflightGemini && [...self._inflightGemini.keys()].some((k) => k.startsWith(uri + ":"));
 		const pend = self._pretranslatePending?.[uri] || 0;
-		if (!hasInflight && pend === 0 && self.state.preTranslateChip?.uri === uri) {
-			self.setState({ preTranslateChip: null });
+		if (!hasInflight && pend === 0) {
+			self.setState((prevState) => {
+				if (prevState.preTranslateChip?.uri === uri) {
+					return { preTranslateChip: null };
+				}
+				return null;
+			});
 		}
 	},
 
@@ -1237,7 +1293,10 @@ window.LyricsPlus.TranslationCoordinator = {
 				...lyricsData,
 				uri: nextInfo.uri,
 				artist: nextInfo.artist,
-				title: nextInfo.title
+				title: nextInfo.title,
+				album: nextInfo.album,
+				year: nextInfo.year,
+				isExplicit: nextInfo.isExplicit,
 			};
 
 			const originalLanguage = this.provideLanguageCode(self, lyricsToTranslate);
@@ -1252,24 +1311,58 @@ window.LyricsPlus.TranslationCoordinator = {
 			const displayMode1 = CONFIG.visual[`translation-mode:${modeKey}`];
 			const displayMode2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
 
-			const triggerTranslation = async (mode) => {
-				if (!mode || mode === "none") return;
-				if (String(mode).startsWith("gemini")) {
-					console.log(`[Lyrics+] Smart Pre-load: triggering ${mode} translation (${Array.isArray(lyricsToTranslate) ? lyricsToTranslate.length : 1} lines)`);
-					await this.getGeminiTranslation(self, lyricsStateForTranslation, lyricsToTranslate, mode, true).catch((e) => {
-						console.warn(`[Lyrics+] Smart Pre-load: ${mode} translation failed:`, e);
-						self.pretranslatedUri = null;
-						queueMicrotask(() => this._maybeClearPretranslateChip(self, nextInfo.uri));
-					});
-				}
+			const activeGeminiModes = [displayMode1, displayMode2].filter((m) => m && m !== "none" && String(m).startsWith("gemini"));
+			if (activeGeminiModes.length === 0) {
+				return;
+			}
+
+			// Pre-check cache so we never show or hang the chip if everything is already cached
+			const styleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
+			const pronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
+			const targetLang = CONFIG.visual["translate:target-language"] || "vi";
+
+			const isModeCached = async (mode) => {
+				const wantSmartPhonetic = mode === "gemini_romaji" || mode === "gemini_furigana";
+				const key = wantSmartPhonetic
+					? `${nextInfo.uri}:${mode}`
+					: (targetLang === "vi"
+						? `${nextInfo.uri}:${mode}:${styleKey}:${pronounKey}`
+						: `${nextInfo.uri}:${targetLang}:${mode}:${styleKey}:${pronounKey}`);
+				const c = await CacheManager.get(key);
+				return Array.isArray(c) && c.length === (Array.isArray(lyricsToTranslate) ? lyricsToTranslate.length : 1);
 			};
 
-			// Show chip as soon as pre-load starts (regardless of mode)
+			const cachedChecks = await Promise.all(activeGeminiModes.map(isModeCached));
+			if (cachedChecks.every(Boolean)) {
+				console.log(`[Lyrics+] Smart Pre-load: all active modes already cached for ${nextInfo.title}`);
+				return;
+			}
+
+			// Only show chip when background Gemini network work is actually starting
 			self.setState({
 				preTranslateChip: { uri: nextInfo.uri, title: nextInfo.title || "" },
 			});
-			triggerTranslation(displayMode1);
-			triggerTranslation(displayMode2);
+
+			if (self._pretranslateChipTimeout) clearTimeout(self._pretranslateChipTimeout);
+			self._pretranslateChipTimeout = setTimeout(() => {
+				this._maybeClearPretranslateChip(self, nextInfo.uri);
+			}, 30000);
+
+			const triggerTranslation = async (mode) => {
+				console.log(`[Lyrics+] Smart Pre-load: triggering ${mode} translation (${Array.isArray(lyricsToTranslate) ? lyricsToTranslate.length : 1} lines)`);
+				try {
+					await this.getGeminiTranslation(self, lyricsStateForTranslation, lyricsToTranslate, mode, true);
+				} catch (e) {
+					console.warn(`[Lyrics+] Smart Pre-load: ${mode} translation failed:`, e);
+					self.pretranslatedUri = null;
+				} finally {
+					queueMicrotask(() => this._maybeClearPretranslateChip(self, nextInfo.uri));
+				}
+			};
+
+			Promise.all(activeGeminiModes.map(triggerTranslation)).finally(() => {
+				this._maybeClearPretranslateChip(self, nextInfo.uri);
+			});
 		}
 	},
 

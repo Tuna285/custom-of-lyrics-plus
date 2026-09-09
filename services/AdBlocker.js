@@ -1,6 +1,5 @@
 (function lyricsPlusAdBlocker() {
     // Advanced YouTube ad-blocking utility for Spicetify.
-    // Ported and adapted from ivLyrics (VideoBackgroundDepend.js).
 
     const logPrefix = "[Lyrics+ Ad-Blocker]";
 
@@ -419,17 +418,29 @@
 
             // Active Ad Watchdog & Skipping Logic
             let adWatchdog = null;
+            const checkPlayerAd = (player) => {
+                try {
+                    const state = typeof player.getPlayerState === "function" ? player.getPlayerState() : -1;
+                    if ([105, 106, 107, 108, 109, 110, 111].includes(state)) return true;
+                    if (typeof player.getAdState === "function" && player.getAdState() === 1) return true;
+
+                    const videoData = (typeof player.getVideoData === "function") ? player.getVideoData() : null;
+                    if (videoData?.isAd) return true;
+                } catch (_) {}
+                return false;
+            };
+
             const skipActiveAd = (player) => {
                 try {
-                    const isAd = (typeof player.getAdState === "function" && player.getAdState() === 1) ||
-                                 (typeof player.getVideoData === "function" && player.getVideoData()?.isAd);
-
+                    const isAd = checkPlayerAd(player);
                     if (isAd) {
                         player.setPlaybackRate?.(16);
                         player.mute?.();
-                        const dur = player.getDuration?.() || 0;
-                        if (dur > 0) player.seekTo?.(dur, true);
                         if (typeof player.skipAd === "function") player.skipAd();
+                    } else {
+                        if (typeof player.getPlaybackRate === "function" && player.getPlaybackRate() > 1) {
+                            player.setPlaybackRate(1);
+                        }
                     }
                 } catch (_) {}
             };
@@ -443,7 +454,8 @@
                     const state = event.data;
                     
                     const isAdState = [105, 106, 107, 108, 109, 110, 111].includes(state) || 
-                                     (typeof player.getAdState === "function" && player.getAdState() === 1);
+                                     (typeof player.getAdState === "function" && player.getAdState() === 1) ||
+                                     checkPlayerAd(player);
 
                     if (isAdState) {
                         skipActiveAd(player);
@@ -491,6 +503,40 @@
         (document.head || document.documentElement).appendChild(style);
     };
 
+    const listenMessageAdEvents = () => {
+        if (window.__lyricsPlusAdBlockMessageListener) return;
+        window.addEventListener("message", (e) => {
+            try {
+                if (!e.data || typeof e.data !== "string") return;
+                if (!e.data.includes("infoDelivery")) return;
+                const parsed = JSON.parse(e.data);
+                if (parsed?.event === "infoDelivery" && parsed?.info) {
+                    const info = parsed.info;
+                    const isAd = Boolean(info.isAd || (info.adState !== undefined && info.adState > 0) || info.adVideoId);
+                    document.querySelectorAll("iframe").forEach((iframe) => {
+                        if (/youtube|youtu\.be/i.test(iframe.src)) {
+                            try {
+                                iframe.contentWindow?.postMessage(JSON.stringify({
+                                    event: "command",
+                                    func: "setPlaybackRate",
+                                    args: [isAd ? 16 : 1]
+                                }), "*");
+                                if (isAd) {
+                                    iframe.contentWindow?.postMessage(JSON.stringify({
+                                        event: "command",
+                                        func: "mute",
+                                        args: []
+                                    }), "*");
+                                }
+                            } catch (_) {}
+                        }
+                    });
+                }
+            } catch (_) {}
+        });
+        window.__lyricsPlusAdBlockMessageListener = true;
+    };
+
     const initialize = () => {
         patchFetch();
         patchXHR();
@@ -506,6 +552,7 @@
         patchYouTubePlayer();
         observeDOM();
         injectAdBlockStyles();
+        listenMessageAdEvents();
         console.log(`${logPrefix} Initialized`);
     };
 

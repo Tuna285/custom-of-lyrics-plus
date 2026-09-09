@@ -693,7 +693,7 @@ const GeminiClient = {
      * Falls back gracefully if the server returns a non-SSE body.
      * Returns: { content, reasoningContent, message } shaped like the non-streaming `data.choices[0]`.
      */
-    async streamChatCompletion({ endpoint, headers, body, onProgress, signal, lineCount = 0, responseMode = "prompt" }) {
+    async streamChatCompletion({ endpoint, headers, body, onProgress, onChunk, signal, lineCount = 0, responseMode = "prompt" }) {
         const streamingBody = { ...body, stream: true, stream_options: { include_usage: true } };
 
         // Chain external signal with an internal AbortController so we can also abort
@@ -920,6 +920,9 @@ const GeminiClient = {
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
+                if (typeof onChunk === "function") {
+                    try { onChunk(); } catch (_) {}
+                }
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split("\n");
                 buffer = lines.pop() ?? "";
@@ -997,7 +1000,7 @@ const GeminiClient = {
         return Math.min(16000, Math.max(2000, estimated));
     },
 
-    async callGemini({ apiKey, artist, title, text, styleKey, pronounKey, wantSmartPhonetic, wantFurigana, _isRetry, priority, taskId, onReasoningProgress, targetLang = "vi" }) {
+    async callGemini({ apiKey, artist, title, text, styleKey, pronounKey, wantSmartPhonetic, wantFurigana, _isRetry, priority, taskId, onReasoningProgress, targetLang = "vi", trackMetadata = null }) {
         const startTime = Date.now();
         const rawLines = text.split('\n');
         const lineCount = rawLines.length;
@@ -1067,7 +1070,7 @@ const GeminiClient = {
             } else if (wantSmartPhonetic) {
                 prompt = Prompts.buildJsonSchemaPhoneticPrompt({ artist, title, text, wantFurigana, reasoningEffort });
             } else {
-                prompt = Prompts.buildJsonSchemaTranslationPrompt({ artist, title, text, styleKey, pronounKey, reasoningEffort, targetLang });
+                prompt = Prompts.buildJsonSchemaTranslationPrompt({ artist, title, text, styleKey, pronounKey, reasoningEffort, targetLang, trackMetadata });
             }
 
             body = {
@@ -1089,7 +1092,7 @@ const GeminiClient = {
                     user: Prompts.buildMinimalFallbackTagsPrompt({ artist, title, text, wantSmartPhonetic, wantFurigana, targetLang })
                 };
             } else {
-                prompt = Prompts.buildPromptEngPrompt({ artist, title, text, styleKey, pronounKey, wantSmartPhonetic, wantFurigana, reasoningEffort, targetLang });
+                prompt = Prompts.buildPromptEngPrompt({ artist, title, text, styleKey, pronounKey, wantSmartPhonetic, wantFurigana, reasoningEffort, targetLang, trackMetadata });
             }
 
             let msgs = [];
@@ -1130,10 +1133,11 @@ const GeminiClient = {
                 const streamed = await this.fetchWithRetry(async () => {
                     const controller = new AbortController();
                     // Connection timeouts:
-                    // 1) Initial connect timeout: if Google queues/stalls the connection for >15s without sending headers/tokens,
+                    // 1) Initial connect timeout: if Google queues/stalls the connection for >45s without sending headers/tokens,
                     //    abort early with isStalledConnect to let key rotation switch to a fast key immediately.
+                    //    45s provides ample room for Gemini reasoning and large lyric prompt processing without false aborts.
                     // 2) Streaming idle timeout: once streaming, allow up to 45s between chunks for long deliberation.
-                    const CONNECT_TIMEOUT_MS = 15000;
+                    const CONNECT_TIMEOUT_MS = 45000;
                     const STREAM_IDLE_MS = 45000;
                     let hasReceivedFirstChunk = false;
                     let idleAbort = false;
@@ -1159,6 +1163,9 @@ const GeminiClient = {
                             signal: controller.signal,
                             lineCount,
                             responseMode,
+                            onChunk: () => {
+                                resetIdle();
+                            },
                             onProgress: ({ reasoning }) => {
                                 resetIdle();
                                 if (typeof onReasoningProgress === "function" && reasoning) {
@@ -1208,7 +1215,7 @@ const GeminiClient = {
                     apiKey, artist, title, text,
                     styleKey: 'literal_study', pronounKey: 'default',
                     wantSmartPhonetic, wantFurigana, _isRetry: true,
-                    onReasoningProgress, targetLang
+                    onReasoningProgress, targetLang, trackMetadata
                 });
             }
 
@@ -1219,7 +1226,7 @@ const GeminiClient = {
                 if (error.name === 'AbortError') {
                     userMessage = error.idleAbort
                         ? (error.isStalledConnect 
-                            ? `Connection stalled: no response from API for 15s. The model may be overloaded.`
+                            ? `Connection stalled: no response from API for 45s. The model may be overloaded.`
                             : `Request timed out: no response from API for 45s. The model may be overloaded or stuck.`)
                         : `Request cancelled.`;
                 } else if (error.message?.includes('fetch') || error.message?.includes('network') || error.message?.includes('Failed to fetch')) {
