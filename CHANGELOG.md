@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Track Audio Context**: Uses real-time track metadata (BPM, key, release year, album) from Spotify Player to provide accurate musical context for AI translations.
 - **Reload Options Menu**: Replaced the single reset cache button with a dropdown menu to refresh translation, phonetics, or both independently.
+- **NetEase & Video IndexedDB Caching**: Cached NetEase search results, raw lyrics, and video background metadata in IndexedDB to minimize network requests and load replays instantly.
 
 ### Changed
 
@@ -23,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Lyrics Metadata Filtering**: Stripped song credits, theme labels (OP/ED), and arranger tags from NetEase and LRC lyrics before rendering.
 - **Pronoun Consistency**: Fixed character pronouns shifting between verses and choruses in Auto mode.
+- **Settings Cache Wipe**: Purged IndexedDB base lyrics and in-memory cache alongside AI translations when clicking Clear Cache in Settings.
 
 ## [1.9.0] - 2026-09-05
 
