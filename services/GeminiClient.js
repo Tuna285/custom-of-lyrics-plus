@@ -25,7 +25,7 @@ class RequestQueue {
         // Track pending promise for deduplication
         if (key) {
             this.pendingPromises.set(key, promise);
-            promise.finally(() => this.pendingPromises.delete(key));
+            promise.finally(() => this.pendingPromises.delete(key)).catch(() => {});
         }
 
         return promise;

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.2] - 2026-09-10
+
+### Changed
+
+- **Multi-Key Failover & Quota Protection**: Halts key rotation early during Google backend outages (HTTP 503) to prevent exhausting remaining daily quotas; temporarily quarantines rate-limited keys (HTTP 429) so subsequent songs automatically select healthy keys; limits failover attempts per song with paced intervals to avoid rate spikes.
+
+### Fixed
+
+- **Duplicate Requests on Failed Tracks**: Prevented player state updates and UI re-renders from continuously re-triggering translation attempts on failed tracks.
+- **Background Pre-translation Retry Loop**: Fixed an issue where failed pre-translation attempts would repeatedly re-trigger background network requests.
+- **Unhandled Promise Rejection**: Fixed an uncaught rejection error when deduplicating concurrent translation requests.
+
 ## [1.9.1] - 2026-09-09
 
 ### Added

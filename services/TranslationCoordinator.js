@@ -36,6 +36,7 @@ window.LyricsPlus.TranslationCoordinator = {
 			//Reset per-track progressive results
 			self._dmResults = {};
 			self._saveInProgress = null;
+			self._failedFetches = {};
 
 			//Clean up inflight requests for OLD tracks only, keep current track
 			if (self._inflightGemini) {
@@ -146,9 +147,14 @@ window.LyricsPlus.TranslationCoordinator = {
 
 		const settingsChanged = (self._lastTargetLang !== currentTargetLang || self._lastStyleKey !== currentStyleKey || self._lastPronounKey !== currentPronounKey);
 
-		if (settingsChanged && self._dmResults[currentUri]) {
-			// Clear only target language translation (gemini_vi), KEEP phonetic (furigana/romaji) intact
-			delete self._dmResults[currentUri]["gemini_vi"];
+		if (settingsChanged) {
+			if (self._dmResults?.[currentUri]) {
+				// Clear only target language translation (gemini_vi), KEEP phonetic (furigana/romaji) intact
+				delete self._dmResults[currentUri]["gemini_vi"];
+			}
+			if (self._failedFetches?.[currentUri]) {
+				self._failedFetches[currentUri].delete("gemini_vi");
+			}
 			console.log(`[Lyrics+] Translation settings changed (${self._lastTargetLang}/${self._lastStyleKey}/${self._lastPronounKey} → ${currentTargetLang}/${currentStyleKey}/${currentPronounKey}), re-fetching translation...`);
 		}
 		
@@ -275,8 +281,9 @@ window.LyricsPlus.TranslationCoordinator = {
 		// Otherwise proceed to fetch the missing ones
 		const activeMode1 = displayMode1 && displayMode1 !== "none";
 		const activeMode2 = displayMode2 && displayMode2 !== "none";
-		const missingMode1 = activeMode1 && !cachedMode1 && !isModeInflight(displayMode1);
-		const missingMode2 = activeMode2 && !cachedMode2 && !isModeInflight(displayMode2);
+		const hasFailed = (m) => Boolean(self._failedFetches?.[currentUri]?.has(m));
+		const missingMode1 = activeMode1 && !cachedMode1 && !isModeInflight(displayMode1) && !hasFailed(displayMode1);
+		const missingMode2 = activeMode2 && !cachedMode2 && !isModeInflight(displayMode2) && !hasFailed(displayMode2);
 
 		if ((cachedMode1 || cachedMode2)) {
 			updateCombinedLyrics(true);
@@ -329,14 +336,25 @@ window.LyricsPlus.TranslationCoordinator = {
 			}
 		};
 
+		const markFetchFailed = (mode) => {
+			if (!mode || mode === "none") return;
+			self._failedFetches = self._failedFetches || {};
+			self._failedFetches[currentUri] = self._failedFetches[currentUri] || new Set();
+			self._failedFetches[currentUri].add(mode);
+		};
+
 		// Start first request immediately (non-blocking)
 		const promise1 = processMode(firstMode, lyrics).then(result => {
 			if (self.state.uri !== uri) return;
 			if (self._dmResults?.[currentUri]) self._dmResults[currentUri][firstMode] = result;
+			if (result === null) {
+				markFetchFailed(firstMode);
+			}
 			updateCombinedLyrics(true);
 		}).catch(error => {
 			if (self.state.uri !== uri) return;
 			console.warn(`Display ${firstMode} failed:`, error.message);
+			markFetchFailed(firstMode);
 			updateCombinedLyrics(true);
 		}).finally(() => {
 			cleanActiveFetch(firstMode);
@@ -347,10 +365,14 @@ window.LyricsPlus.TranslationCoordinator = {
 			return processMode(secondMode, lyrics).then(result => {
 				if (self.state.uri !== uri) return;
 				if (self._dmResults?.[currentUri]) self._dmResults[currentUri][secondMode] = result;
+				if (result === null) {
+					markFetchFailed(secondMode);
+				}
 				updateCombinedLyrics(true);
 			}).catch(error => {
 				if (self.state.uri !== uri) return;
 				console.warn(`Display ${secondMode} failed:`, error.message);
+				markFetchFailed(secondMode);
 				updateCombinedLyrics(true);
 			}).finally(() => {
 				cleanActiveFetch(secondMode);
@@ -577,17 +599,30 @@ window.LyricsPlus.TranslationCoordinator = {
 				let result = null;
 				let lastError = null;
 				
-				// Initialize global API key index if not exists
+				// Initialize global API key index and dead keys quarantine map
 				window._lyricsPlusApiKeyIndex = window._lyricsPlusApiKeyIndex || 0;
-				let startIdx = window._lyricsPlusApiKeyIndex % apiKeys.length;
-				// Move index forward for subsequent calls (sequential rotation)
-				window._lyricsPlusApiKeyIndex = (startIdx + 1) % apiKeys.length;
+				window._lyricsPlusDeadKeys = window._lyricsPlusDeadKeys || new Map();
 
-				for (let attempt = 0; attempt < apiKeys.length; attempt++) {
-					const currentApiKey = apiKeys[(startIdx + attempt) % apiKeys.length];
+				const now = Date.now();
+				// Filter out keys currently quarantined for quota exhaustion
+				const healthyKeys = apiKeys.filter((k) => {
+					const deadUntil = window._lyricsPlusDeadKeys.get(k);
+					return !deadUntil || deadUntil < now;
+				});
+				const candidateKeys = healthyKeys.length > 0 ? healthyKeys : apiKeys;
+
+				let startIdx = window._lyricsPlusApiKeyIndex % candidateKeys.length;
+				window._lyricsPlusApiKeyIndex = (startIdx + 1) % candidateKeys.length;
+
+				// Cap attempts: Maximum 3 keys per song to protect daily quota (e.g. 20 RPD free tier)
+				const maxAttempts = Math.min(3, candidateKeys.length);
+				let consecutive503Count = 0;
+
+				for (let attempt = 0; attempt < maxAttempts; attempt++) {
+					const currentApiKey = candidateKeys[(startIdx + attempt) % candidateKeys.length];
+					const masked = currentApiKey.length > 8 ? `...${currentApiKey.slice(-5)}` : "••••";
 					try {
-						const masked = currentApiKey.length > 8 ? `...${currentApiKey.slice(-5)}` : "••••";
-						console.log(`[Lyrics+] Translation attempt ${attempt + 1}/${apiKeys.length} using API key ending in: ${masked}`);
+						console.log(`[Lyrics+] Translation attempt ${attempt + 1}/${maxAttempts} using API key ending in: ${masked}`);
 						
 						result = await Translator.callGemini({
 							apiKey: currentApiKey,
@@ -605,27 +640,52 @@ window.LyricsPlus.TranslationCoordinator = {
 							trackMetadata,
 						});
 						
-						// If successful, break the retry loop
+						// If successful, remove from dead keys and break
+						window._lyricsPlusDeadKeys.delete(currentApiKey);
 						break;
 					} catch (err) {
 						lastError = err;
 						const errMsg = String(err.message || err).toLowerCase();
-						
-						if (attempt < apiKeys.length - 1) {
-							console.warn(`[Lyrics+] API key attempt ${attempt + 1}/${apiKeys.length} failed, switching to next key... Error:`, errMsg);
-							// Clear reasoning progress for the failed attempt to let next key start clean
-							if (inflight.uiWanted && trackUri === self.state.uri) {
-								self.setState((prev) => {
-									const prevStreams = prev.reasoningStreams || {};
-									return {
-										reasoningStreams: { ...prevStreams, [taskKey]: "" }
-									};
-								});
-							}
-							continue;
+						const is503 = err.status === 503 || /service unavailable|overloaded|high demand/i.test(errMsg);
+						const is429 = err.status === 429 || /rate limit|resource_exhausted|too many requests/i.test(errMsg);
+
+						// Quarantine exhausted key to prevent subsequent songs from burning requests on it
+						if (is429) {
+							const isDaily = /quota|resource_exhausted/i.test(errMsg);
+							const quarantineMs = isDaily ? 30 * 60 * 1000 : 60 * 1000;
+							window._lyricsPlusDeadKeys.set(currentApiKey, Date.now() + quarantineMs);
+							console.warn(`[Lyrics+] Key ending in ${currentApiKey.slice(-5)} rate limited (429). Quarantined for ${quarantineMs / 1000}s.`);
 						}
-						// If it's the last key, rethrow to be caught by the outer catch
-						throw err;
+
+						// Clear reasoning progress for the failed attempt to let next key start clean
+						if (inflight.uiWanted && trackUri === self.state.uri) {
+							self.setState((prev) => {
+								const prevStreams = prev.reasoningStreams || {};
+								return {
+									reasoningStreams: { ...prevStreams, [taskKey]: "" }
+								};
+							});
+						}
+
+						// Emergency brake for 503: Google backend is overloaded across all projects.
+						// Retrying across all 15 keys will not help and burns daily quotas.
+						if (is503) {
+							consecutive503Count++;
+							if (consecutive503Count >= 2 || attempt >= maxAttempts - 1) {
+								console.warn(`[Lyrics+] Google API is overloaded (503). Halting failover loop to preserve daily quota.`);
+								throw err;
+							}
+							console.warn(`[Lyrics+] Google API overloaded (503). Waiting 1.5s before 1 retry...`);
+							await new Promise((r) => setTimeout(r, 1500));
+						} else if (attempt < maxAttempts - 1) {
+							// Gentle 800ms cooldown between key switches to protect RPM limits
+							console.warn(`[Lyrics+] API key attempt ${attempt + 1}/${maxAttempts} failed, switching to next key in 800ms... Error:`, errMsg);
+							await new Promise((r) => setTimeout(r, 800));
+						}
+
+						if (attempt >= maxAttempts - 1) {
+							throw err;
+						}
 					}
 				}
 
@@ -1074,6 +1134,11 @@ window.LyricsPlus.TranslationCoordinator = {
 					delete self._dmResults[uri][mode];
 				});
 			}
+			if (self._failedFetches && self._failedFetches[uri]) {
+				modesToClear.forEach(mode => {
+					self._failedFetches[uri].delete(mode);
+				});
+			}
 
 			if (!modesToClear || modesToClear.length > 1) {
 				const baseLyrics = self.state.synced || self.state.unsynced || self.state.genius || [];
@@ -1098,6 +1163,9 @@ window.LyricsPlus.TranslationCoordinator = {
 
 			if (self._dmResults && self._dmResults[uri]) {
 				delete self._dmResults[uri];
+			}
+			if (self._failedFetches && self._failedFetches[uri]) {
+				delete self._failedFetches[uri];
 			}
 		}
 
@@ -1265,14 +1333,12 @@ window.LyricsPlus.TranslationCoordinator = {
 				}
 			} catch (e) {
 				console.warn("[Lyrics+] Pre-translate: lyrics fetch failed:", e);
-				self.pretranslatedUri = null;
 				return;
 			}
 		}
 
 		if (!lyricsData) {
 			console.log(`[Lyrics+] Pre-translate: no lyrics data available, aborting`);
-			self.pretranslatedUri = null;
 			return;
 		}
 
@@ -1354,7 +1420,6 @@ window.LyricsPlus.TranslationCoordinator = {
 					await this.getGeminiTranslation(self, lyricsStateForTranslation, lyricsToTranslate, mode, true);
 				} catch (e) {
 					console.warn(`[Lyrics+] Smart Pre-load: ${mode} translation failed:`, e);
-					self.pretranslatedUri = null;
 				} finally {
 					queueMicrotask(() => this._maybeClearPretranslateChip(self, nextInfo.uri));
 				}

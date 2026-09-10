@@ -802,7 +802,7 @@ const ConfigHelper = () => {
 						}
 					},
 						react.createElement("div", null,
-							react.createElement("div", { style: { fontWeight: "bold", fontSize: "14px", color: "var(--spice-text)" } }, `Lyric Plus Translate v${window.UpdateService?.CURRENT_VERSION || "1.9.1"}`),
+							react.createElement("div", { style: { fontWeight: "bold", fontSize: "14px", color: "var(--spice-text)" } }, `Lyric Plus Translate v${window.UpdateService?.CURRENT_VERSION || "1.9.2"}`),
 							react.createElement("div", { style: { fontSize: "12px", color: "var(--spice-subtext)", marginTop: "2px" } }, getText("settings.updateAppSubtitle"))
 						),
 						react.createElement("button", {
