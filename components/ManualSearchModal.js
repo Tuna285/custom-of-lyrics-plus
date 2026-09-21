@@ -399,6 +399,19 @@ const ManualSearchModal = (() => {
                         throw new Error("Could not parse lyrics from this candidate");
                     }
 
+                    if (item.provider === "netease" && typeof IDBCache !== "undefined" && info?.uri) {
+                        IDBCache.set(`netease:lyrics:${info.uri}`, {
+                            uri: info.uri,
+                            provider: "netease",
+                            copyright,
+                            synced,
+                            unsynced,
+                            genius: null,
+                            neteaseTranslation,
+                            _neteaseId: item.id,
+                        }, 30 * 24 * 60 * 60 * 1000).catch(() => {});
+                    }
+
                     onFound?.({
                         uri: info?.uri || "",
                         provider: item.provider,

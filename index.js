@@ -441,6 +441,8 @@ class LyricsContainer extends react.Component {
 	async tryServices(trackInfo, mode = -1) {
 		const currentMode = CONFIG.modes[mode] || "";
 		let finalData = { ...emptyState, uri: trackInfo.uri };
+		let fallbackUnsynced = null;
+
 		for (const id of CONFIG.providersOrder) {
 			const service = CONFIG.providers[id];
 			if (spotifyVersion >= "1.2.31" && id === "genius") continue;
@@ -456,9 +458,18 @@ class LyricsContainer extends react.Component {
 			}
 
 			if (data.error || (!data.karaoke && !data.synced && !data.unsynced && !data.genius)) continue;
+
+			// Mode === -1 (Auto Mode): Priority Level Hierarchy
+			// Priority 1: Synced or Karaoke -> Winner, return immediately
+			// Priority 2: Unsynced or Genius -> Keep as fallback, continue checking next providers for Synced
 			if (mode === -1) {
-				finalData = data;
-				return finalData;
+				if (data.synced || data.karaoke) {
+					return data;
+				}
+				if (!fallbackUnsynced && (data.unsynced || data.genius)) {
+					fallbackUnsynced = data;
+				}
+				continue;
 			}
 
 			if (!data[currentMode]) {
@@ -490,6 +501,11 @@ class LyricsContainer extends react.Component {
 			}
 
 			return finalData;
+		}
+
+		if (mode === -1 && fallbackUnsynced) {
+			fallbackUnsynced._allProvidersChecked = true;
+			return fallbackUnsynced;
 		}
 
 		return finalData;
@@ -525,12 +541,19 @@ class LyricsContainer extends react.Component {
 		if (!refresh) {
 			cachedLyrics = (mode === -1 ? CACHE[info.uri] : CACHE[info.uri]?.[CONFIG.modes?.[mode]]) ? CACHE[info.uri] : null;
 
+			// In Auto Mode (mode === -1): if cached RAM lyrics are unsynced-only and never verified across all providers,
+			// treat as cache miss so tryServices can search for higher-quality Synced lyrics.
+			if (mode === -1 && cachedLyrics && !cachedLyrics.synced && !cachedLyrics.karaoke && !cachedLyrics._manualSelected && !cachedLyrics._allProvidersChecked) {
+				cachedLyrics = null;
+			}
+
 			// 2. If RAM cache missed, check IndexedDB (DBManager) before showing loader or fetching from network
 			if (!cachedLyrics && typeof DBManager !== "undefined" && info.uri) {
 				try {
 					const dbData = await DBManager.get(info.uri);
 					if (dbData && (dbData.synced || dbData.unsynced || dbData.karaoke || dbData.genius)) {
-						if (mode === -1 || dbData[CONFIG.modes?.[mode]]) {
+						const isFullMatch = dbData.synced || dbData.karaoke || dbData._manualSelected || dbData._allProvidersChecked;
+						if ((mode === -1 && isFullMatch) || (mode !== -1 && dbData[CONFIG.modes?.[mode]])) {
 							cachedLyrics = dbData;
 							CACHE[info.uri] = dbData;
 							isCached = true;
@@ -1397,6 +1420,10 @@ class LyricsContainer extends react.Component {
 								if (modalOpener) {
 									modalOpener((selectedLyrics) => {
 										if (selectedLyrics) {
+											// 1. Reset TranslationCoordinator cache so stale translations from previous provider aren't misaligned
+											if (typeof this.resetTranslationCache === "function") {
+												this.resetTranslationCache(selectedLyrics.uri);
+											}
 											if (CACHE[selectedLyrics.uri]) {
 												const resetKeys = ["romaji", "furigana", "hiragana", "katakana", "hangul", "romaja", "cn", "hk", "tw", "musixmatchTranslation", "musixmatchTranslationLanguage", "neteaseTranslation"];
 												for (const k of resetKeys) {
@@ -1407,6 +1434,18 @@ class LyricsContainer extends react.Component {
 												...CACHE[selectedLyrics.uri],
 												...selectedLyrics
 											};
+											// 2. Persist manual selection to IndexedDB (DBManager)
+											if (typeof DBManager !== "undefined" && selectedLyrics.uri) {
+												DBManager.set(selectedLyrics.uri, selectedLyrics).catch((e) => console.warn("[Lyrics+] Failed to save manual selection to DBManager:", e));
+												try {
+													const cachedUris = JSON.parse(localStorage.getItem(`${APP_NAME}:cached-uris`) || "[]");
+													if (!cachedUris.includes(selectedLyrics.uri)) {
+														cachedUris.push(selectedLyrics.uri);
+														if (cachedUris.length > 500) cachedUris.shift();
+														localStorage.setItem(`${APP_NAME}:cached-uris`, JSON.stringify(cachedUris));
+													}
+												} catch (_) {}
+											}
 											let finalMode = -1;
 											if (selectedLyrics.karaoke) {
 												finalMode = KARAOKE;

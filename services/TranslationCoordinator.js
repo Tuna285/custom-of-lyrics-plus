@@ -24,9 +24,12 @@ window.LyricsPlus.TranslationCoordinator = {
 			}
 		}
 
-		//Clean up any existing progress flags from previous songs
+		//Clean up any existing progress flags from previous songs or when lyrics source/line-count changes
 		const currentUri = lyricsState.uri;
-		if (self.lastCleanedUri !== currentUri) {
+		const lyricsLength = Array.isArray(lyrics) ? lyrics.length : 0;
+		const lyricsSourceChanged = (self._lastLyricsProvider !== lyricsState.provider || self._lastLyricsLength !== lyricsLength);
+
+		if (self.lastCleanedUri !== currentUri || lyricsSourceChanged) {
 			//Remove all progress flags
 			Object.keys(self).forEach(key => {
 				if (key.includes(':inProgress')) {
@@ -38,12 +41,12 @@ window.LyricsPlus.TranslationCoordinator = {
 			self._saveInProgress = null;
 			self._failedFetches = {};
 
-			//Clean up inflight requests for OLD tracks only, keep current track
+			//Clean up inflight requests for OLD tracks only (or current track if lyrics source changed)
 			if (self._inflightGemini) {
 				const keysToDelete = [];
 				self._inflightGemini.forEach((value, key) => {
-					//Key format: "uri:mode:style:pronoun", only delete if URI doesn't match current
-					if (!key.startsWith(currentUri + ':')) {
+					//Key format: "uri:mode:style:pronoun", delete if URI doesn't match current or source changed
+					if (!key.startsWith(currentUri + ':') || lyricsSourceChanged) {
 						keysToDelete.push(key);
 					}
 				});
@@ -51,6 +54,8 @@ window.LyricsPlus.TranslationCoordinator = {
 			}
 
 			self.lastCleanedUri = currentUri;
+			self._lastLyricsProvider = lyricsState.provider;
+			self._lastLyricsLength = lyricsLength;
 		}
 
 		//Handle translation and display modes efficiently
@@ -188,7 +193,15 @@ window.LyricsPlus.TranslationCoordinator = {
 						CacheManager.set(cacheKey2, memCached);
 					}
 				}
-				if (memCached) return memCached;
+				if (memCached && Array.isArray(memCached)) {
+					if (Array.isArray(lyrics) && lyrics.length > 0 && memCached.length !== lyrics.length) {
+						console.warn(`[Lyrics+] Cached translation length (${memCached.length}) does not match lyrics length (${lyrics.length}). Invalidating stale cache.`);
+						CacheManager.delete(cacheKey2);
+						memCached = null;
+					} else {
+						return memCached;
+					}
+				}
 
 				// Check persistent localStorage (legacy fallback)
 				const persistKey = `${APP_NAME}:gemini-cache`;
@@ -196,6 +209,9 @@ window.LyricsPlus.TranslationCoordinator = {
 				const persisted = persistedCache[cacheKey2] || (isPhonetic ? persistedCache[`${currentUri}:${mode}:${styleKey}:${pronounKey}`] : null);
 
 				if (persisted?.data && (isPhonetic || (persisted.styleKey === styleKey && persisted.pronounKey === pronounKey))) {
+					if (Array.isArray(lyrics) && lyrics.length > 0 && Array.isArray(persisted.data) && persisted.data.length !== lyrics.length) {
+						return null;
+					}
 					CacheManager.set(cacheKey2, persisted.data); // Load into session cache
 					return persisted.data;
 				}
@@ -1098,6 +1114,44 @@ window.LyricsPlus.TranslationCoordinator = {
 		let clearedCount = 0;
 		let geminiClearedCount = 0;
 		
+		// 1. Synchronous cleanup FIRST (prevents race conditions with immediate React renders)
+		if (self._dmResults && self._dmResults[uri]) {
+			if (modesToClear && modesToClear.length > 0) {
+				modesToClear.forEach(mode => {
+					delete self._dmResults[uri][mode];
+				});
+			} else {
+				delete self._dmResults[uri];
+			}
+		}
+		if (self._failedFetches && self._failedFetches[uri]) {
+			if (modesToClear && modesToClear.length > 0) {
+				modesToClear.forEach(mode => {
+					self._failedFetches[uri].delete(mode);
+				});
+			} else {
+				delete self._failedFetches[uri];
+			}
+		}
+		if (self._inflightGemini) {
+			const keysToDelete = [];
+			for (const [key] of self._inflightGemini) {
+				if (!key.includes(uri)) continue;
+				if (modesToClear && modesToClear.length > 0) {
+					if (modesToClear.some(mode => key.includes(`:${mode}:`) || key.includes(`:${mode}`))) {
+						keysToDelete.push(key);
+					}
+				} else {
+					keysToDelete.push(key);
+				}
+			}
+			keysToDelete.forEach(key => self._inflightGemini.delete(key));
+		}
+		if (typeof CacheManager !== "undefined") {
+			CacheManager.clearL1();
+		}
+
+		// 2. Asynchronous cache purge across L2 IndexedDB and localStorage
 		if (modesToClear && modesToClear.length > 0) {
 			// Match any cache key belonging to this song URI and any of the modes being cleared
 			// Keys can be:
@@ -1129,24 +1183,12 @@ window.LyricsPlus.TranslationCoordinator = {
 				console.warn("[Lyrics+] Failed to clear persisted Gemini cache:", e);
 			}
 
-			if (self._dmResults && self._dmResults[uri]) {
-				modesToClear.forEach(mode => {
-					delete self._dmResults[uri][mode];
-				});
-			}
-			if (self._failedFetches && self._failedFetches[uri]) {
-				modesToClear.forEach(mode => {
-					self._failedFetches[uri].delete(mode);
-				});
-			}
-
 			if (!modesToClear || modesToClear.length > 1) {
 				const baseLyrics = self.state.synced || self.state.unsynced || self.state.genius || [];
 				self._setCurrentLyrics(baseLyrics);
 			}
 		} else {
 			clearedCount = await CacheManager.clearByUri(uri);
-			await this.deleteLocalLyrics(self, uri);
 
 			try {
 				const persistKey = `${APP_NAME}:gemini-cache`;
@@ -1161,27 +1203,8 @@ window.LyricsPlus.TranslationCoordinator = {
 				console.warn("[Lyrics+] Failed to clear persisted Gemini cache:", e);
 			}
 
-			if (self._dmResults && self._dmResults[uri]) {
-				delete self._dmResults[uri];
-			}
-			if (self._failedFetches && self._failedFetches[uri]) {
-				delete self._failedFetches[uri];
-			}
-		}
-
-		if (self._inflightGemini) {
-			const keysToDelete = [];
-			for (const [key] of self._inflightGemini) {
-				if (!key.includes(uri)) continue;
-				if (modesToClear && modesToClear.length > 0) {
-					if (modesToClear.some(mode => key.includes(`:${mode}:`) || key.includes(`:${mode}`))) {
-						keysToDelete.push(key);
-					}
-				} else {
-					keysToDelete.push(key);
-				}
-			}
-			keysToDelete.forEach(key => self._inflightGemini.delete(key));
+			const baseLyrics = self.state.synced || self.state.unsynced || self.state.genius || [];
+			self._setCurrentLyrics(baseLyrics);
 		}
 
 		if (!modesToClear) {
