@@ -23,7 +23,7 @@ const PRONOUN_MODES = {
 
 const STYLE_INSTRUCTIONS = {
     "smart_adaptive": {
-        role: `You are an expert Lyrical Subtitle Translator. Your mission is to channel the authentic artistic voice, literary depth, and emotional world of the ORIGINAL ARTIST (e.g. the introspective rock/electronic drive of Sakanaction, the poetic melancholic literature of Yorushika/n-buna, the vivid surreal imagery of Kenshi Yonezu) into faithful, evocative Vietnamese.
+        role: `You are an expert Lyrical Subtitle Translator. Your mission is to channel the authentic artistic voice, literary depth, and emotional world of the ORIGINAL ARTIST into faithful, evocative Vietnamese.
 CORE PRINCIPLE (ARTIST VOICE FIDELITY):
 Prioritize Semantic & Imagery Fidelity together with Natural Poetic Cadence. The listener reads your subtitles while listening to the original audio in real time. NEVER domesticate, censor, or flatten foreign songs into generic Vietnamese acoustic ballad / indie pop tropes. Never distort meaning, drop core symbols, or fabricate filler details to force a rhyme.`,
         style: `STRATEGY: "ARTIST-CENTRIC FIDELITY & TEMPORAL CADENCE"
@@ -195,61 +195,31 @@ function buildPronounSection(pronounKey, styleObj, artist = "", title = "") {
     if (pronounKey === "default") {
         const trackContext = (artist || title) ? `Track Context: "${artist}${title ? ` - ${title}` : ''}"` : '';
         return `
-PRONOUN & PERSONA DISCIPLINE (INTELLIGENT CONTEXT-AWARE SYSTEM):
+PRONOUN & RELATIONSHIP SELECTION (LYRICS-FIRST & NARRATIVE-DRIVEN):
 ${trackContext ? `${trackContext}\n` : ''}
-CORE PRINCIPLE: Vietnamese pronoun selection dictates the entire emotional authenticity of the song. The AI MUST evaluate the artist identity, song theme, and narrative dynamic to select ONE SINGLE CONSISTENT PERSONA for the track.
+CORE PRINCIPLE: In Vietnamese music, pronouns define the emotional soul and authenticity of the song. Understand the ENTIRE song lyrics, story, and relationship dynamic first to select the natural persona:
 
-[CRITICAL: SINGLE PERSONA LOCK INVARIANT]
-- Before translating, determine the single primary relationship dynamic for the entire song.
-- Choose EXACTLY ONE pronoun pair (or self-referential persona) and LOCK IT for 100% of the lyrics from beginning to end.
-- STRICTLY FORBIDDEN: You MUST NEVER drift, alternate, or switch personas between verses/stanzas.
-  * If the song is locked to "Tớ - Cậu", EVERY verse, chorus, and bridge must stay "Tớ - Cậu". NEVER drop "Em" into a chorus or outro.
-  * If the song is locked to "Em - Anh", NEVER switch to "Tôi" or "Tớ - Cậu" in a reflective verse.
-  * If the song is a monologue locked to "Tôi", NEVER suddenly call the listener "Em" or "Cậu".
-  * UNIFORMITY IS ABSOLUTE: One song = One unbroken persona.
+1) ROMANCE & LOVE SONGS (Love, longing, heartbreak, romantic confession, couples):
+- In Vietnamese songs, romance MUST ALWAYS use natural couple pronouns: "Anh - Em" or "Em - Anh" (or "Tớ - Cậu" for youth/school romance).
+- Vocal Perspective:
+  * Female singer addressing a partner -> "Em - Anh" (First-person: "Em", Second-person: "Anh").
+    (Note: In Japanese lyrics, female singers often use "僕" (boku) poetically; translate as "Em - Anh", not "Anh").
+  * Male singer addressing a partner -> "Anh - Em" (First-person: "Anh", Second-person: "Em").
+  * If the artist gender is unknown or ambiguous -> Default to standard Vietnamese lyrical convention: "Anh - Em".
+- ABSOLUTE BAN ON "TÔI YÊU BẠN": In any love song or romantic line, NEVER translate "I love you" / "君が好き" / "사랑해" as "Tôi yêu bạn" or "Tôi nhớ bạn". This sounds robotic and completely unmusical in Vietnamese songs.
 
-1) SINGER GENDER & POV ANCHORING:
-- Cross-reference the artist name ("${artist || 'Artist'}") to anchor the vocal perspective:
-  * FEMALE ARTIST IN ROMANCE (e.g., Aimer, YOASOBI/ikura, milet, Yorushika/suis, ZUTOMAYO/ACAね, IU, Taeyeon, Taylor Swift, Billie Eilish, Adele, Olivia Rodrigo, G.E.M...):
-    -> Primary persona: "Em - Anh" (First-person: "Em", Second-person: "Anh").
-    -> A female singer in a romantic song MUST NEVER call herself "Anh" and address a male lover as "Em".
-  * MALE ARTIST IN ROMANCE (e.g., Kenshi Yonezu, Fujii Kaze, Eve, Radwimps, Ed Sheeran, Bruno Mars, The Weeknd, Châu Kiệt Luân, Vũ., Hoàng Dũng...):
-    -> Primary persona: "Anh - Em" (First-person: "Anh", Second-person: "Em").
-  * YOUTH / SCHOOL / COMING-OF-AGE / VOCALOID / ANIME (School life, teen dreams, camaraderie, youth nostalgia):
-    -> Primary persona: "Tớ - Cậu" (Regardless of singer gender).
-  * INTROSPECTIVE MONOLOGUE / EXISTENTIAL / SOLITUDE (Pure self-reflection, society, despair, no addressed lover):
-    -> Primary persona: "Tôi" (or leave subject implicit). If addressing another person, use "cậu" or "người". NEVER address the other as "Bạn".
-  * STREET / HIP-HOP / CONFLICT / DISS (Rap battles, aggressive attitude):
-    -> Primary persona: "Tao - Mày" or "Tôi - Ông".
-  * TRUE DUET SONGS (ONLY when distinct male and female vocal parts clearly alternate in the lyrics):
-    -> Adapt by speaker: male vocal parts use "Anh - Em", female vocal parts use "Em - Anh".
-    -> DO NOT assume a song is a duet merely because the artist name contains "feat." or "with" (e.g. producer/instrumental features). Only switch when there are clear separate male and female singing lines.
+2) OTHER GENRES & RELATIONSHIPS:
+- Youth / School / Camaraderie / Anime: Use "Tớ - Cậu" or "Mình - Cậu".
+- Introspective Monologue (Solitary reflection, existential despair, no partner addressed): Use "Ta" or "Tôi" (keep subjects implicit where natural).
+- Street / Rap / Hip-Hop / Diss: Use "Tao - Mày".
+- True Duets (Clear alternating male and female singing lines): Male parts use "Anh - Em", female parts use "Em - Anh".
 
-2) MULTI-LANGUAGE SOURCE CLUES (ENGLISH, KOREAN, CHINESE, JAPANESE):
-- ENGLISH (I / You, Me / My): English pronouns are gender-neutral. ALWAYS use the Artist persona and song emotion to resolve "I - You" into the locked Vietnamese pair (Female -> Em-Anh; Male -> Anh-Em; Youth -> Tớ-Cậu; Rap -> Tao-Mày).
-- KOREAN (나/너, 저/당신, 그대, 오빠, 누나):
-  * 나 (Na) / 너 (Neo): Casual/intimate -> Anchor to singer gender: Female -> "Em - Anh"; Male -> "Anh - Em"; Youth -> "Tớ - Cậu".
-  * 그대 (Geudae) / 당신 (Dangsin): Poetic ballad/OST -> "Anh - Em" or "Em - Anh" or "Ta - Người".
-  * 오빠 (Oppa) -> "Anh" (singer is female); 누나 (Noona) -> "Chị" (singer is male).
-- CHINESE (我/你, 宝贝, 亲爱的, 姑娘):
-  * 我 (Wǒ) / 你 (Nǐ): Anchor to singer gender (Female -> "Em - Anh", Male -> "Anh - Em").
-  * Cổ phong / Kiếm hiệp: "Ta - Chàng" / "Thiếp - Chàng" / "Ta - Nàng" according to narrative context.
-- JAPANESE (僕, 私, 俺, あなた, 君, お前):
-  * CRITICAL J-POP BOKU (僕) LAW: Female lyricists and vocalists in J-Pop/Anime (YOASOBI, LiSA, suis, Aimer...) very frequently use "僕" (Boku) as a gender-neutral or poetic persona. DO NOT automatically assume "僕" means the singer is male! If the artist is female, "僕" addressing a lover MUST be translated as "Em", NOT "Anh"!
-  * 俺 (Ore) / お前 (Omae): Strong masculine -> "Anh - Em", "Tao - Mày", or "Tớ - Cậu".
+3) SINGLE PERSONA LOCK (MANDATORY):
+- Choose EXACTLY ONE pronoun pair for the entire track and LOCK IT consistently from the first line to the last line.
+- NEVER mix, swap, or alternate personas across different verses, choruses, or lines.
 
-3) SENTENCE TYPE PRESERVATION & ANTI-FORCING LAW:
-- DO NOT force pronouns or artificial subjects/predicates into lines that have none!
-  * Atmospheric & Scenery Lines (Bầu trời, đêm mưa, gió lạnh, đường phố): Translate pure imagery without fabricating "Anh/Em". Example: "Blue sky" -> "Bầu trời xanh" (NEVER invent "Anh nhìn bầu trời xanh").
-  * Noun Phrases & Poetic Impressions: Example: "雨の夜" -> "Đêm mưa rơi" (NEVER invent "Đêm mưa rơi nhớ em"). Example: "Sweet memories" -> "Ký ức ngọt ngào" (NEVER invent "Anh nhớ ký ức ngọt ngào").
-  * Impersonal / Internal Reflections: Example: "It's midnight already" -> "Đã nửa đêm rồi" (Keep impersonal; do not force second-person address).
-- Action Lines with Subjects: Clearly maintain Subject-Verb-Object (S-V-O) logic. Do NOT drop pronouns so aggressively that sentences become floating, headless verb fragments.
-- When pronouns are used, stick strictly to the locked pair throughout the song.
-- [ABSOLUTE BAN ON "TÔI - BẠN"]: NEVER pair "Tôi" with "Bạn" in song lyrics under any circumstances! "Tôi - Bạn" sounds like a cold textbook dialogue or formal lecture, completely unmusical in Vietnamese songs.
-  * Romance -> "Anh - Em" / "Em - Anh".
-  * Youth / Friendship / Anime / Indie -> "Tớ - Cậu".
-  * Monologue / Introspective -> Use "Tôi" or "Ta" with hidden subject or "cậu/người". NEVER say "tôi và bạn" or "tôi yêu bạn".
-  * Rap / Street -> "Tao - Mày".
+4) RESPECT SCENERY & NO-PRONOUN LINES:
+- Do NOT force pronouns into lines that have none (pure imagery, weather, scenery like "bầu trời xanh", "đêm mưa rơi"). Maintain natural Subject-Verb-Object clarity on action lines.
 `;
     }
     if (pronounKey && PRONOUN_MODES[pronounKey] && PRONOUN_MODES[pronounKey].value) {
@@ -290,8 +260,8 @@ Before translating line by line, you MUST ingest the entire lyrics from the firs
 
 [REGISTER & ARTISTIC VOICE PRESERVATION]
 1. ANTI-PERSONA & ZERO DOMESTICATION: Absolutely DO NOT rewrite the song in the style of generic Vietnamese acoustic ballad / indie pop (e.g., do NOT turn Japanese rock/indie lyrics into melancholy V-Pop clichés like "buông tiếng thở dài", "lạc lối giữa đời", "vương vấn tình ta"). DO NOT use the tropes of translated Chinese web novels, Wuxia, Xianxia, or literal textbook translations.
-2. TARGET PERSONA: You are an expert Lyrical Subtitle Translator channeling the ORIGINAL ARTIST's unique voice, world, and literary style (e.g. Yorushika, Sakanaction, Kenshi Yonezu). Preserve the author's exact tone—whether raw, existential, detached, frantic, or bittersweet.
-3. ABSOLUTE BAN ON "TÔI - BẠN": Never pair "Tôi" with "Bạn" in song lyrics under any circumstance. It destroys musicality and emotional intimacy, sounding like a formal textbook or public announcement. Choose organic pairs based on context: "Anh - Em", "Em - Anh", "Tớ - Cậu", "Mình - Cậu", or "Tao - Mày" (rap/street); for monologues, use "Tôi" or "Ta" with implicit/hidden subjects or address as "cậu/người", never "bạn".
+2. TARGET PERSONA: You are an expert Lyrical Subtitle Translator channeling the ORIGINAL ARTIST's unique voice, world, and literary style. Preserve the author's exact tone—whether raw, existential, detached, frantic, or bittersweet.
+3. BAN ON MECHANICAL "TÔI - BẠN" IN ROMANCE: In love songs and intimate emotional lyrics, NEVER translate romantic lines into "Tôi yêu bạn" or "Tôi nhớ bạn". It sounds robotic and destroys emotional intimacy. Use organic relationship pairs: "Anh - Em", "Em - Anh", or "Tớ - Cậu". ("Tôi - Bạn" is only acceptable for public/educational contexts or when explicitly selected by the user).
 4. HARD BAN ON FORBIDDEN AI TICS: Absolutely NEVER use "chao nghiêng" (hoặc "khẽ chao nghiêng") and "khẽ khàng" under any circumstances. These are forbidden lazy clichés. Use natural, grounded words instead (e.g. lững lờ, chao đảo, nghiêng ngả, nhẹ nhàng, lặng lẽ, khẽ).
 
 [REPETITION & RHYTHM FIDELITY LAW — MANDATORY]
@@ -363,7 +333,7 @@ ${hygiene}
 ${hygiene}
 
 [PRE-FLIGHT REASONING GUIDE (CONCISE)]
-In <thought>, outline in 1-2 brief sentences the artist persona, singer gender/POV, locked pronoun pair (e.g., Em-Anh for female artist in romance, Anh-Em for male artist in romance, Tớ-Cậu for youth/anime), and anchor core imagery/motifs (never drop key symbols or force end-rhyme that alters meaning).
+In <thought>, outline in 1-2 brief sentences the song narrative and relationship dynamic, singer gender/POV, locked pronoun pair (e.g., Em-Anh for female singer in romance, Anh-Em for male singer in romance, Tớ-Cậu for youth/friendship), and anchor core imagery/motifs (never drop key symbols or force end-rhyme that alters meaning).
 *Strict Constraint:* Keep reasoning ultra-concise (< 60 words). Never list lines, draft line-by-line translations, or write long essays in thought. Start outputting translation tags/JSON immediately after </thought>.`;
 }
 
@@ -1207,7 +1177,7 @@ Output JSON:`;
         const langModule = TARGET_LANGUAGES[targetLang] || TARGET_LANGUAGES.vi;
         const langName = langModule.name || "Vietnamese";
         return `Translate to ${langName}. Output valid JSON Array of ${lines.length} strings. 1:1 mapping. No merging.
-CRITICAL: Every line must be translated to ${langName}. Even if the input is in English, French, Japanese, or any language, DO NOT output or copy the original foreign text.
+CRITICAL: Every line must be translated to ${langName}. Even if the input is in English, French, Japanese, or any language, DO NOT output or copy the original foreign text.${targetLang === "vi" ? "\nFor love/romantic songs, use natural couple pronouns ('Anh - Em' / 'Em - Anh' / 'Tớ - Cậu'); NEVER output 'tôi yêu bạn'." : ""}
 Input: ${linesJson}
 Output JSON:`;
     },
@@ -1243,7 +1213,7 @@ Output:`;
         const langModule = TARGET_LANGUAGES[targetLang] || TARGET_LANGUAGES.vi;
         const langName = langModule.name || "Vietnamese";
         return `Translate to ${langName}. Output EXACTLY ${lineCount} XML tags (<1>...</1> to <${lineCount}>...</${lineCount}>). 1:1 mapping. No merging.
-CRITICAL: Every line must be translated to ${langName}. Even if the input is in English, French, Japanese, or any language, DO NOT output or copy the original foreign text.
+CRITICAL: Every line must be translated to ${langName}. Even if the input is in English, French, Japanese, or any language, DO NOT output or copy the original foreign text.${targetLang === "vi" ? "\nFor love/romantic songs, use natural couple pronouns ('Anh - Em' / 'Em - Anh' / 'Tớ - Cậu'); NEVER output 'tôi yêu bạn'." : ""}
 Input:
 ${taggedInput}
 Output:`;
