@@ -9,6 +9,8 @@ const ProviderNetease = (() => {
 
     const DEDICATED_WORKER_TEMPLATE = "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}";
 
+    const METADATA_CREDITS_REGEX = /^(作词人?|作曲人?|编曲人?|演唱(?:者)?|制作(?:人|助理|室|公司)?|製作(?:人|助理|室|公司)?|监制|監製|出品人?|发行人?|發行人?|企划|企劃|统筹|統籌|人声(?:编辑|修音|录音)?|配唱(?:制作人|制作)?|后期(?:制作|工程)?|录音(?:师|室|棚|助理|工程师)?|混音(?:师|室|棚|助理|工程师)?|母带(?:师|室|棚|工程|工程师|后期)?|音频(?:工程|工程师|编辑)?|声音(?:工程|工程师)?|作詞人?|作曲人?|編曲人?|歌詞|演奏|歌|唄|唱|アーティスト|歌手|プロデューサー|ディレクター|レコーディング(?:エンジニア)?|ミキシング(?:エンジニア)?|マスタリング(?:エンジニア)?|エンジニア|吉他(?:录音|演奏)?|贝斯(?:录音|演奏)?|鼓(?:录音|演奏)?|弦乐(?:录音|编写|演奏|监制)?|和音(?:编写|录音)?|和声(?:编写|录音)?|(?:Recording|Mixing|Mastering|Audio|Sound)\s+(?:Engineer|Studio|Producer)|(?:Vocal|Track|Sound)\s+(?:Producer|Editor|Director)|Lyricist|Composer|Arranger|Producer|Lyrics|Vocals|Mixer|Mastering|Guitar|Bass|Drums|Strings|Recording|Artist|Singer|Lời|Nhạc|Phối khí|Trình bày|Sáng tác|Hòa âm)\s*[:：]|^(Written by|Composed by|Arranged by|Produced by|Mixed by|Mastered by|Recorded by|Sound Produced by|Directed by|Performed by|Vocals by|Music by|Lyrics by)\b|(テーマソング|主題歌|オープニングテーマ|エンディングテーマ|挿入歌|イメージソング|テーマ曲|\bTheme Song\b|\bOpening Theme\b|\bEnding Theme\b|\bInsert Song\b)|^(LRC|Lrc|lrc|Offset|offset|by|By|提供|字幕|翻译|翻譯|校对|潤色)\s*[:：]/i;
+
     async function fetchNetEase(targetUrl) {
         if (!targetUrl) return null;
         
@@ -178,7 +180,7 @@ const ProviderNetease = (() => {
         const lines = lrcText.split("\n");
         const synced = [];
         const unsynced = [];
-        const metadataRegex = /^(作词人?|作曲人?|编曲人?|演唱|制作人?|製作人?|监制|監製|出品人?|发行人?|發行人?|企划|企劃|统筹|統籌|人声|后期|混音|母带|作詞人?|作曲人?|編曲人?|歌詞|演奏|歌|唄|唱|アーティスト|歌手|プロデューサー|ディレクター|吉他|贝斯|鼓|弦乐|和音|录音|混音师|母带工程师|Lyricist|Composer|Arranger|Producer|Lyrics|Vocals|Mixer|Mastering|Guitar|Bass|Drums|Strings|Recording|Artist|Singer|Lời|Nhạc|Phối khí|Trình bày|Sáng tác|Hòa âm)\s*[:：]|^(Written by|Composed by|Arranged by|Produced by|Mixed by|Mastered by|Recorded by|Sound Produced by|Directed by|Performed by|Vocals by|Music by|Lyrics by)\b|(テーマソング|主題歌|オープニングテーマ|エンディングテーマ|挿入歌|イメージソング|テーマ曲|\bTheme Song\b|\bOpening Theme\b|\bEnding Theme\b|\bInsert Song\b)|^(LRC|Lrc|lrc|Offset|offset|by|By|提供|字幕|翻译|翻譯|校对|潤色)\s*[:：]/i;
+        const metadataRegex = METADATA_CREDITS_REGEX;
 
         for (const raw of lines) {
             const m = raw.match(/^\[(\d{1,2}):(\d{2})[:\.](\d{2,3})\](.*)/);
@@ -211,6 +213,12 @@ const ProviderNetease = (() => {
                     const cached = await IDBCache.get(`netease:lyrics:${info.uri}`);
                     if (cached && (cached.synced || cached.unsynced)) {
                         DebugLogger.log(`[NetEase] IndexedDB cache hit for "${info.title}"`);
+                        if (Array.isArray(cached.synced)) {
+                            cached.synced = cached.synced.filter(l => !l?.text || !METADATA_CREDITS_REGEX.test(l.text));
+                        }
+                        if (Array.isArray(cached.unsynced)) {
+                            cached.unsynced = cached.unsynced.filter(l => !l?.text || !METADATA_CREDITS_REGEX.test(l.text));
+                        }
                         return cached;
                     }
                 } catch (_) {}
