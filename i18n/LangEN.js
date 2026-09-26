@@ -61,6 +61,11 @@ window.LANG_EN = {
       "label": "Font size",
       "desc": "(or Ctrl + Mouse scroll in main app)"
     },
+    "fontFamily": {
+      "label": "Font family",
+      "desc": "Custom font for lyrics (leave blank for Spotify default).",
+      "placeholder": "Default (Spotify)"
+    },
     "alignment": {
       "label": "Alignment",
       "options": {

@@ -633,8 +633,22 @@ const ConfigHelper = () => {
 		{ desc: getText("settings.playbarButton.label"), key: "playbar-button", info: getText("settings.playbarButton.desc"), type: ConfigSlider },
 		{ desc: getText("settings.globalDelay.label"), info: getText("settings.globalDelay.desc"), key: "global-delay", type: ConfigAdjust, min: -10000, max: 10000, step: 250 },
 		{ desc: getText("settings.fontSize.label"), info: getText("settings.fontSize.desc"), key: "font-size", type: ConfigAdjust, min: fontSizeLimit.min, max: fontSizeLimit.max, step: fontSizeLimit.step },
+		{ desc: getText("settings.fontFamily.label"), info: getText("settings.fontFamily.desc"), key: "font-family", type: ConfigComboBox, placeholder: getText("settings.fontFamily.placeholder") || "Default (Spotify)", options: FONT_PRESETS },
 		{ desc: getText("settings.alignment.label"), key: "alignment", type: ConfigSelection, options: { left: getText("settings.alignment.options.left"), center: getText("settings.alignment.options.center"), right: getText("settings.alignment.options.right") } },
 		{ desc: getText("settings.fullscreenKey.label"), key: "fullscreen-key", type: ConfigHotkey },
+	];
+
+	const FONT_PRESETS = [
+		"Segoe UI",
+		"Inter",
+		"Roboto",
+		"Arial",
+		"Montserrat",
+		"Be Vietnam Pro",
+		"Nunito",
+		"Georgia",
+		"Courier New",
+		"monospace"
 	];
 
 	const syncedSettings = [

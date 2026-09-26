@@ -76,7 +76,7 @@
 			overflow: hidden;
 			padding: 4px 12px;
 			box-sizing: border-box;
-			font-family: var(--font-family, CircularSp, sans-serif);
+			font-family: var(--lyrics-font-family, var(--font-family, CircularSp, sans-serif));
 		}
 		#${LYRICS_PANEL_ID} .pip-lyrics-scroll {
 			flex: 1;
@@ -152,7 +152,7 @@
 			padding: 4px 12px;
 			pointer-events: none;
 			z-index: 50;
-			font-family: var(--font-family, CircularSp, sans-serif);
+			font-family: var(--lyrics-font-family, var(--font-family, CircularSp, sans-serif));
 			text-align: center;
 			transition: opacity 0.3s;
 		}
@@ -436,6 +436,13 @@
 		if (lyricFontSize !== lastFontSize) {
 			lastFontSize = lyricFontSize;
 			doc.documentElement.style.setProperty("--pip-lyric-font-size", lyricFontSize + "px");
+		}
+
+		// Sync font family if set
+		const customFont = CONFIG?.visual?.["font-family"]?.trim();
+		const targetFontFamily = customFont ? (customFont.includes(",") ? customFont : `"${customFont.replace(/"/g, "")}", sans-serif`) : "";
+		if (doc.documentElement.style.getPropertyValue("--lyrics-font-family") !== targetFontFamily) {
+			doc.documentElement.style.setProperty("--lyrics-font-family", targetFontFamily);
 		}
 	}
 

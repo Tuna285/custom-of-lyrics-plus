@@ -168,6 +168,7 @@ const CONFIG = {
         "lines-before": ConfigUtils.getPersisted("lyrics-plus:visual:lines-before") || "0",
         "lines-after": ConfigUtils.getPersisted("lyrics-plus:visual:lines-after") || "2",
         "font-size": ConfigUtils.getPersisted("lyrics-plus:visual:font-size") || "32",
+        "font-family": ConfigUtils.getPersisted("lyrics-plus:visual:font-family") || "",
         "lyric-position": Number(ConfigUtils.getPersisted("lyrics-plus:visual:lyric-position")) || 50,
         "translate:translated-lyrics-source": ConfigUtils.getPersisted("lyrics-plus:visual:translate:translated-lyrics-source") || "geminiVi",
         "translate:target-language": ConfigUtils.getPersisted("lyrics-plus:visual:translate:target-language") || "vi",

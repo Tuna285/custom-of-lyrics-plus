@@ -470,6 +470,10 @@
     0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
+.lyrics-lyricsContainer-LyricsLine {
+  font-family: var(--lyrics-font-family, inherit);
+}
+
 .lyrics-lyricsContainer-LyricsLine,
 .lyrics-versionSelector {
   margin-left: 100px;

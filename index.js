@@ -1148,6 +1148,9 @@ class LyricsContainer extends react.Component {
 			...this.styleVariables,
 			"--lyrics-align-text": CONFIG.visual.alignment,
 			"--lyrics-font-size": `${CONFIG.visual["font-size"]}px`,
+			"--lyrics-font-family": CONFIG.visual["font-family"]?.trim()
+				? (CONFIG.visual["font-family"].includes(",") ? CONFIG.visual["font-family"] : `"${CONFIG.visual["font-family"].replace(/"/g, "")}", inherit`)
+				: "inherit",
 			"--animation-tempo": this.state.tempo,
 		};
 
@@ -1237,6 +1240,9 @@ class LyricsContainer extends react.Component {
 			...this.styleVariables,
 			"--lyrics-align-text": CONFIG.visual.alignment,
 			"--lyrics-font-size": `${CONFIG.visual["font-size"]}px`,
+			"--lyrics-font-family": CONFIG.visual["font-family"]?.trim()
+				? (CONFIG.visual["font-family"].includes(",") ? CONFIG.visual["font-family"] : `"${CONFIG.visual["font-family"].replace(/"/g, "")}", inherit`)
+				: "inherit",
 			"--animation-tempo": this.state.tempo,
 		};
 

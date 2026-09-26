@@ -62,6 +62,11 @@ window.LANG_VI = {
       "label": "Cỡ chữ",
       "desc": "(Hoặc giữ Ctrl + lăn chuột trong màn hình lyrics)"
     },
+    "fontFamily": {
+      "label": "Phông chữ",
+      "desc": "Tùy chỉnh phông chữ lời bài hát (để trống để dùng mặc định).",
+      "placeholder": "Mặc định (Spotify)"
+    },
     "alignment": {
       "label": "Căn chỉnh",
       "options": {
