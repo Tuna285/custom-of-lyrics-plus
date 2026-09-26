@@ -439,10 +439,13 @@
 		}
 
 		// Sync font family if set
-		const customFont = CONFIG?.visual?.["font-family"]?.trim();
-		const targetFontFamily = customFont ? (customFont.includes(",") ? customFont : `"${customFont.replace(/"/g, "")}", sans-serif`) : "";
-		if (doc.documentElement.style.getPropertyValue("--lyrics-font-family") !== targetFontFamily) {
-			doc.documentElement.style.setProperty("--lyrics-font-family", targetFontFamily);
+		const customFont = CONFIG?.visual?.["font-family"];
+		const targetFontFamily = (typeof Utils !== "undefined" && Utils.computeLyricsFontFamily)
+			? Utils.computeLyricsFontFamily(customFont)
+			: (customFont?.trim() || "inherit");
+		const targetValue = targetFontFamily === "inherit" ? "" : targetFontFamily;
+		if (doc.documentElement.style.getPropertyValue("--lyrics-font-family") !== targetValue) {
+			doc.documentElement.style.setProperty("--lyrics-font-family", targetValue);
 		}
 	}
 

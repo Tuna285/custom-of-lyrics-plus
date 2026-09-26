@@ -439,6 +439,27 @@ const Utils = {
 		// Default / Unchanged / Fixed mode fallback
 		return { mainText: text, subText: null, subText2: null };
 	},
+	computeLyricsFontFamily(font) {
+		const trimmed = font?.trim();
+		if (!trimmed || trimmed.toLowerCase() === "inherit" || trimmed.toLowerCase() === "default") {
+			return "inherit";
+		}
+		if (trimmed.includes(",")) {
+			return trimmed;
+		}
+		const cleanFont = trimmed.replace(/["']/g, "");
+		const lower = cleanFont.toLowerCase();
+		const genericFamilies = ["sans-serif", "serif", "monospace", "cursive", "fantasy", "system-ui"];
+		if (genericFamilies.includes(lower)) {
+			return lower;
+		}
+		const fallback = (lower.includes("mono") || lower.includes("courier") || lower.includes("console") || lower.includes("code"))
+			? "monospace"
+			: (lower.includes("serif") || lower.includes("times") || lower.includes("georgia"))
+				? "serif"
+				: "sans-serif";
+		return `"${cleanFont}", ${fallback}`;
+	},
 };
 
 const DBManager = {

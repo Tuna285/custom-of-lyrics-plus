@@ -318,6 +318,7 @@ const ConfigComboBox = ({ name, defaultValue, onChange = () => { }, placeholder 
 			react.createElement("input", {
 				value,
 				onChange: setValueCallback,
+				onInput: setValueCallback,
 				placeholder,
 				type: inputType,
 				autoComplete,
@@ -629,14 +630,20 @@ const ConfigHelper = () => {
 
 	const FONT_PRESETS = [
 		"Segoe UI",
+		"Arial",
+		"Georgia",
+		"Times New Roman",
+		"Courier New",
+		"Consolas",
+		"Bahnschrift",
+		"Comic Sans MS",
+		"Trebuchet MS",
+		"Verdana",
 		"Inter",
 		"Roboto",
-		"Arial",
 		"Montserrat",
 		"Be Vietnam Pro",
 		"Nunito",
-		"Georgia",
-		"Courier New",
 		"monospace"
 	];
 
