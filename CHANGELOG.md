@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.3] - 2026-09-28
+
+### Added
+
+- **Universal Custom Font & Google Fonts Integration**: Configure custom lyrics fonts via Settings with dynamic Google Fonts fetching, smart font aliasing, and presets supporting Vietnamese diacritics (`Nunito`, `Quicksand`).
+- **Musixmatch Performer Tagging**: Displays vocalists per lyric line for duets and group tracks by parsing performer metadata from Musixmatch.
+- **English Song Conversion Button**: Restored the conversions menu button for English songs, allowing 1-click translation to Vietnamese or other target languages.
+
+### Changed
+
+- **Musixmatch Cloudflare Proxy Routing**: Routes Musixmatch requests through the dedicated Cloudflare Worker proxy with native fallback, bypassing ISP Captcha challenges (401) and rate limits.
+- **Musixmatch Richsync & Token Optimization**: Directly extracts compact word-level richsync from macro payloads without extra HTTP calls and adds cooldown to prevent request flooding.
+- **Contextual Conversion Notifications**: Shows specific notifications per conversion mode (Romaji, Furigana, Pinyin, etc.) on failure instead of generic error toasts.
+
+### Fixed
+
+- **Sub-line & PiP Font Inheritance**: Enforced custom font styling across all lyric sub-lines (translations, furigana) and Picture-in-Picture views via inline `@font-face` injection and FontFace synchronization.
+- **Settings Combobox TDZ ReferenceError**: Fixed an initialization error when opening the settings modal with font presets.
+- **Synced Lyrics Auto-Fetch Priority**: Ensured synchronized lyrics take priority during auto-fetch and prevented stale translation cache leaks.
+
 ## [1.9.2] - 2026-09-10
 
 ### Changed

@@ -4,7 +4,7 @@ const UpdateService = {
     VERSION_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/version.json",
     RAW_BASE_URL: "https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main",
     INSTALL_COMMAND: "iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/install.ps1 | iex",
-    CURRENT_VERSION: "1.9.2",
+    CURRENT_VERSION: "1.9.3",
     CHECK_INTERVAL: 1800000, // 30 minutes for silent auto-checks
 
     async checkForUpdates(silent = false) {

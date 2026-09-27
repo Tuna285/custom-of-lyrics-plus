@@ -179,10 +179,12 @@ const CONFIG = {
         "translation-mode:japanese": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode:japanese") || "none",
         "translation-mode:korean": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode:korean") || "none",
         "translation-mode:chinese": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode:chinese") || "none",
+        "translation-mode:english": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode:english") || "none",
         "translation-mode:gemini": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode:gemini") || "none",
         "translation-mode-2:japanese": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode-2:japanese") || "none",
         "translation-mode-2:korean": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode-2:korean") || "none",
         "translation-mode-2:chinese": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode-2:chinese") || "none",
+        "translation-mode-2:english": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode-2:english") || "none",
         "translation-mode-2:gemini": ConfigUtils.getPersisted("lyrics-plus:visual:translation-mode-2:gemini") || "none",
         "gemini-api-key": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key") || "",
         "gemini-api-key-romaji": ConfigUtils.getPersisted("lyrics-plus:visual:gemini-api-key-romaji") || "",
@@ -244,7 +246,7 @@ const CONFIG = {
         musixmatch: {
             on: ConfigUtils.get("lyrics-plus:provider:musixmatch:on"),
             desc: "Fully compatible with Spotify. Requires a token that can be retrieved from the official Musixmatch app. If you have problems with retrieving lyrics, try refreshing the token by clicking <code>Refresh Token</code> button. You may need to be forced to use your own CORS Proxy to use this provider.",
-            token: localStorage.getItem("lyrics-plus:provider:musixmatch:token") || "21051986b9886beabe1ce01c3ce94c96319411f8f2c122676365e3",
+            token: localStorage.getItem("lyrics-plus:provider:musixmatch:token") || "26092761be5f458c27bdb9f54cb7c2673eae65ce8e3a0937796cb7",
             modes: [SYNCED, UNSYNCED],
         },
         spotify: {

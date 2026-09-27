@@ -2,21 +2,57 @@ const ProviderMusixmatch = (() => {
 	const headers = {
 		Host: "apic-appmobile.musixmatch.com",
 		authority: "apic-appmobile.musixmatch.com",
+		cookie: "x-mxm-token-guid=",
 		"X-Cookie": "x-mxm-token-guid=",
 		"x-mxm-app-version": "10.1.1",
+		"User-Agent": "Musixmatch/2025120901 CFNetwork/3860.300.31 Darwin/25.2.0",
 		"X-User-Agent": "Musixmatch/2025120901 CFNetwork/3860.300.31 Darwin/25.2.0",
 		"Accept-Language": "en-US,en;q=0.9",
 		Connection: "keep-alive",
 		Accept: "application/json",
 	};
 
-	async function refreshMusixmatchToken() {
+	const DEDICATED_WORKER_TEMPLATE = "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}";
+
+	async function fetchMxm(targetUrl) {
+		if (!targetUrl) return null;
+
+		// 1. Primary: Dedicated Cloudflare Worker CORS Proxy (bypasses ISP Captchas and IP rate limits)
 		try {
-			console.warn("[Lyrics+] Musixmatch token expired or invalid. Refreshing token...");
-			const res = await Spicetify.CosmosAsync.get(
-				"https://apic-appmobile.musixmatch.com/ws/1.1/token.get?app_id=mac-ios-v2.0",
-				null,
-				headers
+			const proxyTemplate = localStorage.getItem("spicetify:corsProxyTemplate") || DEDICATED_WORKER_TEMPLATE;
+			const proxiedUrl = proxyTemplate.replace("{url}", encodeURIComponent(targetUrl));
+			const res = await fetch(proxiedUrl);
+			if (res.ok) {
+				const data = await res.json();
+				if (data?.message) return data;
+			}
+		} catch (_) {}
+
+		// 2. Fallback: Native Spicetify.CosmosAsync
+		try {
+			const res = await Spicetify.CosmosAsync.get(targetUrl, null, headers);
+			if (res?.message) return res;
+		} catch (e) {
+			console.warn("[Lyrics+] Musixmatch direct fetch error:", e);
+		}
+
+		return null;
+	}
+
+	let lastRefreshAttempt = 0;
+	const REFRESH_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes cooldown on repeated failures
+
+	async function refreshMusixmatchToken(force = false) {
+		const now = Date.now();
+		if (!force && now - lastRefreshAttempt < REFRESH_COOLDOWN_MS) {
+			console.warn(`[Lyrics+] Musixmatch token refresh in cooldown (${Math.round((REFRESH_COOLDOWN_MS - (now - lastRefreshAttempt)) / 1000)}s remaining). Skipping.`);
+			return null;
+		}
+		lastRefreshAttempt = now;
+		try {
+			console.warn("[Lyrics+] Musixmatch token expired or invalid. Refreshing token via proxy...");
+			const res = await fetchMxm(
+				"https://apic-appmobile.musixmatch.com/ws/1.1/token.get?app_id=mac-ios-v2.0"
 			);
 			const newToken = res?.message?.body?.user_token;
 			if (newToken) {
@@ -24,10 +60,42 @@ const ProviderMusixmatch = (() => {
 				localStorage.setItem("lyrics-plus:provider:musixmatch:token", newToken);
 				console.log("[Lyrics+] Musixmatch token auto-refreshed successfully:", newToken);
 				return newToken;
+			} else {
+				console.warn("[Lyrics+] Musixmatch token.get response had no user_token:", res?.message?.header);
 			}
 		} catch (e) {
 			console.error("[Lyrics+] Failed to auto-refresh Musixmatch token:", e);
 		}
+		return null;
+	}
+
+	function findTranslationStatus(body) {
+		if (!body || typeof body !== "object") {
+			return null;
+		}
+
+		if (Array.isArray(body)) {
+			for (const item of body) {
+				const result = findTranslationStatus(item);
+				if (result) {
+					return result;
+				}
+			}
+
+			return null;
+		}
+
+		if (Array.isArray(body.track_lyrics_translation_status)) {
+			return body.track_lyrics_translation_status;
+		}
+
+		for (const value of Object.values(body)) {
+			const result = findTranslationStatus(value);
+			if (result) {
+				return result;
+			}
+		}
+
 		return null;
 	}
 
@@ -47,6 +115,9 @@ const ProviderMusixmatch = (() => {
 				q_duration: durr,
 				f_subtitle_length: Math.floor(durr),
 				usertoken: tokenVal,
+				optional_calls: "track.richsync",
+				richsync_compact_type: "words",
+				part: "track_lyrics_translation_status,track_structure,track_performer_tagging",
 			};
 
 			const finalURL =
@@ -55,7 +126,7 @@ const ProviderMusixmatch = (() => {
 					.map((key) => `${key}=${encodeURIComponent(params[key])}`)
 					.join("&");
 
-			return await Spicetify.CosmosAsync.get(finalURL, null, headers);
+			return await fetchMxm(finalURL);
 		};
 
 		let currentToken = CONFIG.providers.musixmatch.token;
@@ -78,9 +149,9 @@ const ProviderMusixmatch = (() => {
 			};
 		}
 
-		if (body["matcher.track.get"].message.header.status_code !== 200) {
+		if (body["matcher.track.get"]?.message?.header?.status_code !== 200) {
 			return {
-				error: `Requested error: ${body["matcher.track.get"].message.header.mode}`,
+				error: `Requested error: ${body["matcher.track.get"]?.message?.header?.mode || "Track not found"}`,
 				uri: info.uri,
 			};
 		}
@@ -91,7 +162,144 @@ const ProviderMusixmatch = (() => {
 			};
 		}
 
+		const translationStatus = findTranslationStatus(body);
+		const meta = body?.["matcher.track.get"]?.message?.body;
+		const availableTranslations = Array.isArray(translationStatus) ? [...new Set(translationStatus.map((status) => status?.to).filter(Boolean))] : [];
+
+		Object.defineProperties(body, {
+			__musixmatchTranslationStatus: {
+				value: availableTranslations,
+			},
+			__musixmatchTrackId: {
+				value: meta?.track?.track_id ?? null,
+			},
+		});
+
 		return body;
+	}
+
+	function parsePerformerData(meta) {
+		if (!meta || !meta.track || !meta.track.performer_tagging) {
+			return [];
+		}
+
+		const tagging = meta.track.performer_tagging;
+		const miscTags = meta.track.performer_tagging_misc_tags || {};
+		let performerMap = [];
+		if (tagging && tagging.content && tagging.content.length > 0) {
+			const resources = tagging.resources?.artists || [];
+			const resourcesList = Array.isArray(resources) ? resources : Object.values(resources);
+
+			performerMap = tagging.content
+				.map((c) => {
+					if (!c.performers || c.performers.length === 0) return null;
+
+					const resolvedPerformers = c.performers
+						.map((p) => {
+							let name = "Unknown";
+							if (p.type === "artist") {
+								const fqid = p.fqid;
+								const idFromFqid = fqid ? parseInt(fqid.split(":")[2]) : null;
+
+								const artist = resourcesList.find((r) => r.artist_id === idFromFqid);
+								if (artist) name = artist.artist_name;
+							} else if (miscTags[p.type]) {
+								name = miscTags[p.type];
+							}
+							return {
+								fqid: p.fqid,
+								artist_id: p.fqid ? parseInt(p.fqid.split(":")[2]) : null,
+								name: name,
+							};
+						})
+						.filter((p) => p.name !== "Unknown");
+
+					const names = resolvedPerformers.map((p) => p.name);
+					if (names.length === 0) return null;
+
+					return {
+						name: names.join(", "),
+						snippet: c.snippet,
+						performers: resolvedPerformers,
+					};
+				})
+				.filter(Boolean);
+		}
+
+		const normalizeForMatch = (text) => text.replace(/\s+/g, "").toLowerCase();
+
+		const snippetQueue = [];
+		if (performerMap.length > 0) {
+			for (const tag of performerMap) {
+				if (!tag.snippet) continue;
+				const snippetLines = tag.snippet
+					.split(/\n+/)
+					.map((s) => s.trim())
+					.filter(Boolean);
+				for (const sLine of snippetLines) {
+					if (sLine.length < 2 && !/^[\u3131-\uD79D]/.test(sLine)) continue;
+					snippetQueue.push({
+						text: normalizeForMatch(sLine),
+						raw: sLine,
+						performers: tag.performers,
+					});
+				}
+			}
+		}
+		return snippetQueue;
+	}
+
+	function matchSequential(lyricsLines, snippetQueue, getTextCallback = (l) => l.text) {
+		if (!snippetQueue || snippetQueue.length === 0) return lyricsLines;
+
+		const normalizeForMatch = (text) => text.replace(/\s+/g, "").toLowerCase();
+		let queueCursor = 0;
+		const LOOKAHEAD = 5;
+
+		return lyricsLines.map((line) => {
+			const lineText = getTextCallback(line) || "♪";
+			let normalizedLine = normalizeForMatch(lineText);
+
+			let matchedPerformers = [];
+
+			while (queueCursor < snippetQueue.length) {
+				let matchFoundAtOffset = -1;
+
+				for (let i = 0; i < LOOKAHEAD && queueCursor + i < snippetQueue.length; i++) {
+					const snippet = snippetQueue[queueCursor + i];
+
+					if (normalizedLine.includes(snippet.text) && snippet.text.length > 0) {
+						matchFoundAtOffset = i;
+						break;
+					}
+				}
+
+				if (matchFoundAtOffset !== -1) {
+					queueCursor += matchFoundAtOffset;
+					const matchedSnippet = snippetQueue[queueCursor];
+					matchedPerformers.push(...matchedSnippet.performers);
+					normalizedLine = normalizedLine.replace(matchedSnippet.text, "");
+					queueCursor++;
+				} else {
+					break;
+				}
+			}
+
+			const uniquePerformers = [];
+			const sawMap = new Set();
+			for (const p of matchedPerformers) {
+				const key = p.fqid || p.name;
+				if (!sawMap.has(key)) {
+					sawMap.add(key);
+					uniquePerformers.push(p);
+				}
+			}
+
+			return {
+				...line,
+				performers: uniquePerformers,
+			};
+		});
 	}
 
 	async function getKaraoke(body) {
@@ -104,28 +312,14 @@ const ProviderMusixmatch = (() => {
 			return null;
 		}
 
-		const baseURL = "https://apic-appmobile.musixmatch.com/ws/1.1/track.richsync.get?format=json&subtitle_format=mxm&app_id=mac-ios-v2.0&";
-
-		const params = {
-			f_subtitle_length: meta.track.track_length,
-			q_duration: meta.track.track_length,
-			commontrack_id: meta.track.commontrack_id,
-			usertoken: CONFIG.providers.musixmatch.token,
-		};
-
-		const finalURL =
-			baseURL +
-			Object.keys(params)
-				.map((key) => `${key}=${encodeURIComponent(params[key])}`)
-				.join("&");
-
-		let result = await Spicetify.CosmosAsync.get(finalURL, null, headers);
-
-		if (result.message.header.status_code !== 200) {
+		// Optimized in PR #3909: extracted directly from macro_calls payload
+		const richsyncCall = body?.["track.richsync.get"];
+		if (!richsyncCall || richsyncCall.message.header.status_code !== 200 || !richsyncCall.message.body.richsync) {
 			return null;
 		}
 
-		result = result.message.body;
+		const result = richsyncCall.message.body;
+		const snippetQueue = parsePerformerData(meta);
 
 		const parsedKaraoke = JSON.parse(result.richsync.richsync_body).map((line) => {
 			const startTime = line.ts * 1000;
@@ -146,11 +340,26 @@ const ProviderMusixmatch = (() => {
 			});
 			return {
 				startTime,
+				endTime,
 				text,
 			};
 		});
 
-		return parsedKaraoke;
+		return matchSequential(parsedKaraoke, snippetQueue, (line) => {
+			if (Array.isArray(line.text)) {
+				return line.text.map((t) => t.word).join("");
+			}
+			return line.text;
+		}).map((line) => {
+			const performerNames = (line.performers || [])
+				.map((p) => p.name)
+				.filter(Boolean)
+				.join(", ");
+			return {
+				...line,
+				performer: performerNames || null,
+			};
+		});
 	}
 
 	function getSynced(body) {
@@ -160,7 +369,6 @@ const ProviderMusixmatch = (() => {
 		}
 
 		const hasSynced = meta?.track?.has_subtitles;
-
 		const isInstrumental = meta?.track?.instrumental;
 
 		if (isInstrumental) {
@@ -172,10 +380,22 @@ const ProviderMusixmatch = (() => {
 				return null;
 			}
 
-			return JSON.parse(subtitle.subtitle_body).map((line) => ({
-				text: line.text || "♪",
-				startTime: line.time.total * 1000,
-			}));
+			const snippetQueue = parsePerformerData(meta);
+			const rawLines = JSON.parse(subtitle.subtitle_body);
+
+			return matchSequential(rawLines, snippetQueue, (l) => l.text).map((line) => {
+				const lineText = line.text || "♪";
+				const performerNames = (line.performers || [])
+					.map((p) => p.name)
+					.filter(Boolean)
+					.join(", ");
+
+				return {
+					text: lineText,
+					startTime: line.time.total * 1000,
+					performer: performerNames || null,
+				};
+			});
 		}
 
 		return null;
@@ -188,7 +408,6 @@ const ProviderMusixmatch = (() => {
 		}
 
 		const hasUnSynced = meta.track.has_lyrics || meta.track.has_lyrics_crowd;
-
 		const isInstrumental = meta?.track?.instrumental;
 
 		if (isInstrumental) {
@@ -199,15 +418,29 @@ const ProviderMusixmatch = (() => {
 			if (!lyrics) {
 				return null;
 			}
-			return lyrics.split("\n").map((text) => ({ text }));
+
+			const snippetQueue = parsePerformerData(meta);
+			const rawLines = lyrics.split("\n").map((text) => ({ text }));
+
+			return matchSequential(rawLines, snippetQueue, (l) => l.text).map((line) => {
+				const performerNames = (line.performers || [])
+					.map((p) => p.name)
+					.filter(Boolean)
+					.join(", ");
+
+				return {
+					...line,
+					performer: performerNames || null,
+				};
+			});
 		}
 
 		return null;
 	}
 
-	async function getTranslation(body) {
-		const track_id = body?.["matcher.track.get"]?.message?.body?.track?.track_id;
-		if (!track_id) return null;
+	async function getTranslation(target) {
+		const trackId = typeof target === "object" ? target?.["matcher.track.get"]?.message?.body?.track?.track_id : target;
+		if (!trackId) return null;
 
 		const selectedLanguage = CONFIG.visual["musixmatch-translation-language"] || "none";
 		if (selectedLanguage === "none") return null;
@@ -216,7 +449,7 @@ const ProviderMusixmatch = (() => {
 			"https://apic-appmobile.musixmatch.com/ws/1.1/crowd.track.translations.get?translation_fields_set=minimal&comment_format=text&format=json&app_id=mac-ios-v2.0&";
 
 		const params = {
-			track_id,
+			track_id: trackId,
 			selected_language: selectedLanguage,
 			usertoken: CONFIG.providers.musixmatch.token,
 		};
@@ -227,13 +460,13 @@ const ProviderMusixmatch = (() => {
 				.map((key) => `${key}=${encodeURIComponent(params[key])}`)
 				.join("&");
 
-		let result = await Spicetify.CosmosAsync.get(finalURL, null, headers);
+		let result = await fetchMxm(finalURL);
 
-		if (result.message.header.status_code !== 200) return null;
+		if (result?.message?.header?.status_code !== 200) return null;
 
 		result = result.message.body;
 
-		if (!result.translations_list?.length) return null;
+		if (!result?.translations_list?.length) return null;
 
 		return result.translations_list.map(({ translation }) => ({
 			translation: translation.description,
@@ -241,7 +474,58 @@ const ProviderMusixmatch = (() => {
 		}));
 	}
 
-	return { findLyrics, fetchLyrics: findLyrics, getSynced, getUnsynced, getTranslation, refreshMusixmatchToken };
+	let languageMap = null;
+	async function getLanguages() {
+		if (languageMap) return languageMap;
+
+		try {
+			const cached = localStorage.getItem("lyrics-plus:musixmatch-languages");
+			if (cached) {
+				const tempMap = JSON.parse(cached);
+				if (tempMap.__version === 1) {
+					delete tempMap.__version;
+					languageMap = tempMap;
+					return languageMap;
+				}
+			}
+		} catch (e) {
+			console.warn("Failed to parse cached languages", e);
+		}
+
+		const baseURL = "https://apic-appmobile.musixmatch.com/ws/1.1/languages.get?app_id=mac-ios-v2.0&get_romanized_info=1&";
+
+		const params = {
+			usertoken: CONFIG.providers.musixmatch.token,
+		};
+
+		const finalURL =
+			baseURL +
+			Object.keys(params)
+				.map((key) => `${key}=${encodeURIComponent(params[key])}`)
+				.join("&");
+
+		try {
+			let body = await fetchMxm(finalURL);
+			if (body?.message?.body?.language_list) {
+				languageMap = {};
+				body.message.body.language_list.forEach((item) => {
+					const lang = item.language;
+					if (lang.language_name) {
+						const name = lang.language_name.charAt(0).toUpperCase() + lang.language_name.slice(1);
+						if (lang.language_iso_code_1) languageMap[lang.language_iso_code_1] = name;
+						if (lang.language_iso_code_3) languageMap[lang.language_iso_code_3] = name;
+					}
+				});
+				localStorage.setItem("lyrics-plus:musixmatch-languages", JSON.stringify({ ...languageMap, __version: 1 }));
+				return languageMap;
+			}
+		} catch (e) {
+			console.error("Failed to fetch languages", e);
+		}
+		return {};
+	}
+
+	return { findLyrics, fetchLyrics: findLyrics, getSynced, getUnsynced, getKaraoke, getTranslation, getLanguages, refreshMusixmatchToken };
 })();
 
 window.ProviderMusixmatch = ProviderMusixmatch;

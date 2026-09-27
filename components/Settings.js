@@ -86,22 +86,47 @@ const RefreshTokenButton = ({ setTokenCallback }) => {
 
 	useEffect(() => {
 		if (status === "loading") {
-			Spicetify.CosmosAsync.get("https://apic-appmobile.musixmatch.com/ws/1.1/token.get?app_id=mac-ios-v2.0", null, {
-				Host: "apic-appmobile.musixmatch.com",
-				authority: "apic-appmobile.musixmatch.com",
-				"X-Cookie": "x-mxm-token-guid=",
-				"x-mxm-app-version": "10.1.1",
-				"X-User-Agent": "Musixmatch/2025120901 CFNetwork/3860.300.31 Darwin/25.2.0",
-				"Accept-Language": "en-US,en;q=0.9",
-				Connection: "keep-alive",
-				Accept: "application/json",
-			})
-				.then(({ message: response }) => {
-					if (response.header.status_code === 200 && response.body.user_token) { setTokenCallback(response.body.user_token); setStatus("success"); }
-					else if (response.header.status_code === 401) { setStatus("rateLimit"); }
-					else { setStatus("error"); console.error("Failed to refresh token", response); }
+			const tokenUrl = "https://apic-appmobile.musixmatch.com/ws/1.1/token.get?app_id=mac-ios-v2.0";
+			const proxyTemplate = localStorage.getItem("spicetify:corsProxyTemplate") || "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}";
+			const proxiedUrl = proxyTemplate.replace("{url}", encodeURIComponent(tokenUrl));
+
+			// Priority 1: Cloudflare proxy to bypass ISP Captchas and rate limits
+			fetch(proxiedUrl)
+				.then((res) => (res.ok ? res.json() : null))
+				.then((data) => {
+					if (data?.message?.header?.status_code === 200 && data.message.body?.user_token) {
+						setTokenCallback(data.message.body.user_token);
+						setStatus("success");
+						return;
+					}
+					// Fallback: CosmosAsync
+					return Spicetify.CosmosAsync.get(tokenUrl, null, {
+						Host: "apic-appmobile.musixmatch.com",
+						authority: "apic-appmobile.musixmatch.com",
+						cookie: "x-mxm-token-guid=",
+						"X-Cookie": "x-mxm-token-guid=",
+						"x-mxm-app-version": "10.1.1",
+						"User-Agent": "Musixmatch/2025120901 CFNetwork/3860.300.31 Darwin/25.2.0",
+						"X-User-Agent": "Musixmatch/2025120901 CFNetwork/3860.300.31 Darwin/25.2.0",
+						"Accept-Language": "en-US,en;q=0.9",
+						Connection: "keep-alive",
+						Accept: "application/json",
+					}).then(({ message: response }) => {
+						if (response.header.status_code === 200 && response.body.user_token) {
+							setTokenCallback(response.body.user_token);
+							setStatus("success");
+						} else if (response.header.status_code === 401) {
+							setStatus("rateLimit");
+						} else {
+							setStatus("error");
+							console.error("Failed to refresh token", response);
+						}
+					});
 				})
-				.catch((error) => { setStatus("error"); console.error("Failed to refresh token", error); });
+				.catch((error) => {
+					setStatus("error");
+					console.error("Failed to refresh token", error);
+				});
 		} else if (status === "error" || status === "rateLimit" || status === "success") {
 			const timer = setTimeout(() => setStatus("idle"), 3000);
 			return () => clearTimeout(timer);
@@ -629,6 +654,8 @@ const ConfigHelper = () => {
 	const tabKeys = ["general", "translation", "providers", "background", "appearance", "advanced"];
 
 	const FONT_PRESETS = [
+		"Nunito",
+		"Quicksand",
 		"M PLUS Rounded 1c",
 		"M PLUS 1",
 		"Be Vietnam Pro",
@@ -823,7 +850,7 @@ const ConfigHelper = () => {
 						}
 					},
 						react.createElement("div", null,
-							react.createElement("div", { style: { fontWeight: "bold", fontSize: "14px", color: "var(--spice-text)" } }, `Lyric Plus Translate v${window.UpdateService?.CURRENT_VERSION || "1.9.2"}`),
+							react.createElement("div", { style: { fontWeight: "bold", fontSize: "14px", color: "var(--spice-text)" } }, `Lyric Plus Translate v${window.UpdateService?.CURRENT_VERSION || "1.9.3"}`),
 							react.createElement("div", { style: { fontSize: "12px", color: "var(--spice-subtext)", marginTop: "2px" } }, getText("settings.updateAppSubtitle"))
 						),
 						react.createElement("button", {

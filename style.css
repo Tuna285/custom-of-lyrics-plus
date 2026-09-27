@@ -258,7 +258,7 @@
   height: 100%;
   width: 100%;
   top: 0;
-  font-family: var(--lyrics-font-family, inherit);
+  font-family: var(--lyrics-font-family, inherit) !important;
 }
 
 .lyrics-lyricsContainer-Loading {
@@ -471,10 +471,19 @@
     0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
+.lyrics-lyricsContainer-LyricsContainer,
+.lyrics-lyricsContainer-LyricsContainer *,
 .lyrics-lyricsContainer-LyricsLine,
+.lyrics-lyricsContainer-LyricsLine *,
 .lyrics-lyricsContainer-LyricsLine p,
-.lyrics-lyricsContainer-LyricsLine span {
-  font-family: var(--lyrics-font-family, inherit);
+.lyrics-lyricsContainer-LyricsLine span,
+.lyrics-lyricsContainer-LyricsLine-sub,
+.lyrics-lyricsContainer-LyricsLine-sub *,
+.lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine,
+.lyrics-lyricsContainer-UnsyncedLyricsPage .lyrics-lyricsContainer-LyricsLine,
+ruby,
+rt {
+  font-family: var(--lyrics-font-family, inherit) !important;
 }
 
 .lyrics-lyricsContainer-LyricsLine,

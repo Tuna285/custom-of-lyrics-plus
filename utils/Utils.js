@@ -455,7 +455,7 @@ const Utils = {
 		}
 		// Smart aliases for M PLUS family to resolve seamlessly across local Windows & Google Fonts
 		if (lower.includes("m plus") || lower.includes("mplus")) {
-			return `"${cleanFont}", "Rounded Mplus 1c", "M PLUS Rounded 1c", "M PLUS 1", sans-serif`;
+			return `"${cleanFont}", "Rounded Mplus 1c", "M PLUS Rounded 1c", "M PLUS 1", var(--font-family, "CircularSp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif)`;
 		}
 		const fallback = (lower.includes("mono") || lower.includes("courier") || lower.includes("console") || lower.includes("code"))
 			? "monospace"
@@ -464,7 +464,21 @@ const Utils = {
 				: (lower.includes("script") || lower.includes("caveat") || lower.includes("hand"))
 					? "cursive"
 					: "sans-serif";
-		return `"${cleanFont}", ${fallback}`;
+		return `"${cleanFont}", var(--font-family, "CircularSp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, ${fallback})`;
+	},
+	_fontCssCache: new Map(),
+	_applyInlineFontFace(cssText, targetDoc) {
+		if (!targetDoc || !targetDoc.head || !cssText) return;
+		const styleId = "lyrics-plus-dynamic-google-font-style";
+		let styleEl = targetDoc.getElementById(styleId);
+		if (!styleEl) {
+			styleEl = targetDoc.createElement("style");
+			styleEl.id = styleId;
+			targetDoc.head.appendChild(styleEl);
+		}
+		if (styleEl.textContent !== cssText) {
+			styleEl.textContent = cssText;
+		}
 	},
 	loadGoogleFont(fontName, targetDoc = (typeof document !== "undefined" ? document : null)) {
 		if (!targetDoc || !targetDoc.head) return;
@@ -489,12 +503,37 @@ const Utils = {
 				linkEl = targetDoc.createElement("link");
 				linkEl.id = elementId;
 				linkEl.rel = "stylesheet";
+				linkEl.crossOrigin = "anonymous";
 				targetDoc.head.appendChild(linkEl);
 			}
 			const queryFamily = encodeURIComponent(firstFont).replace(/%20/g, "+");
-			const targetUrl = `https://fonts.googleapis.com/css2?family=${queryFamily}:wght@400;700;900&display=swap`;
+			const targetUrl = `https://fonts.googleapis.com/css2?family=${queryFamily}:wght@400;500;700;900&display=swap`;
 			if (linkEl.href !== targetUrl) {
 				linkEl.href = targetUrl;
+			}
+
+			// In parallel, fetch CSS and inject inline @font-face <style> (vital for PiP about:blank contexts)
+			if (this._fontCssCache.has(targetUrl)) {
+				this._applyInlineFontFace(this._fontCssCache.get(targetUrl), targetDoc);
+			} else if (typeof fetch !== "undefined") {
+				fetch(targetUrl)
+					.then((res) => {
+						if (!res.ok) {
+							const fallbackUrl = `https://fonts.googleapis.com/css2?family=${queryFamily}&display=swap`;
+							return fetch(fallbackUrl);
+						}
+						return res;
+					})
+					.then((res) => res.text())
+					.then((cssText) => {
+						if (cssText && cssText.includes("@font-face")) {
+							this._fontCssCache.set(targetUrl, cssText);
+							this._applyInlineFontFace(cssText, targetDoc);
+						}
+					})
+					.catch((e) => {
+						console.warn("[Lyrics+] Failed to fetch inline Google Font CSS:", e);
+					});
 			}
 		} catch (e) {
 			console.warn("[Lyrics+] Failed to load Google Font:", e);

@@ -76,7 +76,12 @@
 			overflow: hidden;
 			padding: 4px 12px;
 			box-sizing: border-box;
-			font-family: var(--lyrics-font-family, var(--font-family, CircularSp, sans-serif));
+		}
+		#${LYRICS_PANEL_ID},
+		#${LYRICS_PANEL_ID} *,
+		#${HORIZ_OVERLAY_ID},
+		#${HORIZ_OVERLAY_ID} * {
+			font-family: var(--lyrics-font-family, var(--font-family, CircularSp, sans-serif)) !important;
 		}
 		#${LYRICS_PANEL_ID} .pip-lyrics-scroll {
 			flex: 1;
@@ -104,7 +109,7 @@
 		#${LYRICS_PANEL_ID} .pip-lyrics-line.active {
 			color: var(--text-base, #fff);
 			font-size: var(--pip-lyric-font-size);
-			font-weight: 600;
+			font-weight: 700;
 			text-shadow: 0 1px 6px rgba(0,0,0,0.9), 0 0 20px rgba(0,0,0,0.4);
 		}
 		#${LYRICS_PANEL_ID} .pip-line-main {
@@ -113,7 +118,7 @@
 		#${LYRICS_PANEL_ID} .pip-line-sub {
 			display: block;
 			font-size: calc(var(--pip-lyric-font-size) * 0.75);
-			font-weight: 400;
+			font-weight: 500;
 			opacity: 0.6;
 			margin-top: 1px;
 		}
@@ -152,28 +157,32 @@
 			padding: 4px 12px;
 			pointer-events: none;
 			z-index: 50;
-			font-family: var(--lyrics-font-family, var(--font-family, CircularSp, sans-serif));
+			font-family: var(--lyrics-font-family, var(--font-family, CircularSp, sans-serif)) !important;
 			text-align: center;
 			transition: opacity 0.3s;
 		}
 		#${HORIZ_OVERLAY_ID} .horiz-main {
 			color: var(--text-base, #fff);
 			font-size: calc(var(--pip-lyric-font-size) * 0.9);
-			font-weight: 600;
+			font-weight: 700;
 			line-height: 1.3;
 			text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+			font-family: var(--lyrics-font-family, var(--font-family, CircularSp, sans-serif)) !important;
 		}
 		#${HORIZ_OVERLAY_ID} .horiz-sub {
 			color: var(--text-subdued, rgba(255,255,255,0.65));
 			font-size: calc(var(--pip-lyric-font-size) * 0.75);
+			font-weight: 500;
 			line-height: 1.3;
 			margin-top: 1px;
 			text-shadow: 0 1px 3px rgba(0,0,0,0.5);
 			white-space: pre-wrap; /* Preserve newlines if any */
+			font-family: var(--lyrics-font-family, var(--font-family, CircularSp, sans-serif)) !important;
 		}
 
 		ruby {
 			ruby-position: over;
+			font-family: var(--lyrics-font-family, inherit) !important;
 		}
 		rt {
 			font-size: 0.6em;
@@ -181,6 +190,7 @@
 			transform: translateY(-2px); /* Slight lift */
 			opacity: 0.8;
 			user-select: none;
+			font-family: var(--lyrics-font-family, inherit) !important;
 		}
 		rp { display: none; }
 		
@@ -346,7 +356,22 @@
 		pipDoc = win.document;
 		console.log("[Lyrics+] PiP MiniLyrics: attaching to PiP window");
 
+		// Synchronously clone dynamic Google Font @font-face style from opener if available
+		const mainStyle = document.getElementById("lyrics-plus-dynamic-google-font-style");
+		if (mainStyle && pipDoc.head) {
+			let pipStyle = pipDoc.getElementById("lyrics-plus-dynamic-google-font-style");
+			if (!pipStyle) {
+				pipStyle = pipDoc.createElement("style");
+				pipStyle.id = "lyrics-plus-dynamic-google-font-style";
+				pipDoc.head.appendChild(pipStyle);
+			}
+			if (pipStyle.textContent !== mainStyle.textContent) {
+				pipStyle.textContent = mainStyle.textContent;
+			}
+		}
+
 		injectStyles(pipDoc);
+		syncFontFamily(pipDoc);
 		// Force apply saved font size on new window
 		pipDoc.documentElement.style.setProperty("--pip-lyric-font-size", lyricFontSize + "px");
 		
@@ -382,13 +407,40 @@
 		win.addEventListener("unload", onClose);
 	}
 
+	function syncFontFamily(doc) {
+		if (!doc?.documentElement) return;
+		const customFont = CONFIG?.visual?.["font-family"];
+		const targetFontFamily = (typeof Utils !== "undefined" && Utils.computeLyricsFontFamily)
+			? Utils.computeLyricsFontFamily(customFont)
+			: (customFont?.trim() || "inherit");
+		const targetValue = targetFontFamily === "inherit" ? "" : targetFontFamily;
+		if (doc.documentElement.style.getPropertyValue("--lyrics-font-family") !== targetValue) {
+			doc.documentElement.style.setProperty("--lyrics-font-family", targetValue);
+		}
+		if (customFont && typeof Utils !== "undefined" && Utils.loadGoogleFont) {
+			Utils.loadGoogleFont(customFont, doc);
+		}
+		// Synchronize FontFace objects from main document to PiP document
+		if (document.fonts && doc.fonts && doc !== document) {
+			document.fonts.forEach((font) => {
+				try {
+					doc.fonts.add(font);
+				} catch (_) {}
+			});
+		}
+	}
+
 	// ── Inject Styles ─────────────────────────────────────────────────────
 	function injectStyles(doc) {
-		if (doc.getElementById(STYLE_ID)) return;
-		const style = doc.createElement("style");
-		style.id = STYLE_ID;
-		style.textContent = PIP_CSS;
-		doc.head.appendChild(style);
+		let style = doc.getElementById(STYLE_ID);
+		if (!style) {
+			style = doc.createElement("style");
+			style.id = STYLE_ID;
+			doc.head.appendChild(style);
+		}
+		if (style.textContent !== PIP_CSS) {
+			style.textContent = PIP_CSS;
+		}
 	}
 
 	// ── Find Queue Container ──────────────────────────────────────────────
@@ -439,17 +491,7 @@
 		}
 
 		// Sync font family if set
-		const customFont = CONFIG?.visual?.["font-family"];
-		if (customFont) {
-			Utils.loadGoogleFont?.(customFont, doc);
-		}
-		const targetFontFamily = (typeof Utils !== "undefined" && Utils.computeLyricsFontFamily)
-			? Utils.computeLyricsFontFamily(customFont)
-			: (customFont?.trim() || "inherit");
-		const targetValue = targetFontFamily === "inherit" ? "" : targetFontFamily;
-		if (doc.documentElement.style.getPropertyValue("--lyrics-font-family") !== targetValue) {
-			doc.documentElement.style.setProperty("--lyrics-font-family", targetValue);
-		}
+		syncFontFamily(doc);
 	}
 
 	function createLyricsPanel(doc, queueEl) {
@@ -641,6 +683,8 @@
 
 	function updateLyrics() {
 		if (!pipDoc?.body) { cleanupPiP(); return; }
+		injectStyles(pipDoc);
+		syncFontFamily(pipDoc);
 
 		const horizontal = isHorizontalMode();
 
@@ -780,13 +824,13 @@
 		}
 
 		// Use parseFurigana for main text (it escapes safe chars then adds ruby tags)
-		let html = `<div class="horiz-main">${parseFurigana(displayMain)}</div>`;
+		let html = `<div class="horiz-main" style="font-family: var(--lyrics-font-family, inherit) !important;">${parseFurigana(displayMain)}</div>`;
 		
 		const sub = subText || subText2;
 		if (sub && stripHTML(sub) !== displayMain) {
 			// Sub text might also have furigana or ruby tags? 
 			// Usually translation doesn't have furigana. Escape it safely.
-			html += `<div class="horiz-sub">${escapeHTML(stripHTML(sub))}</div>`;
+			html += `<div class="horiz-sub" style="font-family: var(--lyrics-font-family, inherit) !important;">${escapeHTML(stripHTML(sub))}</div>`;
 		}
 		overlay.innerHTML = html;
 	}
@@ -815,13 +859,13 @@
 			lineEl.className = `pip-lyrics-line${isActive ? " active" : ""}`;
 			
 			// Use parseFurigana
-			let html = `<span class="pip-line-main">${parseFurigana(displayMain)}</span>`;
+			let html = `<span class="pip-line-main" style="font-family: var(--lyrics-font-family, inherit) !important;">${parseFurigana(displayMain)}</span>`;
 			
 			if (subText && stripHTML(subText) !== displayMain) {
-				html += `<span class="pip-line-sub">${escapeHTML(stripHTML(subText))}</span>`;
+				html += `<span class="pip-line-sub" style="font-family: var(--lyrics-font-family, inherit) !important;">${escapeHTML(stripHTML(subText))}</span>`;
 			}
 			if (subText2 && stripHTML(subText2) !== displayMain && stripHTML(subText2) !== stripHTML(subText)) {
-				html += `<span class="pip-line-sub">${escapeHTML(stripHTML(subText2))}</span>`;
+				html += `<span class="pip-line-sub" style="font-family: var(--lyrics-font-family, inherit) !important;">${escapeHTML(stripHTML(subText2))}</span>`;
 			}
 			lineEl.innerHTML = html;
 			

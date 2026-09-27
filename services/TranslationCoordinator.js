@@ -85,8 +85,12 @@ window.LyricsPlus.TranslationCoordinator = {
 		// Default to AI mode: use generic keys if no specific language detected
 		const modeKey = !friendlyLanguage ? "gemini" : friendlyLanguage;
 
-		const displayMode1 = CONFIG.visual[`translation-mode:${modeKey}`];
-		const displayMode2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
+		const displayMode1 = CONFIG.visual[`translation-mode:${modeKey}`]
+			|| ConfigUtils.getPersisted(`lyrics-plus:visual:translation-mode:${modeKey}`)
+			|| "none";
+		const displayMode2 = CONFIG.visual[`translation-mode-2:${modeKey}`]
+			|| ConfigUtils.getPersisted(`lyrics-plus:visual:translation-mode-2:${modeKey}`)
+			|| "none";
 
 		self.language = originalLanguage;
 		self.modeKey = modeKey; // Save for reset button to use
@@ -109,7 +113,24 @@ window.LyricsPlus.TranslationCoordinator = {
 				if (!error?._notified) {
 					const targetLang = CONFIG.visual["translate:target-language"] || "vi";
 					const langName = (typeof Prompts !== "undefined" && Prompts.getLanguage) ? Prompts.getLanguage(targetLang).name : "Translation";
-					const modeDisplayName = mode === "gemini_romaji" ? "Romaji, Romaja, Pinyin translation" : (mode === "gemini_furigana" ? "Furigana translation" : `${langName} translation`);
+					const localModeLabels = {
+						romaji: "Romaji",
+						furigana: "Furigana",
+						hiragana: "Hiragana",
+						katakana: "Katakana",
+						romaja: "Romaja",
+						pinyin: "Pinyin",
+						cn: "Simplified Chinese",
+						hk: "Traditional Chinese (HK)",
+						tw: "Traditional Chinese (TW)",
+					};
+					const modeDisplayName = localModeLabels[mode]
+						? `${localModeLabels[mode]} conversion`
+						: (mode === "gemini_romaji"
+							? "Romaji, Romaja, Pinyin translation"
+							: (mode === "gemini_furigana"
+								? "Furigana translation"
+								: `${langName} translation`));
 					Spicetify.showNotification(getText("notifications.translationFailedWithReason", { mode: modeDisplayName, reason: error.message || "Unknown error" }), true, 4000);
 				}
 				return null; // Return null on failure
