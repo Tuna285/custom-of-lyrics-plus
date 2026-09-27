@@ -629,21 +629,21 @@ const ConfigHelper = () => {
 	const tabKeys = ["general", "translation", "providers", "background", "appearance", "advanced"];
 
 	const FONT_PRESETS = [
-		"Segoe UI",
-		"Arial",
-		"Georgia",
-		"Times New Roman",
-		"Courier New",
-		"Consolas",
-		"Bahnschrift",
-		"Comic Sans MS",
-		"Trebuchet MS",
-		"Verdana",
+		"M PLUS Rounded 1c",
+		"M PLUS 1",
+		"Be Vietnam Pro",
 		"Inter",
 		"Roboto",
 		"Montserrat",
-		"Be Vietnam Pro",
-		"Nunito",
+		"Dancing Script",
+		"Playfair Display",
+		"JetBrains Mono",
+		"Segoe UI",
+		"Arial",
+		"Times New Roman",
+		"Georgia",
+		"Courier New",
+		"Consolas",
 		"monospace"
 	];
 

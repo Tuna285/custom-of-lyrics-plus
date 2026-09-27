@@ -356,16 +356,25 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 
 		// Build combined display mode options: AI modes + Local modes (if available for language)
 		const combinedOptions = { ...STATIC_OPTIONS.geminiModes };
-		if (friendlyLanguage) {
-			if (friendlyLanguage !== "japanese") {
-				delete combinedOptions.gemini_furigana;
-			}
+		if (friendlyLanguage === "japanese") {
 			const localModes = STATIC_OPTIONS.languageModes[friendlyLanguage];
 			if (localModes) {
 				Object.keys(localModes).forEach(key => {
 					combinedOptions[key] = `${localModes[key]} (Local)`;
 				});
 			}
+		} else if (friendlyLanguage === "chinese" || friendlyLanguage === "korean") {
+			delete combinedOptions.gemini_furigana;
+			const localModes = STATIC_OPTIONS.languageModes[friendlyLanguage];
+			if (localModes) {
+				Object.keys(localModes).forEach(key => {
+					combinedOptions[key] = `${localModes[key]} (Local)`;
+				});
+			}
+		} else {
+			// For English / Latin / non-CJK languages: Furigana and Romaji are irrelevant
+			delete combinedOptions.gemini_furigana;
+			delete combinedOptions.gemini_romaji;
 		}
 
 		const displayModeKey = friendlyLanguage ? `translation-mode:${friendlyLanguage}` : "translation-mode:gemini";

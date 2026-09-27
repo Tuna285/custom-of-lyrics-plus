@@ -440,6 +440,9 @@
 
 		// Sync font family if set
 		const customFont = CONFIG?.visual?.["font-family"];
+		if (customFont) {
+			Utils.loadGoogleFont?.(customFont, doc);
+		}
 		const targetFontFamily = (typeof Utils !== "undefined" && Utils.computeLyricsFontFamily)
 			? Utils.computeLyricsFontFamily(customFont)
 			: (customFont?.trim() || "inherit");

@@ -453,12 +453,52 @@ const Utils = {
 		if (genericFamilies.includes(lower)) {
 			return lower;
 		}
+		// Smart aliases for M PLUS family to resolve seamlessly across local Windows & Google Fonts
+		if (lower.includes("m plus") || lower.includes("mplus")) {
+			return `"${cleanFont}", "Rounded Mplus 1c", "M PLUS Rounded 1c", "M PLUS 1", sans-serif`;
+		}
 		const fallback = (lower.includes("mono") || lower.includes("courier") || lower.includes("console") || lower.includes("code"))
 			? "monospace"
-			: (lower.includes("serif") || lower.includes("times") || lower.includes("georgia"))
+			: (lower.includes("serif") || lower.includes("times") || lower.includes("georgia") || lower.includes("playfair"))
 				? "serif"
-				: "sans-serif";
+				: (lower.includes("script") || lower.includes("caveat") || lower.includes("hand"))
+					? "cursive"
+					: "sans-serif";
 		return `"${cleanFont}", ${fallback}`;
+	},
+	loadGoogleFont(fontName, targetDoc = (typeof document !== "undefined" ? document : null)) {
+		if (!targetDoc || !targetDoc.head) return;
+		const trimmed = fontName?.trim();
+		if (!trimmed || trimmed.toLowerCase() === "inherit" || trimmed.toLowerCase() === "default") {
+			return;
+		}
+		const systemFonts = [
+			"segoe ui", "arial", "times new roman", "georgia", "courier new", "consolas",
+			"bahnschrift", "comic sans ms", "trebuchet ms", "verdana", "calibri", "tahoma",
+			"impact", "monospace", "sans-serif", "serif"
+		];
+		const firstFont = (trimmed.split(",")[0] || "").replace(/["']/g, "").trim();
+		if (!firstFont || systemFonts.includes(firstFont.toLowerCase())) {
+			return;
+		}
+
+		try {
+			const elementId = "lyrics-plus-dynamic-google-font";
+			let linkEl = targetDoc.getElementById(elementId);
+			if (!linkEl) {
+				linkEl = targetDoc.createElement("link");
+				linkEl.id = elementId;
+				linkEl.rel = "stylesheet";
+				targetDoc.head.appendChild(linkEl);
+			}
+			const queryFamily = encodeURIComponent(firstFont).replace(/%20/g, "+");
+			const targetUrl = `https://fonts.googleapis.com/css2?family=${queryFamily}:wght@400;700;900&display=swap`;
+			if (linkEl.href !== targetUrl) {
+				linkEl.href = targetUrl;
+			}
+		} catch (e) {
+			console.warn("[Lyrics+] Failed to load Google Font:", e);
+		}
 	},
 };
 

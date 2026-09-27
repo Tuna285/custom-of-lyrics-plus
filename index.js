@@ -1144,6 +1144,8 @@ class LyricsContainer extends react.Component {
 			};
 		}
 
+		Utils.loadGoogleFont?.(CONFIG.visual["font-family"]);
+
 		this.styleVariables = {
 			...this.styleVariables,
 			"--lyrics-align-text": CONFIG.visual.alignment,
@@ -1271,7 +1273,7 @@ class LyricsContainer extends react.Component {
 		const hasPerformer = !!this.state.currentLyrics?.some((line) => line.performer);
 
 		if (mode !== -1) {
-			showTranslationButton = (friendlyLanguage || hasTranslation) && (mode === SYNCED || mode === UNSYNCED);
+			showTranslationButton = mode === SYNCED || mode === UNSYNCED;
 
 			if (mode === KARAOKE && this.state.karaoke) {
 				activeItem = react.createElement(CONFIG.visual["synced-compact"] ? SyncedLyricsPage : SyncedExpandedLyricsPage, {
