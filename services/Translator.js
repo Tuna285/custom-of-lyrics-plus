@@ -44,17 +44,17 @@ class Translator {
 	applyKuromojiFix() {
 		if (typeof XMLHttpRequest.prototype.realOpen !== "undefined") return;
 		XMLHttpRequest.prototype.realOpen = XMLHttpRequest.prototype.open;
-		XMLHttpRequest.prototype.open = function (method, url, bool) {
-			if (url.indexOf(dictPath.replace("https://", "https:/")) === 0) {
-				this.realOpen(method, url.replace("https:/", "https://"), bool);
-			} else {
-				this.realOpen(method, url, bool);
+		XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+			if (typeof url === "string" && url.indexOf(dictPath.replace("https://", "https:/")) === 0) {
+				return this.realOpen(method, url.replace("https:/", "https://"), ...rest);
 			}
+			return this.realOpen(method, url, ...rest);
 		};
 	}
 
 	async createTranslator(lang) {
-		const langCode = lang.slice(0, 2);
+		const langCode = typeof lang === "string" ? lang.slice(0, 2) : "";
+		if (!langCode) return;
 		switch (langCode) {
 			case "ja":
 				if (this.kuroshiro) return;

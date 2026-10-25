@@ -36,9 +36,10 @@ Prioritize Semantic & Imagery Fidelity together with Natural Poetic Cadence. The
    - Sacred Visual Imagery: If the source highlights a specific concrete image (e.g., "tấm lưng" - 背中, "đèn đuôi xe", "đêm mưa", "ngã tư", "pháo hoa"), that symbol MUST be preserved in the translation. NEVER discard a central motif just to make a rhyme.
    - Zero Hallucination: Do NOT invent extra actions, storylines, or fake emotional declarations not found in the original lyrics.
 
-3) Natural Vocabulary & Subject-Predicate Flow:
+3) Natural Vocabulary, Sentence Type & Subject-Predicate Flow:
    - Prefer natural, emotionally resonant modern Vietnamese vocabulary. Avoid heavy, stiff, or archaic Sino-Vietnamese (Hán-Việt) terms unless requested.
-   - Coherent Subject-Predicate Flow: Preserve clear actor-action relationships. Do NOT drop subjects arbitrarily so that lines become floating, severed verb phrases without a clear actor.
+   - Atmospheric / Scenery lines (Câu tả cảnh / Danh ngữ - 体言止め): Preserve as pure evocative imagery (e.g., "Bầu trời xanh thẳm", "Đêm mưa rơi"). DO NOT fabricate artificial subjects (never invent "Anh thấy bầu trời xanh" or "Tớ nhìn đêm mưa").
+   - Action & Emotional lines: Preserve clear actor-action relationships. Do NOT drop subjects arbitrarily when translating verb-heavy lines so that they become floating, severed verb phrases without a clear actor.
    - Avoid mechanical repetition of pronouns on every line, but ALWAYS maintain grammatical clarity on who is feeling or acting.
 
 4) CJK & J-Pop Narrative, Grammar & Enjambment:
@@ -53,16 +54,16 @@ Prioritize Semantic & Imagery Fidelity together with Natural Poetic Cadence. The
     },
 
     "poetic_standard": {
-        role: `You are a Poet & Lyrical Adapter. Your goal is to make the Vietnamese lyrics sound beautiful, romantic, and singable.`,
+        role: `You are a Poet & Lyrical Adapter. Your goal is to make the Vietnamese lyrics sound beautiful, romantic, and singable while remaining faithful to the source imagery.`,
         style: `STRATEGY: "POETIC IMAGERY"
-1) Vocabulary: Use "Musically poetic" words.
-   - Examples: "Vương vấn" (lingering), "Tương tư" (longing), "Ngóng chờ" (awaiting).
+1) Vocabulary: Use evocative, musically poetic Vietnamese diction.
+   - Examples: "Hoài mong" (longing), "Tương tư" (yearning), "Ngóng chờ" (awaiting).
    - "Sky" -> "Bầu trời" or "Khoảng trời" depending on mood.
    - "Miss you" -> "Nhớ thương" / "Hoài mong".
 
 2) Flow & Rhythm:
-   - Avoid dry/logical sentences. Use particles like "nhé, hỡi, a, ư" naturally.
-   - Constraint: Do NOT be cheesy (sến). Keep it elegant.`,
+   - Use soft, melodic phrasing and natural modal particles ("nhé, chăng, ư") only where the original tone invites them.
+   - Constraint: Do NOT be cheesy (sến) and never inject clichéd filler vocatives ("người hỡi", "em ơi") not present in the source. Keep it elegant.`,
         pronounSuggestion: "Anh - Em"
     },
 
@@ -245,9 +246,18 @@ PRONOUN LOCK (MANDATORY — HIGHEST PRIORITY):
 
 /**
  * Builds the translation guardrails section of the prompt.
+ * @param {string} [styleKey="smart_adaptive"] - The chosen translation style key
  * @returns {string}
  */
-function buildTranslationGuardrails() {
+function buildTranslationGuardrails(styleKey = "smart_adaptive") {
+    if (styleKey === "literal_study") {
+        return `[HOLISTIC CONTEXT & LINGUISTIC FIDELITY LAW]
+1. Read the entire lyrics first to understand grammatical relationships across lines, especially multi-line relative clauses (連体修飾) and enjambments.
+2. Direct Semantic Precision: Prioritize accurate, transparent meaning and grammatical structure so language learners can map each Vietnamese phrase back to the source line.
+3. Repetition Fidelity: When words or phrases are repeated in the source, repeat the exact same Vietnamese word without synonym substitution or omission.
+4. Zero Hallucination: Do NOT add filler words or invented context.`;
+    }
+
     return `[HOLISTIC NARRATIVE COMPREHENSION LAW]
 Before translating line by line, you MUST ingest the entire lyrics from the first line to the last line as a unified emotional story:
 1. Understand the Story Arc: Grasp the narrative journey (Intro/Verse context -> Chorus emotional climax -> Outro resolution).
@@ -259,7 +269,7 @@ Before translating line by line, you MUST ingest the entire lyrics from the firs
 3. Meaning Over Rhyme: Rhyme is secondary; poetic meaning and imagery are supreme. Never compromise the author's message or emotional intent for an end-rhyme.
 
 [REGISTER & ARTISTIC VOICE PRESERVATION]
-1. ANTI-PERSONA & ZERO DOMESTICATION: Absolutely DO NOT rewrite the song in the style of generic Vietnamese acoustic ballad / indie pop (e.g., do NOT turn Japanese rock/indie lyrics into melancholy V-Pop clichés like "buông tiếng thở dài", "lạc lối giữa đời", "vương vấn tình ta"). DO NOT use the tropes of translated Chinese web novels, Wuxia, Xianxia, or literal textbook translations.
+1. ANTI-PERSONA & ZERO DOMESTICATION: Absolutely DO NOT rewrite the song in the style of generic Vietnamese acoustic ballad / indie pop (e.g., do NOT turn Japanese rock/indie lyrics into melancholy V-Pop clichés like "buông tiếng thở dài", "lạc lối giữa đời", "vương vấn tình ta"). DO NOT use the tropes of translated Chinese web novels, Wuxia, Xianxia, or stiff textbook translationese.
 2. TARGET PERSONA: You are an expert Lyrical Subtitle Translator channeling the ORIGINAL ARTIST's unique voice, world, and literary style. Preserve the author's exact tone—whether raw, existential, detached, frantic, or bittersweet.
 3. BAN ON MECHANICAL "TÔI - BẠN" IN ROMANCE: In love songs and intimate emotional lyrics, NEVER translate romantic lines into "Tôi yêu bạn" or "Tôi nhớ bạn". It sounds robotic and destroys emotional intimacy. Use organic relationship pairs: "Anh - Em", "Em - Anh", or "Tớ - Cậu". ("Tôi - Bạn" is only acceptable for public/educational contexts or when explicitly selected by the user).
 4. HARD BAN ON FORBIDDEN AI TICS: Absolutely NEVER use "chao nghiêng" (hoặc "khẽ chao nghiêng") and "khẽ khàng" under any circumstances. These are forbidden lazy clichés. Use natural, grounded words instead (e.g. lững lờ, chao đảo, nghiêng ngả, nhẹ nhàng, lặng lẽ, khẽ).
@@ -274,7 +284,8 @@ When words, phrases, or chants are repeated in the source (whether within the sa
 [TEMPORAL PROGRESSION & TOPIC-COMMENT (DỊCH XUÔI DÒNG THỜI GIAN)]
 1. Left-to-Right Temporal Sync: The listener reads subtitles while listening in real time. The order of ideas in the translation MUST follow the audio's progression from left to right as closely as Vietnamese grammar allows.
 2. Topic-Comment Structure (Khởi ngữ): For Japanese/Korean lines where the topicalized noun/object comes first (e.g. "行く末を 行く末を 越えてゆくことが今"), place the topic at the beginning of the Vietnamese sentence ("Tương lai ấy, tương lai ấy, giờ đây ta sẽ vượt qua"). NEVER invert the sentence in a way that drags the repeated topic into a dangling comma fragment at the tail.
-3. Imagery Integrity: Preserve the original intensity and visceral impact of the artist's actions without over-dramatizing or softening them.
+3. Atmospheric / Scenery Lines (Câu tả cảnh / Danh ngữ): Preserve pure scenery or noun-ending lines as evocative imagery without fabricating artificial subjects ("Anh thấy...", "Em nhìn...").
+4. Imagery Integrity: Preserve the original intensity and visceral impact of the artist's actions without over-dramatizing or softening them.
 
 [MASTERCLASS EXEMPLARS (FEW-SHOT)]
 - Example 1 (Visceral Actions — No Ballad Softening): 転んで足元つばを吐いた -> Vấp ngã rồi nhổ một bãi nước bọt xuống chân. (Preserve the raw visceral frustration; NEVER soften into polite clichés like 'buông tiếng thở dài').
@@ -327,14 +338,27 @@ ${hygiene}
 6) Skip deliberation entirely. Write the ${finalOutputLabel} immediately.`;
     }
 
-    const depthStr = effort === "high" ? "Deep Deliberation" : (effort === "medium" ? "Medium Effort" : "Concise Planning");
+    if (effort === "high") {
+        return `THINKING PROCESS RULES (Deep Deliberation):
+${hygiene}
 
-    return `THINKING PROCESS RULES (${depthStr}):
+[PRE-FLIGHT REASONING GUIDE (DEEP)]
+In <thought>, analyze the song's narrative arc, speaker/listener relationship, locked pronoun/register persona, core symbolic motifs, and any multi-line enjambments or complex cultural metaphors that require careful restructuring across lines. Once resolved, close </thought> and output the final ${finalOutputLabel} once cleanly without redrafting the entire song inside thought.`;
+    }
+
+    if (effort === "medium") {
+        return `THINKING PROCESS RULES (Medium Effort):
+${hygiene}
+
+[PRE-FLIGHT REASONING GUIDE (BALANCED)]
+In <thought>, briefly map out (< 150 words) the song's emotional arc, singer POV & locked pronoun/register choice, key visual motifs to preserve, and how any tricky multi-line sentences (enjambments) connect. Do not draft line-by-line translations in thought. Output the ${finalOutputLabel} immediately after </thought>.`;
+    }
+
+    return `THINKING PROCESS RULES (Concise Planning):
 ${hygiene}
 
 [PRE-FLIGHT REASONING GUIDE (CONCISE)]
-In <thought>, outline in 1-2 brief sentences the song narrative and relationship dynamic, singer gender/POV, locked pronoun pair (e.g., Em-Anh for female singer in romance, Anh-Em for male singer in romance, Tớ-Cậu for youth/friendship), and anchor core imagery/motifs (never drop key symbols or force end-rhyme that alters meaning).
-*Strict Constraint:* Keep reasoning ultra-concise (< 60 words). Never list lines, draft line-by-line translations, or write long essays in thought. Start outputting translation tags/JSON immediately after </thought>.`;
+In <thought>, outline in 1-2 brief sentences (< 60 words) the song narrative and relationship dynamic, singer gender/POV, locked pronoun/register persona, and core imagery/motifs. Never list lines or draft line-by-line translations in thought. Start outputting translation tags/JSON immediately after </thought>.`;
 }
 
 /**
@@ -458,9 +482,10 @@ Prioritize Semantic & Imagery Fidelity together with Natural Poetic Cadence. The
    - Atmospheric / Scenery lines (e.g., "Blue sky", "Rainy night"): Preserve as pure evocative imagery. DO NOT fabricate artificial subjects (never invent "I see the blue sky").
    - Action lines: Maintain clear subject-verb agreement and logical flow.
 
-4) Cultural Metaphors & Nuance:
+4) CJK Enjambment, Pre-Nominal Clauses & Cultural Nuance:
+   - Japanese and Korean place long modifying clauses before nouns (連体修飾) and often split a single sentence across multiple lines (enjambment). Read the full multi-line sentence first and restructure naturally so each English line flows coherently without dangling fragments.
    - Accurately adapt cultural idioms, seasonal motifs, and unexpressed emotions into resonant English poetic language rather than awkward literal dictionary glosses.
-   - Transcreate onomatopoeia/mimetic words into vivid verbs and sensory descriptions.`,
+   - Transcreate onomatopoeia/mimetic words (e.g., ぎゅっと, ふわり, ドキドキ) into vivid verbs and sensory descriptions.`,
         pronounSuggestion: null
     },
 
@@ -476,7 +501,7 @@ Prioritize Semantic & Imagery Fidelity together with Natural Poetic Cadence. The
         role: `You are an English Lyricist specializing in Anime, J-Pop/K-Pop, and Youth/Coming-of-Age storytelling.`,
         style: `STRATEGY: "YOUTH NARRATIVE & ANIME EMOTION"
 1) Tone: Sincere, vibrant, introspective, nostalgic, and full of youthful longing and determination.
-2) Narrative Continuity: Capture the emotional story arc across verse, pre-chorus, and chorus climaxes. Keep the perspective heartfelt and direct.`,
+2) Enjambment & Narrative Continuity: Capture the emotional story arc across verse, pre-chorus, and chorus climaxes, restructuring multi-line Japanese/Korean modifier clauses into natural, connected English lines.`,
         pronounSuggestion: null
     },
 
@@ -504,7 +529,14 @@ Prioritize Semantic & Imagery Fidelity together with Natural Poetic Cadence. The
     }
 };
 
-function buildTranslationGuardrailsEN() {
+function buildTranslationGuardrailsEN(styleKey = "smart_adaptive") {
+    if (styleKey === "literal_study") {
+        return `[HOLISTIC CONTEXT & LINGUISTIC FIDELITY LAW]
+1. Read the entire lyrics first to understand multi-line clauses and grammatical relationships.
+2. Direct Semantic Precision: Prioritize accurate, transparent meaning and grammatical equivalence for language learners.
+3. Repetition Fidelity: Repeat the exact same English word when the source repeats a word or phrase.`;
+    }
+
     return `[HOLISTIC NARRATIVE COMPREHENSION LAW]
 Ingest the entire song lyrics from beginning to end as a unified story before translating.
 1. Story Arc: Align with the emotional progression from verse to chorus climax.
@@ -526,11 +558,16 @@ When words, phrases, or chants are repeated in the source (within the same line 
 3. NO Collapsing or Omission: NEVER collapse repeated chants into a single occurrence.
 4. NO Dangling Tails / Padding: NEVER push repeated words to the end of a line as dangling comma stubs (e.g., "..., ahead") or invent filler words to pad meter.
 
-[TEMPORAL PROGRESSION & AUDION-VISUAL SYNC]
+[TEMPORAL PROGRESSION & AUDIO-VISUAL SYNC]
 1. Left-to-Right Temporal Sync: The listener reads subtitles while listening in real time. The order of ideas in the translation MUST follow the audio's progression from left to right as closely as English grammar allows.
 2. Sentence Structure: When translating from languages with inverted word order, avoid leaving severed trailing fragments at the end of lines.
 3. Atmospheric / Scenery lines: Translate as pure imagery. DO NOT invent fake subjects ("I see...").
-4. Action lines: Keep clean Subject-Verb-Object clarity.`;
+4. Action lines: Keep clean Subject-Verb-Object clarity.
+
+[EXEMPLARS]
+- Visceral Action (No Softening): 転んで足元つばを吐いた -> I stumbled and spat at my feet. (Never soften into polite clichés like "I let out a sigh").
+- Repetition & Temporal Sync: あの風 あの風 懐かしいとお前が言った -> That wind, that wind—you said it felt so nostalgic.
+- Chant Preservation: 痛い 痛い 痛い -> It hurts, it hurts, it hurts.`;
 }
 
 function buildTranslationFlowPunctuationEN() {
@@ -552,7 +589,9 @@ CORE PRINCIPLE (ARTIST VOICE FIDELITY):
 2) 自然なプロソディと歌唱性 (Natural Prosody):
    - 機械的な直訳を排し、息継ぎやメロディの息づかいに寄り添う自然な日本語のリズム（体言止めや情緒的語彙）を構築する。
 3) 情景描写と主語の規律 (Sentence Type Preservation):
-   - 純粋な情景描写には不要な主語（「私は」「僕が見る」）を捏造せず、体言止めや詩的余韻で表現する。`,
+   - 純粋な情景描写には不要な主語（「私は」「僕が見る」）を捏造せず、体言止めや詩的余韻で表現する。
+4) 一人称・二人称および文体の完全統一 (Persona & Register Lock):
+   - 楽曲全体の文脈・アーティストの視点から最適な一人称・二人称のペア（例：「僕 / 君」「私 / あなた」「俺 / お前」）および文体（タメ口 / です・ます調）を1つ選び、最初の行から最後の行まで一貫して固定する。行ごとに一人称や口調がブレることを厳禁とする。`,
         pronounSuggestion: null
     },
     "poetic_standard": {
@@ -589,7 +628,13 @@ CORE PRINCIPLE (ARTIST VOICE FIDELITY):
     }
 };
 
-function buildTranslationGuardrailsJA() {
+function buildTranslationGuardrailsJA(styleKey = "smart_adaptive") {
+    if (styleKey === "literal_study") {
+        return `[HOLISTIC CONTEXT & LINGUISTIC FIDELITY LAW]
+1. 歌詞全体の文脈と行をまたぐ構文を把握した上で、原詩の語義・文法構造が正確に伝わるよう翻訳すること。
+2. 同一語句の反復は省略・類語置換せずそのまま再現すること。`;
+    }
+
     return `[HOLISTIC NARRATIVE COMPREHENSION LAW]
 Ingest the entire song lyrics from beginning to end as a unified story before translating.
 1. Story Arc: Align with the emotional progression from verse to chorus climax.
@@ -598,11 +643,12 @@ Ingest the entire song lyrics from beginning to end as a unified story before tr
 [SEMANTIC & IMAGERY FIDELITY LAW — CRITICAL]
 1. 原詩モチーフの死守: タイトルや歌詞の鍵となる具体的イメージ（背中、雨、交差点、シグナル等）は100%保持すること。押韻や音数調整のためにこれらを削ったり別の比喩に差し替えることを固く禁じる。
 2. 捏造・水増しの排除 (Zero Hallucination): 原詩にない架空のストーリーや安易なフィラーを勝手に追加しない。
-3. 直訳調の排斥と自然な歌言葉: 翻訳調（〜すること、〜によって）を排し、本物のJ-Pop詞としての自然な響きを持たせる。
+3. 直訳調の排斥と自然な歌言葉: 翻訳調（〜すること、〜によって）を排し、本物の歌詞としての自然な響きを持たせる。
 
 [REGISTER & ARTISTIC VOICE PRESERVATION]
 1. ANTI-PERSONA & ZERO DOMESTICATION: 汎用的なJ-Popの定型句に落とし込まず、原曲アーティスト固有の世界観とトーン（荒々しさ、哲学性、倦怠感、疾走感など）をそのまま尊重すること。
-2. TARGET PERSONA: 原曲作者の声を日本語で代弁する字幕翻訳家として振る舞うこと。
+2. PERSONA & SPEECH REGISTER LOCK: 曲全体で一人称・二人称（僕/君、私/あなた、俺/お前 等）と語尾のトーンを1つに固定し、途中で混在させないこと。
+3. TARGET PERSONA: 原曲作者の声を日本語で代弁する字幕翻訳家として振る舞うこと。
 
 [REPETITION & RHYTHM FIDELITY LAW — MANDATORY]
 原詩の中で同一の語句やリフレインが繰り返されている場合（例: あの風 あの風 / 痛い 痛い 痛い）:
@@ -610,7 +656,7 @@ Ingest the entire song lyrics from beginning to end as a unified story before tr
 2. 1回への圧縮や省略の禁止: リスナーは耳で繰り返しを聴いているため、視覚的にも同じ反復を維持すること。
 3. 行末の不自然なぶら下がりや埋め合わせ言葉の禁止。
 
-[TEMPORAL PROGRESSION & AUDION-VISUAL SYNC]
+[TEMPORAL PROGRESSION & AUDIO-VISUAL SYNC]
 1. 時間軸の左から右への同期: リアルタイムで歌を聴きながら読む字幕であるため、可能な限り音楽の時間軸に沿った語順で表現すること。
 2. 情景描写は体言止め等で純粋なイメージとして訳し、架空の主語を捏造しない。`;
 }
@@ -634,7 +680,9 @@ CORE PRINCIPLE (ARTIST VOICE FIDELITY):
 2) 자연스러운 노랫말 리듬 (Natural Prosody):
    - 기계적인 직역투(번역투)를 배제하고, 노래로 불렀을 때 호흡이 자연스럽게 이어지도록 서정적 어휘와 종결어미를 선택한다.
 3) 문장 유형 보존:
-   - 배경/풍경 묘사에는 불필요한 인위적 주어('내가', '난')를 덧붙이지 않고 명사형 종결이나 시적 여운으로 묘사한다.`,
+   - 배경/풍경 묘사에는 불필요한 인위적 주어('내가', '난')를 덧붙이지 않고 명사형 종결이나 시적 여운으로 묘사한다.
+4) 화법(반말/존댓말) 및 대명사 일관성 유지 (Speech Level & Persona Lock):
+   - 곡의 분위기와 화자-청자 관계에 맞춰 화법(반말 '-어/아, 나/너' 또는 서정적 존댓말 '-요/-네요, 나/그대')을 하나로 결정하고 첫 줄부터 마지막 줄까지 일관되게 고정한다. 행마다 반말과 존댓말이 무작위로 섞이는 것을 엄격히 금지한다.`,
         pronounSuggestion: null
     },
     "poetic_standard": {
@@ -669,7 +717,13 @@ CORE PRINCIPLE (ARTIST VOICE FIDELITY):
     }
 };
 
-function buildTranslationGuardrailsKO() {
+function buildTranslationGuardrailsKO(styleKey = "smart_adaptive") {
+    if (styleKey === "literal_study") {
+        return `[HOLISTIC CONTEXT & LINGUISTIC FIDELITY LAW]
+1. 가사 전체의 맥락과 행간 구문을 파악하여 원문의 의미와 문법 구조가 정확히 전달되도록 번역할 것.
+2. 원문의 반복 어구는 유의어로 바꾸거나 생략하지 말고 동일하게 반복할 것.`;
+    }
+
     return `[HOLISTIC NARRATIVE COMPREHENSION LAW]
 Ingest the entire song lyrics from beginning to end as a unified story before translating.
 1. Story Arc: Align with the emotional progression from verse to chorus climax.
@@ -682,7 +736,8 @@ Ingest the entire song lyrics from beginning to end as a unified story before tr
 
 [REGISTER & ARTISTIC VOICE PRESERVATION]
 1. ANTI-PERSONA & ZERO DOMESTICATION: 천편일률적인 K-Pop/가요 유행어에 맞추지 말고, 원곡 아티스트 고유의 톤과 정서(거친 질감, 철학적 사유, 고독, 질주감 등)를 원형 그대로 존중할 것.
-2. TARGET PERSONA: 원곡의 영혼을 한국어로 전하는 자막 번역가로서 기능할 것.
+2. SPEECH LEVEL & PRONOUN LOCK: 곡 전체에서 화법(반말 vs 존댓말)과 인칭대명사(나/너 vs 나/그대 등)를 하나로 통일하고 절대로 혼용하지 말 것.
+3. TARGET PERSONA: 원곡의 영혼을 한국어로 전하는 자막 번역가로서 기능할 것.
 
 [REPETITION & RHYTHM FIDELITY LAW — MANDATORY]
 원곡에서 특정 단어나 후렴구가 반복될 경우 (예: 그 바람 그 바람 / 아파 아파 아파):
@@ -690,7 +745,7 @@ Ingest the entire song lyrics from beginning to end as a unified story before tr
 2. 축약 및 생략 금지: 귀로 들리는 반복 리듬과 눈으로 보는 자막을 일치시킬 것.
 3. 행 끝에 불필요한 군더더기 어휘나 꼬리 표현을 덧붙이지 말 것.
 
-[TEMPORAL PROGRESSION & AUDION-VISUAL SYNC]
+[TEMPORAL PROGRESSION & AUDIO-VISUAL SYNC]
 1. 시간축 좌우 흐름 일치: 음악을 실시간으로 들으며 읽는 자막이므로 가능한 한 호흡과 어순의 흐름을 음악의 진행에 맞출 것.
 2. 배경/풍경 묘사: 인위적 주어('내가', '난')를 지어내지 말고 순수한 심상으로 묘사할 것.`;
 }
@@ -715,7 +770,10 @@ CORE PRINCIPLE (ARTIST VOICE FIDELITY):
    - 摒弃生硬机翻腔，运用现代华语歌词自然的起承转合与长短句节奏，与原曲听觉节拍自然呼应。
    - 严禁过度文绉绉地滥用四字成语，抹杀原曲现代独立音乐/摇滚的先锋质感。
 3) 意境白描与句式保全 (Sentence Type Preservation):
-   - 纯风景与意境白描绝不强行添加虚假主语（如“我看见”），保持原诗的留白与张力。`,
+   - 纯风景与意境白描绝不强行添加虚假主语（如“我看见”），保持原诗的留白与张力。
+4) 跨行长句（Enjambment）与规范简体中文:
+   - 日韩歌词常有长定语前置（連体修飾）及跨行断句，务必先通读完整句子再顺畅切分各行，避免单行语义残缺。
+   - 统一使用规范现代简体中文（Simplified Chinese），严禁直接照搬残留日文汉字异体字或繁体字（如必须将“風/涙/駅/帰”转化为规范简体“风/泪/车站/归”）。`,
         pronounSuggestion: null
     },
     "poetic_standard": {
@@ -750,7 +808,13 @@ CORE PRINCIPLE (ARTIST VOICE FIDELITY):
     }
 };
 
-function buildTranslationGuardrailsZH() {
+function buildTranslationGuardrailsZH(styleKey = "smart_adaptive") {
+    if (styleKey === "literal_study") {
+        return `[HOLISTIC CONTEXT & LINGUISTIC FIDELITY LAW]
+1. 通读全曲理解跨行长句与语法修饰关系，准确传达原词字面语义与语法结构。
+2. 统一使用规范简体中文，严禁残留日文汉字异体字；原词重复的词汇必须使用相同中文词汇重复。`;
+    }
+
     return `[HOLISTIC NARRATIVE COMPREHENSION LAW]
 Ingest the entire song lyrics from beginning to end as a unified story before translating.
 1. Story Arc: Align with the emotional progression from verse to chorus climax.
@@ -760,6 +824,7 @@ Ingest the entire song lyrics from beginning to end as a unified story before tr
 1. 核心意象绝对保全: 歌词中的关键象征意象（如背影、雨丝、车灯等）必须100%准确还原，严禁因押韵而删除或歪曲核心词义。
 2. 杜绝虚构与填充 (Zero Hallucination): 切勿任意添加原词没有的套路性修辞、抒情俗套或无意义填充词。
 3. 意境优先，自然押韵: 押韵必须建立在意义与原作者意图精准的基础之上，绝不容许为韵害意。
+4. 规范简体字要求: 必须输出纯正的现代简体中文（Simplified Chinese），严禁直接复制残留日文汉字（Kanji）或繁体字。
 
 [REGISTER & ARTISTIC VOICE PRESERVATION]
 1. ANTI-PERSONA & ZERO DOMESTICATION: 严禁套用平庸的传统华语流行情歌套路，坚决尊重原曲创作者的独特文风（无论是冷峻、哲学、自省、狂乱还是哀伤）。
@@ -771,7 +836,7 @@ Ingest the entire song lyrics from beginning to end as a unified story before tr
 2. 严禁压缩合并: 严禁将多次反复的呐喊压缩成单一词汇。
 3. 严禁行末断裂拖挂: 严禁将重复词置于句尾变成断裂的逗号碎屑尾巴。
 
-[TEMPORAL PROGRESSION & AUDION-VISUAL SYNC]
+[TEMPORAL PROGRESSION & AUDIO-VISUAL SYNC]
 1. 时间轴听觉同步: 歌词是从左至右随音乐播放实时阅读的字幕，语义走向应尽可能贴合演唱者发声的时间顺序。
 2. 意境白描: 纯风景描写保持意境留白，严禁捏造虚假主语（“我看见”）。`;
 }
@@ -795,8 +860,10 @@ Prioritize Semantic & Imagery Fidelity together with Natural Melodic Flow (ми�
 2) Natural Prosody & Vocal Breath:
    - Create natural, flowing Ukrainian lyric phrasing that breathes with the song's emotional pacing.
    - Melodic Flow means natural phrasing and evocative diction. It DOES NOT mean altering the original text or dropping words to match foreign syllable counts.
-3) Sentence Type Preservation:
-   - Scenery lines: Preserve as pure imagery without fabricating artificial subjects ("Я бачу").`,
+3) Sentence Type & Grammatical Gender Lock:
+   - Scenery lines: Preserve as pure imagery without fabricating artificial subjects ("Я бачу").
+   - Grammatical Gender & Address Consistency: Determine the narrator's and addressee's gender from the track context/artist and lyrics, and lock past-tense verb/adjective gender endings (masculine "-в" vs feminine "-ла") as well as intimacy register ("ти" vs "ви") consistently from the first line to the last line.
+   - Enjambment & CJK Modifiers: When translating multi-line sentences or Japanese/Korean pre-nominal clauses, structure each Ukrainian line so it reads fluidly without broken fragments.`,
         pronounSuggestion: null
     },
     "poetic_standard": {
@@ -831,7 +898,13 @@ Prioritize Semantic & Imagery Fidelity together with Natural Melodic Flow (ми�
     }
 };
 
-function buildTranslationGuardrailsUK() {
+function buildTranslationGuardrailsUK(styleKey = "smart_adaptive") {
+    if (styleKey === "literal_study") {
+        return `[HOLISTIC CONTEXT & LINGUISTIC FIDELITY LAW]
+1. Read the entire lyrics first to resolve multi-line clauses and grammatical gender agreement.
+2. Direct Semantic Precision: Prioritize accurate semantic and grammatical equivalence for language learners while keeping repeated words identical.`;
+    }
+
     return `[HOLISTIC NARRATIVE COMPREHENSION LAW]
 Ingest the entire song lyrics from beginning to end as a unified story before translating.
 1. Story Arc: Align with the emotional progression from verse to chorus climax.
@@ -844,7 +917,8 @@ Ingest the entire song lyrics from beginning to end as a unified story before tr
 
 [REGISTER & ARTISTIC VOICE PRESERVATION]
 1. ANTI-PERSONA & ZERO DOMESTICATION: Absolutely DO NOT rewrite the song into generic pop tropes. Preserve the original artist's unique voice, atmosphere, and intensity.
-2. TARGET PERSONA: You are an expert Lyrical Subtitle Translator channeling the ORIGINAL ARTIST's voice.
+2. GRAMMATICAL GENDER & REGISTER LOCK: Lock narrator/addressee grammatical gender (masculine vs feminine verb/adjective inflections) and second-person register ("ти" vs "ви") consistently across the entire song. Never switch gender endings mid-song.
+3. TARGET PERSONA: You are an expert Lyrical Subtitle Translator channeling the ORIGINAL ARTIST's voice.
 
 [REPETITION & RHYTHM FIDELITY LAW — MANDATORY]
 When words or chants are repeated in the source (e.g., within the same line or across lines):
@@ -852,7 +926,7 @@ When words or chants are repeated in the source (e.g., within the same line or a
 2. NO Collapsing or Omission: Keep the repetition 100% intact to mirror the audio beat.
 3. NO Dangling Tails: Do not leave severed comma fragments at the end of lines.
 
-[TEMPORAL PROGRESSION & AUDION-VISUAL SYNC]
+[TEMPORAL PROGRESSION & AUDIO-VISUAL SYNC]
 1. Left-to-Right Temporal Flow: Align sentence progression with the audio delivery for real-time subtitle reading.
 2. Sentence Type Preservation: Atmospheric/scenery lines must stay as pure imagery. NEVER fabricate artificial subjects ("Я бачу").`;
 }
@@ -873,12 +947,12 @@ const TARGET_LANGUAGES = {
         pronouns: PRONOUN_MODES,
         styles: STYLE_INSTRUCTIONS,
         buildPronounSection: (pronounKey, styleObj, artist, title) => buildPronounSection(pronounKey, styleObj, artist, title),
-        buildGuardrails: () => buildTranslationGuardrails(),
+        buildGuardrails: (styleKey) => buildTranslationGuardrails(styleKey),
         buildFlowPunctuation: () => buildTranslationFlowPunctuation(),
         buildOutputTagsBlock: (lineCount) => buildTranslationOutputTagsBlock(lineCount, "Vietnamese"),
         buildOutputJsonBlock: (lineCount) => buildTranslationOutputJsonBlock(lineCount),
-        userPromptPreamble: (artist, title) => `Translate lyrics to natural, singable Vietnamese.\nCRITICAL: Every single line MUST be translated into Vietnamese. Even if the original text is in English, Spanish, French, Japanese, Korean, Chinese, or Latin/Romaji, DO NOT copy or output the original untranslated text. You MUST output a 100% poetic Vietnamese translation for each line.\n\nSong: ${artist} - ${title}`,
-        jsonSchemaUserPrompt: (artist, title, lineCount) => `Translate lyrics to natural, singable Vietnamese.\nCRITICAL: Every single line MUST be translated into Vietnamese. Even if the original text is in English, Japanese, Korean, Chinese, or Latin/Romaji, DO NOT copy or output the original untranslated text.\n\nSong: ${artist} - ${title}`,
+        userPromptPreamble: (artist, title) => `Translate lyrics to natural, singable Vietnamese.\nCRITICAL: Every meaningful lyric line MUST be translated into Vietnamese (even if the source line is in English, Japanese, Korean, Chinese, Spanish, French, or Romaji—do NOT leave foreign sentences untranslated). Keep only structural tags ([Intro], [Chorus], (Instrumental)) and pure vocal ad-libs (Yeah, Oh, Ah, La la) unchanged.\n\nSong: ${artist} - ${title}`,
+        jsonSchemaUserPrompt: (artist, title, lineCount) => `Translate lyrics to natural, singable Vietnamese.\nCRITICAL: Every meaningful lyric line MUST be translated into Vietnamese (even if the source line is in English, Japanese, Korean, Chinese, or Romaji—do NOT leave foreign sentences untranslated). Keep only structural tags ([Intro], [Chorus], (Instrumental)) and pure vocal ad-libs (Yeah, Oh, Ah, La la) unchanged.\n\nSong: ${artist} - ${title}`,
         fallbackInstruction: "Translate to Vietnamese."
     },
     en: {
@@ -889,12 +963,12 @@ const TARGET_LANGUAGES = {
         pronouns: null,
         styles: STYLE_INSTRUCTIONS_EN,
         buildPronounSection: () => "",
-        buildGuardrails: () => buildTranslationGuardrailsEN(),
+        buildGuardrails: (styleKey) => buildTranslationGuardrailsEN(styleKey),
         buildFlowPunctuation: () => buildTranslationFlowPunctuationEN(),
         buildOutputTagsBlock: (lineCount) => buildTranslationOutputTagsBlock(lineCount, "English"),
         buildOutputJsonBlock: (lineCount) => buildTranslationOutputJsonBlock(lineCount),
-        userPromptPreamble: (artist, title) => `Translate lyrics to natural, singable, and poetic English.\nCRITICAL: Every single line MUST be translated into English. Even if the original text is in Japanese, Korean, Chinese, Spanish, French, or Vietnamese, DO NOT copy or output the original foreign text. You MUST output a 100% poetic English translation for each line.\n\nSong: ${artist} - ${title}`,
-        jsonSchemaUserPrompt: (artist, title, lineCount) => `Translate lyrics to natural, singable English.\nCRITICAL: Every single line MUST be translated into English. Even if the original text is in Japanese, Korean, Chinese, or Vietnamese, DO NOT copy or output the original untranslated text.\n\nSong: ${artist} - ${title}`,
+        userPromptPreamble: (artist, title) => `Translate lyrics to natural, singable, and poetic English.\nCRITICAL: Every meaningful lyric line MUST be translated into English (even if the source line is in Japanese, Korean, Chinese, Spanish, French, or Vietnamese—do NOT leave foreign sentences untranslated). Keep only structural tags ([Intro], [Chorus], (Instrumental)) and pure vocal ad-libs (Yeah, Oh, Ah, La la) unchanged.\n\nSong: ${artist} - ${title}`,
+        jsonSchemaUserPrompt: (artist, title, lineCount) => `Translate lyrics to natural, singable English.\nCRITICAL: Every meaningful lyric line MUST be translated into English (even if the source line is in Japanese, Korean, Chinese, or Vietnamese—do NOT leave foreign sentences untranslated). Keep only structural tags ([Intro], [Chorus], (Instrumental)) and pure vocal ad-libs (Yeah, Oh, Ah, La la) unchanged.\n\nSong: ${artist} - ${title}`,
         fallbackInstruction: "Translate to English."
     },
     ja: {
@@ -905,12 +979,12 @@ const TARGET_LANGUAGES = {
         pronouns: null,
         styles: STYLE_INSTRUCTIONS_JA,
         buildPronounSection: () => "",
-        buildGuardrails: () => buildTranslationGuardrailsJA(),
+        buildGuardrails: (styleKey) => buildTranslationGuardrailsJA(styleKey),
         buildFlowPunctuation: () => buildTranslationFlowPunctuationJA(),
         buildOutputTagsBlock: (lineCount) => buildTranslationOutputTagsBlock(lineCount, "Japanese"),
         buildOutputJsonBlock: (lineCount) => buildTranslationOutputJsonBlock(lineCount),
-        userPromptPreamble: (artist, title) => `Translate lyrics to natural, singable Japanese (日本語).\nCRITICAL: Every single line MUST be translated into Japanese. Even if the original text is in English, Korean, Chinese, Spanish, French, or Vietnamese, DO NOT copy or output the original foreign text. You MUST output a 100% poetic Japanese translation for each line.\n\nSong: ${artist} - ${title}`,
-        jsonSchemaUserPrompt: (artist, title, lineCount) => `Translate lyrics to natural, singable Japanese (日本語).\nCRITICAL: Every single line MUST be translated into Japanese. Even if the original text is in English, Korean, Chinese, or Vietnamese, DO NOT copy or output the original untranslated text.\n\nSong: ${artist} - ${title}`,
+        userPromptPreamble: (artist, title) => `Translate lyrics to natural, singable Japanese (日本語).\nCRITICAL: Every meaningful lyric line MUST be translated into Japanese (even if the source line is in English, Korean, Chinese, Spanish, French, or Vietnamese—do NOT leave foreign sentences untranslated). Keep only structural tags ([Intro], [Chorus], (Instrumental)) and pure vocal ad-libs (Yeah, Oh, Ah, ララ) unchanged.\n\nSong: ${artist} - ${title}`,
+        jsonSchemaUserPrompt: (artist, title, lineCount) => `Translate lyrics to natural, singable Japanese (日本語).\nCRITICAL: Every meaningful lyric line MUST be translated into Japanese (even if the source line is in English, Korean, Chinese, or Vietnamese—do NOT leave foreign sentences untranslated). Keep only structural tags ([Intro], [Chorus], (Instrumental)) and pure vocal ad-libs (Yeah, Oh, Ah, ララ) unchanged.\n\nSong: ${artist} - ${title}`,
         fallbackInstruction: "Translate to Japanese."
     },
     ko: {
@@ -921,29 +995,29 @@ const TARGET_LANGUAGES = {
         pronouns: null,
         styles: STYLE_INSTRUCTIONS_KO,
         buildPronounSection: () => "",
-        buildGuardrails: () => buildTranslationGuardrailsKO(),
+        buildGuardrails: (styleKey) => buildTranslationGuardrailsKO(styleKey),
         buildFlowPunctuation: () => buildTranslationFlowPunctuationKO(),
         buildOutputTagsBlock: (lineCount) => buildTranslationOutputTagsBlock(lineCount, "Korean"),
         buildOutputJsonBlock: (lineCount) => buildTranslationOutputJsonBlock(lineCount),
-        userPromptPreamble: (artist, title) => `Translate lyrics to natural, singable Korean (한국어).\nCRITICAL: Every single line MUST be translated into Korean. Even if the original text is in English, Japanese, Chinese, Spanish, French, or Vietnamese, DO NOT copy or output the original foreign text. You MUST output a 100% poetic Korean translation for each line.\n\nSong: ${artist} - ${title}`,
-        jsonSchemaUserPrompt: (artist, title, lineCount) => `Translate lyrics to natural, singable Korean (한국어).\nCRITICAL: Every single line MUST be translated into Korean. Even if the original text is in English, Japanese, Chinese, or Vietnamese, DO NOT copy or output the original untranslated text.\n\nSong: ${artist} - ${title}`,
+        userPromptPreamble: (artist, title) => `Translate lyrics to natural, singable Korean (한국어).\nCRITICAL: Every meaningful lyric line MUST be translated into Korean (even if the source line is in English, Japanese, Chinese, Spanish, French, or Vietnamese—do NOT leave foreign sentences untranslated). Keep only structural tags ([Intro], [Chorus], (Instrumental)) and pure vocal ad-libs (Yeah, Oh, Ah, 라라) unchanged.\n\nSong: ${artist} - ${title}`,
+        jsonSchemaUserPrompt: (artist, title, lineCount) => `Translate lyrics to natural, singable Korean (한국어).\nCRITICAL: Every meaningful lyric line MUST be translated into Korean (even if the source line is in English, Japanese, Chinese, or Vietnamese—do NOT leave foreign sentences untranslated). Keep only structural tags ([Intro], [Chorus], (Instrumental)) and pure vocal ad-libs (Yeah, Oh, Ah, 라라) unchanged.\n\nSong: ${artist} - ${title}`,
         fallbackInstruction: "Translate to Korean."
     },
     zh: {
         code: "zh",
-        name: "Chinese",
+        name: "Simplified Chinese",
         label: "中文 (Chinese)",
         hasPronouns: false,
         pronouns: null,
         styles: STYLE_INSTRUCTIONS_ZH,
         buildPronounSection: () => "",
-        buildGuardrails: () => buildTranslationGuardrailsZH(),
+        buildGuardrails: (styleKey) => buildTranslationGuardrailsZH(styleKey),
         buildFlowPunctuation: () => buildTranslationFlowPunctuationZH(),
-        buildOutputTagsBlock: (lineCount) => buildTranslationOutputTagsBlock(lineCount, "Chinese"),
+        buildOutputTagsBlock: (lineCount) => buildTranslationOutputTagsBlock(lineCount, "Simplified Chinese"),
         buildOutputJsonBlock: (lineCount) => buildTranslationOutputJsonBlock(lineCount),
-        userPromptPreamble: (artist, title) => `Translate lyrics to natural, singable Chinese (中文).\nCRITICAL: Every single line MUST be translated into Chinese. Even if the original text is in English, Japanese, Korean, Spanish, French, or Vietnamese, DO NOT copy or output the original foreign text. You MUST output a 100% poetic Chinese translation for each line.\n\nSong: ${artist} - ${title}`,
-        jsonSchemaUserPrompt: (artist, title, lineCount) => `Translate lyrics to natural, singable Chinese (中文).\nCRITICAL: Every single line MUST be translated into Chinese. Even if the original text is in English, Japanese, Korean, or Vietnamese, DO NOT copy or output the original untranslated text.\n\nSong: ${artist} - ${title}`,
-        fallbackInstruction: "Translate to Chinese."
+        userPromptPreamble: (artist, title) => `Translate lyrics to natural, singable Simplified Chinese (简体中文).\nCRITICAL: Every meaningful lyric line MUST be translated into Simplified Chinese (even if the source line is in English, Japanese, Korean, Spanish, French, or Vietnamese—do NOT leave foreign sentences or Japanese Kanji variants untranslated). Keep only structural tags ([Intro], [Chorus], (Instrumental)) and pure vocal ad-libs (Yeah, Oh, Ah, 啦啦) unchanged.\n\nSong: ${artist} - ${title}`,
+        jsonSchemaUserPrompt: (artist, title, lineCount) => `Translate lyrics to natural, singable Simplified Chinese (简体中文).\nCRITICAL: Every meaningful lyric line MUST be translated into Simplified Chinese (even if the source line is in English, Japanese, Korean, or Vietnamese—do NOT leave foreign sentences or Japanese Kanji variants untranslated). Keep only structural tags ([Intro], [Chorus], (Instrumental)) and pure vocal ad-libs (Yeah, Oh, Ah, 啦啦) unchanged.\n\nSong: ${artist} - ${title}`,
+        fallbackInstruction: "Translate to Simplified Chinese."
     },
     uk: {
         code: "uk",
@@ -953,12 +1027,12 @@ const TARGET_LANGUAGES = {
         pronouns: null,
         styles: STYLE_INSTRUCTIONS_UK,
         buildPronounSection: () => "",
-        buildGuardrails: () => buildTranslationGuardrailsUK(),
+        buildGuardrails: (styleKey) => buildTranslationGuardrailsUK(styleKey),
         buildFlowPunctuation: () => buildTranslationFlowPunctuationUK(),
         buildOutputTagsBlock: (lineCount) => buildTranslationOutputTagsBlock(lineCount, "Ukrainian"),
         buildOutputJsonBlock: (lineCount) => buildTranslationOutputJsonBlock(lineCount),
-        userPromptPreamble: (artist, title) => `Translate lyrics to natural, singable, and poetic Ukrainian (Українська).\nCRITICAL: Every single line MUST be translated into Ukrainian. Even if the original text is in English, Japanese, Korean, Chinese, Spanish, French, or Vietnamese, DO NOT copy or output the original foreign text. You MUST output a 100% poetic Ukrainian translation for each line.\n\nSong: ${artist} - ${title}`,
-        jsonSchemaUserPrompt: (artist, title, lineCount) => `Translate lyrics to natural, singable Ukrainian (Українська).\nCRITICAL: Every single line MUST be translated into Ukrainian. Even if the original text is in English, Japanese, Korean, Chinese, or Vietnamese, DO NOT copy or output the original untranslated text.\n\nSong: ${artist} - ${title}`,
+        userPromptPreamble: (artist, title) => `Translate lyrics to natural, singable, and poetic Ukrainian (Українська).\nCRITICAL: Every meaningful lyric line MUST be translated into Ukrainian (even if the source line is in English, Japanese, Korean, Chinese, Spanish, French, or Vietnamese—do NOT leave foreign sentences untranslated). Keep only structural tags ([Intro], [Chorus], (Instrumental)) and pure vocal ad-libs (Yeah, Oh, Ah, Ла-ла) unchanged.\n\nSong: ${artist} - ${title}`,
+        jsonSchemaUserPrompt: (artist, title, lineCount) => `Translate lyrics to natural, singable Ukrainian (Українська).\nCRITICAL: Every meaningful lyric line MUST be translated into Ukrainian (even if the source line is in English, Japanese, Korean, Chinese, or Vietnamese—do NOT leave foreign sentences untranslated). Keep only structural tags ([Intro], [Chorus], (Instrumental)) and pure vocal ad-libs (Yeah, Oh, Ah, Ла-ла) unchanged.\n\nSong: ${artist} - ${title}`,
         fallbackInstruction: "Translate to Ukrainian."
     }
 };
@@ -1017,7 +1091,7 @@ function buildTranslationSystemPrompt(lineCount, styleKey, pronounKey, mode, eff
         styleObj.role,
         styleObj.style,
         outputBlock,
-        langModule.buildGuardrails ? langModule.buildGuardrails() : buildTranslationGuardrails(),
+        langModule.buildGuardrails ? langModule.buildGuardrails(styleKey) : buildTranslationGuardrails(styleKey),
         langModule.buildFlowPunctuation ? langModule.buildFlowPunctuation() : buildTranslationFlowPunctuation(),
         buildTaskThinkingRules(thinkingLabel, effort, langModule.name || "Vietnamese")
     ];

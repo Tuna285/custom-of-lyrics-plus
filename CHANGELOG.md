@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.4] - 2026-10-25
+
+### Changed
+
+- **Client-First Provider & YouTube Routing**: Prioritizes direct client requests for Musixmatch, NetEase, and YouTube InnerTube searches with automatic Cloudflare Worker proxy failover, avoiding datacenter IP blocks (403), eliminating CORS preflight overhead, and reducing proxy traffic.
+- **Multi-Language Prompt & Reasoning Calibration**: Resolved prompt conflicts in literal and poetic modes, restored distinct thinking budgets across `low`, `medium`, and `high` reasoning efforts, and enforced consistent persona, speech register, grammatical gender, and Simplified Chinese character normalization across all 6 target languages.
+- **NetEase Negative Caching & Endpoint Short-Circuiting**: Caches empty search and missing-lyric results in IndexedDB with a 3-day TTL and skips fallback endpoints once the primary NetEase API responds successfully, preventing redundant network requests on unavailable tracks.
+
+### Fixed
+
+- **Pre-translation Handover & Queue Promotion**: Seamlessly promotes in-flight background pre-translations and Furigana tasks to active UI priority on track change while sharing cached lyrics across memory and IndexedDB to eliminate duplicate provider fetches.
+- **Musixmatch Manual Search & Token Auto-Refresh**: Routed Musixmatch manual searches and lyric selection through the unified fetcher with automatic token refresh on 401/402/403 responses.
+- **Synced Lyrics Timestamp Normalization**: Coerced string timestamps into numeric values across providers so line duration estimates and instrumental interlude indicators render without `NaN` calculation errors.
+- **Local Lyrics Upload & Retry State**: Immediately updates active lyrics, language detection, and translation caches when importing local lyric files, preserves selected style and pronoun settings during Gemini format-retry fallbacks, and fixes video background refresh calls.
+
 ## [1.9.3] - 2026-09-28
 
 ### Added

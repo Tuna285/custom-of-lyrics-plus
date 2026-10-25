@@ -674,13 +674,19 @@ class LyricsContainer extends react.Component {
 			const friendlyLanguage = language && new Intl.DisplayNames(["en"], { type: "language" }).of(language.split("-")[0])?.toLowerCase();
 			const targetConvert = CONFIG.visual[`translation-mode:${friendlyLanguage}`];
 
-			const isMemory = CACHE[tempState.uri]?.[targetConvert];
-			if (CONFIG.visual.translate && defaultLanguage && !isMemory) {
+			const isLegacyConvert = Boolean(
+				targetConvert && targetConvert !== "none" && !String(targetConvert).startsWith("gemini")
+			);
+			const isMemory = isLegacyConvert ? CACHE[tempState.uri]?.[targetConvert] : null;
+			if (CONFIG.visual.translate && defaultLanguage && isLegacyConvert && !isMemory) {
 				this.translateLyrics(language, newLyrics, targetConvert).then((translated) => {
+					if (!translated) return;
 					const res = { [targetConvert]: translated };
 					// Cache translated lyrics
 					CACHE[tempState.uri] = { ...CACHE[tempState.uri], ...res };
-					this.setState({ ...res });
+					if (this.state.uri === tempState.uri) {
+						this.setState({ ...res });
+					}
 				});
 			}
 
@@ -780,10 +786,16 @@ class LyricsContainer extends react.Component {
 		return target.map((line, i) => {
 			const src = source[i];
 			if (!src) return line;
+			const srcStart = typeof src.startTime === "number" ? src.startTime : Number(src.startTime);
+			const srcEnd = typeof src.endTime === "number" ? src.endTime : Number(src.endTime);
 			return {
 				...line,
-				startTime: (typeof line?.startTime === "number" && isFinite(line.startTime)) ? line.startTime : src.startTime,
-				endTime: (typeof line?.endTime === "number" && isFinite(line.endTime)) ? line.endTime : src.endTime,
+				startTime: (typeof line?.startTime === "number" && isFinite(line.startTime))
+					? line.startTime
+					: (isFinite(srcStart) ? srcStart : src.startTime),
+				endTime: (typeof line?.endTime === "number" && isFinite(line.endTime))
+					? line.endTime
+					: (isFinite(srcEnd) ? srcEnd : src.endTime),
 			};
 		});
 	}
@@ -801,7 +813,15 @@ class LyricsContainer extends react.Component {
 	}
 
 	async translateLyrics(language, lyrics, targetConvert) {
-		if (!language) return;
+		if (
+			!language ||
+			!Array.isArray(lyrics) ||
+			!targetConvert ||
+			targetConvert === "none" ||
+			String(targetConvert).startsWith("gemini")
+		) {
+			return lyrics;
+		}
 
 		Spicetify.showNotification("Converting...", false, 1000);
 		if (!this.translator) {
@@ -820,11 +840,14 @@ class LyricsContainer extends react.Component {
 					katakana: { target: "katakana", mode: "normal" },
 				};
 
+				if (!map[targetConvert]) return lyrics;
+
 				result = await Promise.all(
 					lyrics.map(async (lyric) => await this.translator.romajifyText(lyric.text, map[targetConvert].target, map[targetConvert].mode))
 				);
 			} else if (language === "ko") {
 				// Korean
+				if (targetConvert !== "romaja") return lyrics;
 				result = await Promise.all(lyrics.map(async (lyric) => await this.translator.convertToRomaja(lyric.text, "romaji")));
 			} else if (language === "zh-hans") {
 				// Chinese (Simplified)
@@ -839,6 +862,8 @@ class LyricsContainer extends react.Component {
 					Spicetify.showNotification("No conversion is needed", false, 1000);
 					return lyrics;
 				}
+
+				if (!map[targetConvert]) return lyrics;
 
 				result = await Promise.all(
 					lyrics.map(async (lyric) => await this.translator.convertChinese(lyric.text, map[targetConvert].from, map[targetConvert].target))
@@ -857,11 +882,14 @@ class LyricsContainer extends react.Component {
 					return lyrics;
 				}
 
+				if (!map[targetConvert]) return lyrics;
+
 				result = await Promise.all(
 					lyrics.map(async (lyric) => await this.translator.convertChinese(lyric.text, map[targetConvert].from, map[targetConvert].target))
 				);
 			}
 
+			if (!Array.isArray(result)) return lyrics;
 			const res = Utils.processTranslatedLyrics(result, lyrics);
 			Spicetify.showNotification("Converting...", false, 0);
 			return res;
@@ -996,22 +1024,6 @@ class LyricsContainer extends react.Component {
 			this.currentTrackUri = queue.current.uri;
 			this.fetchLyrics(queue.current, this.state.explicitMode);
 			this.viewPort.scrollTo(0, 0);
-
-			// Fetch next track
-			const nextTrack = queue.queued?.[0] || queue.nextUp?.[0];
-			const nextInfo = this.infoFromTrack(nextTrack);
-			// Debounce next track fetch
-			if (!nextInfo || nextInfo.uri === this.nextTrackUri) return;
-			this.nextTrackUri = nextInfo.uri;
-			this.tryServices(nextInfo, this.state.explicitMode).then((resp) => {
-				if (resp.provider) {
-					// Cache lyrics
-					CACHE[resp.uri] = resp;
-				}
-			});
-			if (CONFIG.visual["video-background"] && window.VideoManager && typeof window.VideoManager.fetchVideoForTrack === "function") {
-				window.VideoManager.fetchVideoForTrack(nextInfo, null, true);
-			}
 		};
 
 		if (Spicetify.Player?.data?.item) {

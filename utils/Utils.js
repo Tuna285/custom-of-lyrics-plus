@@ -218,6 +218,8 @@ const Utils = {
 		return result;
 	},
 	processTranslatedLyrics(translated, original) {
+		if (!Array.isArray(original)) return [];
+		if (!Array.isArray(translated)) return original;
 		return original.map((lyric, index) => ({
 			startTime: lyric?.startTime || 0,
 			// Keep as string so Pages can inject as HTML (furigana) or plain text
@@ -429,15 +431,19 @@ const Utils = {
 		// Treat whitespace-only text as empty (text can be a React element, guard with typeof)
 		if (typeof text === "string" && !text.trim()) text = null;
 
-		if (isBelow && originalText) {
-			return { mainText: originalText, subText: text, subText2: text2 };
+		if (isBelow) {
+			return {
+				mainText: originalText || text,
+				subText: originalText ? text : null,
+				subText2: text2,
+			};
 		} else if (isReplace) {
 			// If replace mode, we prioritize text (translation).
 			// If text is missing or empty, fallback to originalText.
 			return { mainText: text || originalText, subText: text2, subText2: null };
 		}
 		// Default / Unchanged / Fixed mode fallback
-		return { mainText: text, subText: null, subText2: null };
+		return { mainText: text ?? originalText, subText: null, subText2: null };
 	},
 	computeLyricsFontFamily(font) {
 		const trimmed = font?.trim();

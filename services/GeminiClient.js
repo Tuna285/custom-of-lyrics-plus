@@ -234,7 +234,7 @@ const GeminiClient = {
     },
 
     promote(key) {
-        if (key.includes(':gemini_romaji')) geminiQueuePhonetic.promote(key);
+        if (key.includes(':gemini_romaji') || key.includes(':gemini_furigana')) geminiQueuePhonetic.promote(key);
         else geminiQueueTranslation.promote(key);
     },
 
@@ -1204,7 +1204,7 @@ const GeminiClient = {
                 responseMode,
                 stack: error.stack
             });
-            console.groupEnd();
+            DebugLogger.groupEnd();
 
             // Retry with fallback prompt ONLY if format/parsing validation failed on a successful HTTP response.
             // Do NOT retry with fallback prompt for HTTP status errors (400, 429, 503, etc.) or network aborts.
@@ -1213,9 +1213,10 @@ const GeminiClient = {
                 console.log('[Lyrics+] Retrying with fallback minimal prompt...');
                 return this.callGemini({
                     apiKey, artist, title, text,
-                    styleKey: 'literal_study', pronounKey: 'default',
+                    styleKey, pronounKey,
                     wantSmartPhonetic, wantFurigana, _isRetry: true,
-                    onReasoningProgress, targetLang, trackMetadata
+                    onReasoningProgress, targetLang, trackMetadata,
+                    priority, taskId: taskId ? `${taskId}:retry` : null
                 });
             }
 

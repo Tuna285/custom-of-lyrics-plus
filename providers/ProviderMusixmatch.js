@@ -16,24 +16,50 @@ const ProviderMusixmatch = (() => {
 
 	async function fetchMxm(targetUrl) {
 		if (!targetUrl) return null;
+		let lastErrorStatus = null;
 
-		// 1. Primary: Dedicated Cloudflare Worker CORS Proxy (bypasses ISP Captchas and IP rate limits)
+		// 1. Primary: Native Spicetify.CosmosAsync (uses residential IP + full iOS app headers, avoids Cloudflare Worker datacenter IP blocks)
+		try {
+			const res = await Spicetify.CosmosAsync.get(targetUrl, null, headers);
+			const code = res?.message?.header?.status_code;
+			if (res?.message && code !== 401 && code !== 402 && code !== 403) {
+				return res;
+			}
+			if (code === 401 || code === 402 || code === 403) {
+				lastErrorStatus = code;
+			}
+		} catch (e) {
+			const errStatus = e?.status || e?.statusCode;
+			if (errStatus === 401 || errStatus === 402 || errStatus === 403) {
+				lastErrorStatus = errStatus;
+			}
+		}
+
+		// 2. Fallback: Dedicated Cloudflare Worker CORS Proxy (bypasses ISP blocks if direct CosmosAsync failed)
 		try {
 			const proxyTemplate = localStorage.getItem("spicetify:corsProxyTemplate") || DEDICATED_WORKER_TEMPLATE;
 			const proxiedUrl = proxyTemplate.replace("{url}", encodeURIComponent(targetUrl));
 			const res = await fetch(proxiedUrl);
-			if (res.ok) {
-				const data = await res.json();
-				if (data?.message) return data;
+			if (res.status === 401 || res.status === 402 || res.status === 403) {
+				lastErrorStatus = res.status;
+			}
+			const text = await res.text();
+			if (text) {
+				try {
+					const data = JSON.parse(text);
+					if (data?.message) return data;
+				} catch (_) {}
 			}
 		} catch (_) {}
 
-		// 2. Fallback: Native Spicetify.CosmosAsync
-		try {
-			const res = await Spicetify.CosmosAsync.get(targetUrl, null, headers);
-			if (res?.message) return res;
-		} catch (e) {
-			console.warn("[Lyrics+] Musixmatch direct fetch error:", e);
+		if (lastErrorStatus) {
+			return {
+				message: {
+					header: {
+						status_code: lastErrorStatus === 403 ? 401 : lastErrorStatus,
+					},
+				},
+			};
 		}
 
 		return null;
@@ -132,9 +158,9 @@ const ProviderMusixmatch = (() => {
 		let currentToken = CONFIG.providers.musixmatch.token;
 		let res = await queryMxm(currentToken);
 
-		// If unauthorized (401/402), attempt auto-refresh
+		// If unauthorized (401/402/403), attempt auto-refresh
 		let statusCode = res?.message?.header?.status_code;
-		if (statusCode === 401 || statusCode === 402) {
+		if (statusCode === 401 || statusCode === 402 || statusCode === 403) {
 			const refreshedToken = await refreshMusixmatchToken();
 			if (refreshedToken) {
 				res = await queryMxm(refreshedToken);
@@ -372,7 +398,7 @@ const ProviderMusixmatch = (() => {
 		const isInstrumental = meta?.track?.instrumental;
 
 		if (isInstrumental) {
-			return [{ text: "♪ Instrumental ♪", startTime: "0000" }];
+			return [{ text: "♪ Instrumental ♪", startTime: 0 }];
 		}
 		if (hasSynced) {
 			const subtitle = body["track.subtitles.get"]?.message?.body?.subtitle_list?.[0]?.subtitle;
@@ -448,19 +474,30 @@ const ProviderMusixmatch = (() => {
 		const baseURL =
 			"https://apic-appmobile.musixmatch.com/ws/1.1/crowd.track.translations.get?translation_fields_set=minimal&comment_format=text&format=json&app_id=mac-ios-v2.0&";
 
-		const params = {
-			track_id: trackId,
-			selected_language: selectedLanguage,
-			usertoken: CONFIG.providers.musixmatch.token,
+		const queryTranslation = async (tokenVal) => {
+			const params = {
+				track_id: trackId,
+				selected_language: selectedLanguage,
+				usertoken: tokenVal,
+			};
+
+			const finalURL =
+				baseURL +
+				Object.keys(params)
+					.map((key) => `${key}=${encodeURIComponent(params[key])}`)
+					.join("&");
+
+			return await fetchMxm(finalURL);
 		};
 
-		const finalURL =
-			baseURL +
-			Object.keys(params)
-				.map((key) => `${key}=${encodeURIComponent(params[key])}`)
-				.join("&");
-
-		let result = await fetchMxm(finalURL);
+		let result = await queryTranslation(CONFIG.providers.musixmatch.token);
+		const statusCode = result?.message?.header?.status_code;
+		if (statusCode === 401 || statusCode === 402 || statusCode === 403) {
+			const refreshedToken = await refreshMusixmatchToken();
+			if (refreshedToken) {
+				result = await queryTranslation(refreshedToken);
+			}
+		}
 
 		if (result?.message?.header?.status_code !== 200) return null;
 
@@ -525,7 +562,7 @@ const ProviderMusixmatch = (() => {
 		return {};
 	}
 
-	return { findLyrics, fetchLyrics: findLyrics, getSynced, getUnsynced, getKaraoke, getTranslation, getLanguages, refreshMusixmatchToken };
+	return { findLyrics, fetchLyrics: findLyrics, fetchMxm, getSynced, getUnsynced, getKaraoke, getTranslation, getLanguages, refreshMusixmatchToken };
 })();
 
 window.ProviderMusixmatch = ProviderMusixmatch;

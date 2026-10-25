@@ -232,7 +232,7 @@
 	// ── Lyrics helpers ────────────────────────────────────────────────────
 	function parseFurigana(text) {
 		if (!text) return "";
-		const str = typeof text === "object" ? String(text) : text;
+		const str = (typeof text === "object" && text !== null) ? (text.text ?? String(text)) : String(text ?? "");
 		
 		// Case 1: Provider already returned <ruby> tags (e.g. Netease, Musixmatch)
 		// Use Utils.rubyTextToHTML which whitelists only ruby/rt/rp tags, escaping all else

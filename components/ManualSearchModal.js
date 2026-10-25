@@ -94,6 +94,9 @@ const ManualSearchModal = (() => {
 
         const executeSearch = async (tVal) => {
             const url = `https://apic-appmobile.musixmatch.com/ws/1.1/track.search?format=json&q=${encodeURIComponent(query)}&page_size=8&app_id=mac-ios-v2.0&usertoken=${tVal}`;
+            if (typeof ProviderMusixmatch?.fetchMxm === "function") {
+                return await ProviderMusixmatch.fetchMxm(url);
+            }
             return await Spicetify.CosmosAsync.get(url, null, MXM_HEADERS);
         };
 
@@ -376,9 +379,22 @@ const ManualSearchModal = (() => {
                         unsynced = parsed.unsynced || parsed.synced;
                         copyright = "lrclib.net";
                     } else if (item.provider === "musixmatch") {
-                        const token = CONFIG.providers?.musixmatch?.token || localStorage.getItem("lyrics-plus:provider:musixmatch:token");
-                        const url = `https://apic-appmobile.musixmatch.com/ws/1.1/macro.subtitles.get?format=json&namespace=lyrics_richsynched&subtitle_format=mxm&app_id=mac-ios-v2.0&track_id=${item.raw.track_id}&usertoken=${token}`;
-                        const res = await Spicetify.CosmosAsync.get(url, null, MXM_HEADERS);
+                        let token = CONFIG.providers?.musixmatch?.token || localStorage.getItem("lyrics-plus:provider:musixmatch:token");
+                        const querySubtitles = async (tVal) => {
+                            const url = `https://apic-appmobile.musixmatch.com/ws/1.1/macro.subtitles.get?format=json&namespace=lyrics_richsynched&subtitle_format=mxm&app_id=mac-ios-v2.0&track_id=${item.raw.track_id}&usertoken=${tVal}`;
+                            if (typeof ProviderMusixmatch?.fetchMxm === "function") {
+                                return await ProviderMusixmatch.fetchMxm(url);
+                            }
+                            return await Spicetify.CosmosAsync.get(url, null, MXM_HEADERS);
+                        };
+                        let res = await querySubtitles(token);
+                        const statusCode = res?.message?.header?.status_code;
+                        if ((statusCode === 401 || statusCode === 402 || statusCode === 403) && typeof ProviderMusixmatch?.refreshMusixmatchToken === "function") {
+                            const freshToken = await ProviderMusixmatch.refreshMusixmatchToken();
+                            if (freshToken) {
+                                res = await querySubtitles(freshToken);
+                            }
+                        }
                         const body = res?.message?.body?.macro_calls;
                         if (!body) throw new Error("Failed to load subtitles from Musixmatch");
 

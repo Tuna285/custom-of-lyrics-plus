@@ -330,9 +330,14 @@ const VideoBackground = (() => {
                                 if (window.IDBCache?.delete) {
                                     await window.IDBCache.delete(autoKey);
                                 }
-                                if (window.lyricContainer?.fetchVideoBackgroundWithLyrics) {
-                                    const currentTrack = Spicetify.Player.data.item;
-                                    window.lyricContainer.fetchVideoBackgroundWithLyrics(currentTrack);
+                                if (window.lyricContainer?.fetchVideoBackground) {
+                                    const currentTrack = Spicetify.Player.data?.item;
+                                    const trackInfo = window.lyricContainer.infoFromTrack
+                                        ? window.lyricContainer.infoFromTrack(currentTrack)
+                                        : null;
+                                    if (trackInfo) {
+                                        window.lyricContainer.fetchVideoBackground(trackInfo);
+                                    }
                                 }
                             }
                         }

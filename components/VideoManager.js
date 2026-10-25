@@ -8,6 +8,7 @@ const VideoManager = {
     _lastSearchUri: null,
     _lastSearchQuery: null,
     _lastSearchResults: [],
+    _inflightSearches: new Map(),
     
     // Retry configuration
     MAX_RETRIES: 3,
@@ -208,73 +209,97 @@ const VideoManager = {
      * @returns {Promise<Array<{videoId: string, title: string, author: string, lengthSeconds: number}>>}
      */
     async _searchYoutubeTVHTML5(query) {
-        try {
-            const apiKey = "AIzaSyAO_FJ2SlvU8Q4UYNuLic2MeElzYsS180";
-            const targetUrl = `https://www.youtube.com/youtubei/v1/search?key=${apiKey}`;
-            
-            const configuredProxy = localStorage.getItem("spicetify:corsProxyTemplate");
-            const proxyTemplates = configuredProxy 
-                ? [configuredProxy]
-                : [
-                    "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}",
-                    "https://corsproxy.io/?{url}",
-                    "https://api.allorigins.win/raw?url={url}",
-                    "{url}"
-                ];
+        const cleanQuery = (query || "").trim();
+        if (!cleanQuery) return [];
+        if (this._inflightSearches.has(cleanQuery)) {
+            return this._inflightSearches.get(cleanQuery);
+        }
 
-            const body = {
-                context: {
-                    client: {
-                        clientName: "TVHTML5",
-                        clientVersion: "7.20241118.00.00",
-                        hl: "en",
-                        gl: "US"
-                    }
-                },
-                query: query
-            };
-            const headers = {
-                "Content-Type": "application/json",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-            };
+        const searchPromise = (async () => {
+            try {
+                const apiKey = "AIzaSyAO_FJ2SlvU8Q4UYNuLic2MeElzYsS180";
+                const targetUrl = `https://www.youtube.com/youtubei/v1/search?key=${apiKey}`;
 
-            for (const template of proxyTemplates) {
-                const requestUrl = template.replace("{url}", encodeURIComponent(targetUrl)).replace("{url_raw}", targetUrl);
-                try {
-                    let rawData = null;
+                const configuredProxy = localStorage.getItem("spicetify:corsProxyTemplate");
+                const proxyTemplates = configuredProxy
+                    ? [configuredProxy]
+                    : [
+                        "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}",
+                        "https://corsproxy.io/?{url}",
+                        "https://api.allorigins.win/raw?url={url}",
+                    ];
+
+                const body = {
+                    context: {
+                        client: {
+                            clientName: "TVHTML5",
+                            clientVersion: "7.20241118.00.00",
+                            hl: "en",
+                            gl: "US"
+                        }
+                    },
+                    query: cleanQuery
+                };
+
+                // 1. Try direct Spicetify.CosmosAsync.post to targetUrl first (avoids CORS preflight & Worker quota)
+                if (window.Spicetify?.CosmosAsync?.post) {
                     try {
-                        const res = await fetch(requestUrl, {
-                            method: "POST",
-                            headers: headers,
-                            body: JSON.stringify(body)
+                        const directRes = await window.Spicetify.CosmosAsync.post(targetUrl, body, {
+                            "Content-Type": "application/json",
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
                         });
-                        if (res.ok) {
-                            rawData = await res.text();
+                        const directRaw = typeof directRes === "string" ? directRes : JSON.stringify(directRes);
+                        if (directRaw && !directRaw.includes("403 Forbidden") && !directRaw.includes("<!DOCTYPE")) {
+                            const parsedDirect = this._parseYoutubeSearchResults(directRaw, cleanQuery);
+                            if (parsedDirect.length > 0) {
+                                console.log(`[VideoManager] Direct TVHTML5 InnerTube search returned ${parsedDirect.length} YouTube videos.`);
+                                return parsedDirect;
+                            }
                         }
                     } catch (_) {}
-
-                    if (!rawData && window.Spicetify?.CosmosAsync?.post) {
-                        try {
-                            const res = await window.Spicetify.CosmosAsync.post(requestUrl, body, headers);
-                            rawData = typeof res === "string" ? res : JSON.stringify(res);
-                        } catch (_) {}
-                    }
-
-                    if (rawData && !rawData.includes("403 Forbidden") && !rawData.includes("<!DOCTYPE")) {
-                        const parsedVideos = this._parseYoutubeSearchResults(rawData, query);
-                        if (parsedVideos.length > 0) {
-                            console.log(`[VideoManager] TVHTML5 InnerTube search returned ${parsedVideos.length} YouTube videos with parsed metadata.`);
-                            return parsedVideos;
-                        }
-                    }
-                } catch (proxyErr) {
-                    console.warn(`[VideoManager] TVHTML5 search failed on proxy:`, proxyErr.message);
                 }
+
+                // 2. Fallback to proxy templates (using simple text/plain POST to avoid CORS OPTIONS preflight)
+                for (const template of proxyTemplates) {
+                    const requestUrl = template.replace("{url}", encodeURIComponent(targetUrl)).replace("{url_raw}", targetUrl);
+                    try {
+                        let rawData = null;
+                        try {
+                            const res = await fetch(requestUrl, {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "text/plain;charset=UTF-8"
+                                },
+                                body: JSON.stringify(body)
+                            });
+                            if (res.ok) {
+                                rawData = await res.text();
+                            }
+                        } catch (_) {}
+
+                        if (rawData && !rawData.includes("403 Forbidden") && !rawData.includes("<!DOCTYPE")) {
+                            const parsedVideos = this._parseYoutubeSearchResults(rawData, cleanQuery);
+                            if (parsedVideos.length > 0) {
+                                console.log(`[VideoManager] TVHTML5 InnerTube search returned ${parsedVideos.length} YouTube videos with parsed metadata.`);
+                                return parsedVideos;
+                            }
+                        }
+                    } catch (proxyErr) {
+                        console.warn(`[VideoManager] TVHTML5 search failed on proxy:`, proxyErr.message);
+                    }
+                }
+            } catch (e) {
+                console.warn("[VideoManager] TVHTML5 YouTube search failed:", e.message);
             }
-        } catch (e) {
-            console.warn("[VideoManager] TVHTML5 YouTube search failed:", e.message);
+            return [];
+        })();
+
+        this._inflightSearches.set(cleanQuery, searchPromise);
+        try {
+            return await searchPromise;
+        } finally {
+            this._inflightSearches.delete(cleanQuery);
         }
-        return [];
     },
 
     /**

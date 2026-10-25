@@ -13,8 +13,14 @@ const ProviderNetease = (() => {
 
     async function fetchNetEase(targetUrl) {
         if (!targetUrl) return null;
-        
-        // Priority 1: Always use our dedicated hardened Cloudflare Worker
+
+        // Priority 1: Spicetify.CosmosAsync (direct client request with Referer & Cookie, zero Worker quota)
+        try {
+            const data1 = await Spicetify.CosmosAsync.get(targetUrl, null, BASE_HEADERS);
+            if (data1 && (data1.code === 200 || data1.result)) return data1;
+        } catch (_) {}
+
+        // Priority 2: Dedicated hardened Cloudflare Worker
         try {
             const proxiedUrl = DEDICATED_WORKER_TEMPLATE.replace("{url}", encodeURIComponent(targetUrl));
             const res = await fetch(proxiedUrl);
@@ -24,7 +30,7 @@ const ProviderNetease = (() => {
             }
         } catch (_) {}
 
-        // Priority 2: Configured proxy in localStorage (if different)
+        // Priority 3: Configured proxy in localStorage (if different)
         try {
             const configuredProxy = localStorage.getItem("spicetify:corsProxyTemplate");
             if (configuredProxy && configuredProxy !== DEDICATED_WORKER_TEMPLATE && !configuredProxy.includes("corsproxy.io")) {
@@ -35,12 +41,6 @@ const ProviderNetease = (() => {
                     if (data2 && (data2.code === 200 || data2.result)) return data2;
                 }
             }
-        } catch (_) {}
-
-        // Priority 3: Spicetify.CosmosAsync
-        try {
-            const data3 = await Spicetify.CosmosAsync.get(targetUrl, null, BASE_HEADERS);
-            if (data3 && (data3.code === 200 || data3.result)) return data3;
         } catch (_) {}
 
         return null;
@@ -54,45 +54,56 @@ const ProviderNetease = (() => {
         if (typeof IDBCache !== "undefined") {
             try {
                 const cached = await IDBCache.get(`netease:search:${cleanQ}`);
-                if (Array.isArray(cached) && cached.length) return cached;
+                if (Array.isArray(cached)) return cached;
             } catch (_) {}
         }
 
         let songs = [];
+        let apiResponded = false;
 
         // 1. Primary: interface.music.163.com cloudsearch/pc
         try {
             const urlPrimary = `https://interface.music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
             const json = await fetchNetEase(urlPrimary);
-            if (json && json.code === 200 && Array.isArray(json?.result?.songs)) {
-                songs = json.result.songs;
+            if (json && json.code === 200) {
+                apiResponded = true;
+                if (Array.isArray(json?.result?.songs)) {
+                    songs = json.result.songs;
+                }
             }
         } catch (_) {}
 
-        // 2. Secondary: interface.music.163.com search/get/web (only if primary failed/empty)
-        if (!songs.length) {
+        // 2. Secondary: interface.music.163.com search/get/web (only if primary API failed to respond)
+        if (!apiResponded && !songs.length) {
             try {
                 const urlSecondary = `https://interface.music.163.com/api/search/get/web?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
                 const json2 = await fetchNetEase(urlSecondary);
-                if (json2 && json2.code === 200 && Array.isArray(json2?.result?.songs)) {
-                    songs = json2.result.songs;
+                if (json2 && json2.code === 200) {
+                    apiResponded = true;
+                    if (Array.isArray(json2?.result?.songs)) {
+                        songs = json2.result.songs;
+                    }
                 }
             } catch (_) {}
         }
 
-        // 3. Tertiary: music.163.com cloudsearch/pc (only if previous endpoints failed)
-        if (!songs.length) {
+        // 3. Tertiary: music.163.com cloudsearch/pc (only if previous endpoints failed to respond)
+        if (!apiResponded && !songs.length) {
             try {
                 const urlTertiary = `https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(cleanQ)}&type=1&offset=0&limit=${limit}`;
                 const json3 = await fetchNetEase(urlTertiary);
-                if (json3 && json3.code === 200 && Array.isArray(json3?.result?.songs)) {
-                    songs = json3.result.songs;
+                if (json3 && json3.code === 200) {
+                    apiResponded = true;
+                    if (Array.isArray(json3?.result?.songs)) {
+                        songs = json3.result.songs;
+                    }
                 }
             } catch (_) {}
         }
 
-        if (songs.length && typeof IDBCache !== "undefined") {
-            IDBCache.set(`netease:search:${cleanQ}`, songs, 30 * 24 * 60 * 60 * 1000).catch(() => {});
+        if (apiResponded && typeof IDBCache !== "undefined") {
+            const ttl = songs.length ? 30 * 24 * 60 * 60 * 1000 : 3 * 24 * 60 * 60 * 1000;
+            IDBCache.set(`netease:search:${cleanQ}`, songs, ttl).catch(() => {});
         }
 
         return songs;
@@ -211,6 +222,10 @@ const ProviderNetease = (() => {
             if (typeof IDBCache !== "undefined" && info.uri) {
                 try {
                     const cached = await IDBCache.get(`netease:lyrics:${info.uri}`);
+                    if (cached?.notFound) {
+                        DebugLogger.log(`[NetEase] Negative cache hit for "${info.title}"`);
+                        return err("NetEase: cached not found");
+                    }
                     if (cached && (cached.synced || cached.unsynced)) {
                         DebugLogger.log(`[NetEase] IndexedDB cache hit for "${info.title}"`);
                         if (Array.isArray(cached.synced)) {
@@ -260,7 +275,12 @@ const ProviderNetease = (() => {
                     scored = artistScored;
                 }
             }
-            if (!scored.length) return err("NetEase: no results");
+            if (!scored.length) {
+                if (typeof IDBCache !== "undefined" && info.uri) {
+                    IDBCache.set(`netease:lyrics:${info.uri}`, { notFound: true, savedAt: Date.now() }, 3 * 24 * 60 * 60 * 1000).catch(() => {});
+                }
+                return err("NetEase: no results");
+            }
 
             DebugLogger.log(
                 `[NetEase] Top matches for "${info.title}":`,
@@ -349,6 +369,9 @@ const ProviderNetease = (() => {
                 return bestUnsyncedResult;
             }
 
+            if (typeof IDBCache !== "undefined" && info.uri) {
+                IDBCache.set(`netease:lyrics:${info.uri}`, { notFound: true, savedAt: Date.now() }, 3 * 24 * 60 * 60 * 1000).catch(() => {});
+            }
             return err("NetEase: no valid lyrics found across top candidates");
 
         } catch (e) {

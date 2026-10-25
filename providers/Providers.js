@@ -26,7 +26,7 @@ const Providers = {
 		const lines = lyrics.lines;
 		if (lyrics.syncType === "LINE_SYNCED") {
 			result.synced = lines.map((line) => ({
-				startTime: line.startTimeMs,
+				startTime: Number(line.startTimeMs) || 0,
 				text: line.words,
 			}));
 			result.unsynced = result.synced;
@@ -67,15 +67,23 @@ const Providers = {
 		}
 
 		// Karaoke disabled
+		result.musixmatchAvailableTranslations = Array.isArray(list.__musixmatchTranslationStatus)
+			? list.__musixmatchTranslationStatus
+			: [];
+		result.musixmatchTrackId = list.__musixmatchTrackId ?? null;
+
 		const synced = ProviderMusixmatch.getSynced(list);
 		if (synced) {
 			result.synced = synced;
-			result.copyright = list["track.subtitles.get"].message?.body?.subtitle_list?.[0]?.subtitle.lyrics_copyright.trim();
+			result.copyright = list["track.subtitles.get"]?.message?.body?.subtitle_list?.[0]?.subtitle?.lyrics_copyright?.trim() || null;
 		}
 		const unsynced = synced || ProviderMusixmatch.getUnsynced(list);
 		if (unsynced) {
 			result.unsynced = unsynced;
-			result.copyright = list["track.lyrics.get"].message?.body?.lyrics?.lyrics_copyright?.trim();
+			result.copyright =
+				result.copyright ||
+				list["track.lyrics.get"]?.message?.body?.lyrics?.lyrics_copyright?.trim() ||
+				null;
 		}
 		const translation = await ProviderMusixmatch.getTranslation(list);
 		if ((synced || unsynced) && translation) {
@@ -85,6 +93,7 @@ const Providers = {
 				text: translation.find((t) => t.matchedLine === line.text)?.translation ?? line.text,
 				originalText: line.text,
 			}));
+			result.musixmatchTranslationLanguage = CONFIG.visual["musixmatch-translation-language"] || null;
 		}
 
 		return result;

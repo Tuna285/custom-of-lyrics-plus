@@ -181,6 +181,9 @@ window.LyricsPlus.TranslationCoordinator = {
 			if (self._failedFetches?.[currentUri]) {
 				self._failedFetches[currentUri].delete("gemini_vi");
 			}
+			if (self._activeFetches?.[currentUri]) {
+				self._activeFetches[currentUri].delete("gemini_vi");
+			}
 			console.log(`[Lyrics+] Translation settings changed (${self._lastTargetLang}/${self._lastStyleKey}/${self._lastPronounKey} → ${currentTargetLang}/${currentStyleKey}/${currentPronounKey}), re-fetching translation...`);
 		}
 		
@@ -290,7 +293,10 @@ window.LyricsPlus.TranslationCoordinator = {
 				currentUri
 			});
 		}
-		// Helper to check if a mode translation is already in-flight (either in active fetches or Map)
+		// Helper to check if a mode translation is already in-flight for the current UI
+		// Note: Silent background pre-translations in _inflightGemini (with uiWanted=false)
+		// are NOT in _activeFetches yet; letting them enter processMode -> getGeminiTranslation
+		// upgrades inflight.uiWanted=true, promotes queue priority, and attaches UI update callbacks.
 		const isModeInflight = (mode) => {
 			if (!mode || mode === "none") return false;
 			if (self._activeFetches?.[currentUri]?.has(mode)) {
@@ -306,7 +312,8 @@ window.LyricsPlus.TranslationCoordinator = {
 					: (targetLang === "vi"
 						? `${currentUri}:${mode}:${styleKey}:${pronounKey}`
 						: `${currentUri}:${targetLang}:${mode}:${styleKey}:${pronounKey}`);
-				return !!(self._inflightGemini && self._inflightGemini.has(cacheKey2));
+				const inflight = self._inflightGemini?.get(cacheKey2);
+				return Boolean(inflight && inflight.uiWanted);
 			} else {
 				const cacheKey = `${currentUri}:${mode}`;
 				return !!(self._inflightTrad && self._inflightTrad.has(cacheKey));
@@ -380,8 +387,11 @@ window.LyricsPlus.TranslationCoordinator = {
 			self._failedFetches[currentUri].add(mode);
 		};
 
-		// Start first request immediately (non-blocking)
-		const promise1 = processMode(firstMode, lyrics).then(result => {
+		const isFirstMissing = firstModeKey === 'mode1' ? missingMode1 : missingMode2;
+		const isSecondMissing = secondModeKey === 'mode1' ? missingMode1 : missingMode2;
+
+		// Start first request immediately (non-blocking) only if it is missing
+		const promise1 = isFirstMissing ? processMode(firstMode, lyrics).then(result => {
 			if (self.state.uri !== uri) return;
 			if (self._dmResults?.[currentUri]) self._dmResults[currentUri][firstMode] = result;
 			if (result === null) {
@@ -395,10 +405,11 @@ window.LyricsPlus.TranslationCoordinator = {
 			updateCombinedLyrics(true);
 		}).finally(() => {
 			cleanActiveFetch(firstMode);
-		});
+		}) : Promise.resolve();
 
-		// Delay 500ms then start second request (staggered to avoid API contention)
-		const promise2 = new Promise(resolve => setTimeout(resolve, 500)).then(() => {
+		// Delay 500ms only when the first request actually started (staggered to avoid API contention)
+		const secondDelayMs = isFirstMissing ? 500 : 0;
+		const promise2 = isSecondMissing ? new Promise(resolve => setTimeout(resolve, secondDelayMs)).then(() => {
 			return processMode(secondMode, lyrics).then(result => {
 				if (self.state.uri !== uri) return;
 				if (self._dmResults?.[currentUri]) self._dmResults[currentUri][secondMode] = result;
@@ -414,7 +425,7 @@ window.LyricsPlus.TranslationCoordinator = {
 			}).finally(() => {
 				cleanActiveFetch(secondMode);
 			});
-		});
+		}) : Promise.resolve();
 
 		// Auto-save cache after all translations complete
 		Promise.allSettled([promise1, promise2]).then(() => {
@@ -550,6 +561,7 @@ window.LyricsPlus.TranslationCoordinator = {
 			const inflight = self._inflightGemini.get(cacheKey2);
 			if (!silent) {
 				inflight.uiWanted = true;
+				Translator.promote(cacheKey2);
 				if (lyricsState.uri === self.state.uri) {
 					self.setState({
 						isTranslating: true,
@@ -763,7 +775,7 @@ window.LyricsPlus.TranslationCoordinator = {
 
                 // Process Result
                 const transLines = translation || vi;
-                let outText = wantSmartPhonetic ? phonetic : transLines;
+                let outText = wantSmartPhonetic ? (Array.isArray(transLines) ? transLines : phonetic) : transLines;
                 if (!outText) throw new Error("Empty result from Gemini.");
 
                 let lines = Array.isArray(outText) ? outText : (typeof outText === 'string' ? outText.split("\n") : null);
@@ -1028,6 +1040,8 @@ window.LyricsPlus.TranslationCoordinator = {
 						return lyrics;
 					}
 
+					if (!map[targetConvert]) return lyrics;
+
 					result = await Promise.all(
 						lyrics.map(async (lyric) => await self.translator.convertChinese(lyric?.text || "", map[targetConvert].from, map[targetConvert].target))
 					);
@@ -1056,6 +1070,7 @@ window.LyricsPlus.TranslationCoordinator = {
 				}
 			}
 
+			if (!Array.isArray(result)) return lyrics;
 			const res = Utils.processTranslatedLyrics(result, lyrics);
 			return res;
 		} catch (error) {
@@ -1296,10 +1311,16 @@ window.LyricsPlus.TranslationCoordinator = {
 		return target.map((line, i) => {
 			const src = source[i];
 			if (!src) return line;
+			const srcStart = typeof src.startTime === "number" ? src.startTime : Number(src.startTime);
+			const srcEnd = typeof src.endTime === "number" ? src.endTime : Number(src.endTime);
 			return {
 				...line,
-				startTime: (typeof line?.startTime === "number" && isFinite(line.startTime)) ? line.startTime : src.startTime,
-				endTime: (typeof line?.endTime === "number" && isFinite(line.endTime)) ? line.endTime : src.endTime,
+				startTime: (typeof line?.startTime === "number" && isFinite(line.startTime))
+					? line.startTime
+					: (isFinite(srcStart) ? srcStart : src.startTime),
+				endTime: (typeof line?.endTime === "number" && isFinite(line.endTime))
+					? line.endTime
+					: (isFinite(srcEnd) ? srcEnd : src.endTime),
 			};
 		});
 	},
@@ -1356,9 +1377,18 @@ window.LyricsPlus.TranslationCoordinator = {
 		};
 
 		try {
-			const cached = await CacheManager.get(nextInfo.uri);
+			let cached = (typeof CACHE !== "undefined" && CACHE[nextInfo.uri]) ? CACHE[nextInfo.uri] : null;
+			if (!cached && typeof DBManager !== "undefined") {
+				cached = await DBManager.get(nextInfo.uri);
+			}
+			if (!cached) {
+				cached = await CacheManager.get(nextInfo.uri);
+			}
 			if (cached && hasLyricsContent(cached)) {
 				lyricsData = cached;
+				if (typeof CACHE !== "undefined" && !CACHE[nextInfo.uri]) {
+					CACHE[nextInfo.uri] = cached;
+				}
 				console.log(`[Lyrics+] Pre-translate: cache HIT with valid lyrics`);
 			} else if (cached) {
 				console.log(`[Lyrics+] Pre-translate: cache HIT but stale (no lyrics content), treating as MISS`);
@@ -1372,6 +1402,12 @@ window.LyricsPlus.TranslationCoordinator = {
 			try {
 				lyricsData = await self.tryServices(nextInfo, -1, { skipStaleCheck: true });
 				if (lyricsData?.provider) {
+					if (typeof CACHE !== "undefined") {
+						CACHE[nextInfo.uri] = lyricsData;
+					}
+					if (typeof DBManager !== "undefined" && hasLyricsContent(lyricsData)) {
+						DBManager.set(nextInfo.uri, lyricsData).catch(() => {});
+					}
 					CacheManager.set(nextInfo.uri, lyricsData);
 					console.log(`[Lyrics+] Pre-translate: lyrics fetched from ${lyricsData.provider}`);
 				}
@@ -1498,9 +1534,12 @@ window.LyricsPlus.TranslationCoordinator = {
 				}
 
 				// Force re-processing by invalidating cache
+				self.lastCleanedUri = null;
 				self.lastProcessedUri = null;
 				self.lastProcessedMode = null;
 
+				const nextCurrentLyrics = localLyrics.synced || localLyrics.unsynced || localLyrics.karaoke || localLyrics.genius || null;
+				const detectedLanguage = Array.isArray(nextCurrentLyrics) ? Utils.detectLanguage(nextCurrentLyrics) : null;
 				const nextState = {
 					provider: "local",
 					copyright: "",
@@ -1508,11 +1547,18 @@ window.LyricsPlus.TranslationCoordinator = {
 					unsynced: localLyrics.unsynced,
 					karaoke: localLyrics.karaoke,
 					genius: localLyrics.genius,
+					currentLyrics: nextCurrentLyrics,
+					language: detectedLanguage,
 					isLoading: false,
 					error: null,
 				};
 
+				if (self.currentTrackUri && typeof CACHE !== "undefined") {
+					CACHE[self.currentTrackUri] = { ...CACHE[self.currentTrackUri], ...nextState };
+				}
+
 				self.setState(nextState, () => {
+					this.resetTranslationCache(self, self.currentTrackUri);
 					this.saveLocalLyrics(self, self.currentTrackUri, nextState);
 				});
 				Spicetify.showNotification("✓ " + getText("notifications.loadedLyricsFromFile", { types: parsedKeys.join(", ") }), false, 3000);

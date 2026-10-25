@@ -93,8 +93,8 @@ const computeTimingStats = (lyrics) => {
 // Estimate how long a line actually plays. Prefers provider-supplied endTime when present
 // (e.g. Musixmatch karaoke richsync), falls back to char-count × per-song tempo.
 const estimateLineDuration = (line, stats) => {
-    if (line?.endTime && line?.startTime && line.endTime > line.startTime) {
-        return line.endTime - line.startTime;
+    if (line?.endTime && line?.startTime && Number(line.endTime) > Number(line.startTime)) {
+        return Number(line.endTime) - Number(line.startTime);
     }
     const text = line?.originalText || line?.text || "";
     const len = typeof text === "string" ? text.trim().length : 0;
@@ -175,7 +175,7 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                     const len = typeof text === "string" ? text.trim().length : 0;
                     const ratio = len < 10 ? 0.85 : len < 20 ? 0.80 : LINE_END_INTERVAL_FLOOR_RATIO;
 
-                    const lineEnd = currentLine.startTime + Math.min(
+                    const lineEnd = Number(currentLine.startTime) + Math.min(
                         Math.max(estDur, interval * ratio),
                         estDur * 1.5
                     );
@@ -328,17 +328,19 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
 
                 if (isNote) {
                     // Find next line's start time to calculate progress
-                    let nextStartTime = startTime + 5000; // Default fallback
+                    const currentStartTime = Number(startTime) || 0;
+                    let nextStartTime = currentStartTime + 5000; // Default fallback
 
                     // Find the next line in the activeLines array
-                    if (i < activeLines.length - 1) {
-                        nextStartTime = activeLines[i + 1].startTime;
+                    const nextCandidate = i < activeLines.length - 1 ? Number(activeLines[i + 1]?.startTime) : NaN;
+                    if (Number.isFinite(nextCandidate) && nextCandidate > 0) {
+                        nextStartTime = nextCandidate;
                     }
 
-                    const rawDuration = nextStartTime - startTime;
+                    const rawDuration = nextStartTime - currentStartTime;
                     if (rawDuration >= 4000) {
                         const duration = Math.max(rawDuration, 5000);
-                        const elapsed = position - startTime;
+                        const elapsed = position - currentStartTime;
                         const progress = Math.min(Math.max(elapsed / duration, 0), 1);
 
                         return react.createElement(IdlingIndicator, {
@@ -480,7 +482,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
                     const len = typeof text === "string" ? text.trim().length : 0;
                     const ratio = len < 10 ? 0.85 : len < 20 ? 0.80 : LINE_END_INTERVAL_FLOOR_RATIO;
 
-                    const lineEnd = currentLine.startTime + Math.min(
+                    const lineEnd = Number(currentLine.startTime) + Math.min(
                         Math.max(estDur, interval * ratio),
                         estDur * 1.5
                     );
@@ -633,15 +635,17 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
 
             if (isNote) {
                 // Find next line's start time
-                let nextStartTime = startTime + 5000; // Default fallback
-                if (i < padded.length - 1) {
-                    nextStartTime = padded[i + 1].startTime;
+                const currentStartTime = Number(startTime) || 0;
+                let nextStartTime = currentStartTime + 5000; // Default fallback
+                const nextCandidate = i < padded.length - 1 ? Number(padded[i + 1]?.startTime) : NaN;
+                if (Number.isFinite(nextCandidate) && nextCandidate > 0) {
+                    nextStartTime = nextCandidate;
                 }
 
-                const rawDuration = nextStartTime - startTime;
+                const rawDuration = nextStartTime - currentStartTime;
                 if (rawDuration >= 4000) {
                     const duration = Math.max(rawDuration, 5000);
-                    const elapsed = position - startTime;
+                    const elapsed = position - currentStartTime;
                     const progress = Math.min(Math.max(elapsed / duration, 0), 1);
 
                     return react.createElement(IdlingIndicator, {
