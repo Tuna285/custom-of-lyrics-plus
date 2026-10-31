@@ -357,8 +357,8 @@ window.LyricsPlus.TranslationCoordinator = {
 
 		// Staggered parallel execution: Phonetic starts first, Translation starts 500ms later
 		// This avoids API contention while keeping total time close to parallel
-		const isMode1Phonetic = String(displayMode1).includes('romaji') || String(displayMode1).includes('pinyin') || String(displayMode1).includes('romaja');
-		const isMode2Phonetic = String(displayMode2).includes('romaji') || String(displayMode2).includes('pinyin') || String(displayMode2).includes('romaja');
+		const isMode1Phonetic = String(displayMode1).includes('romaji') || String(displayMode1).includes('furigana') || String(displayMode1).includes('pinyin') || String(displayMode1).includes('romaja');
+		const isMode2Phonetic = String(displayMode2).includes('romaji') || String(displayMode2).includes('furigana') || String(displayMode2).includes('pinyin') || String(displayMode2).includes('romaja');
 
 		// Determine which mode is Phonetic (should start first) and which is Translation (delayed)
 		let firstMode, secondMode, firstModeKey, secondModeKey;
@@ -407,8 +407,14 @@ window.LyricsPlus.TranslationCoordinator = {
 			cleanActiveFetch(firstMode);
 		}) : Promise.resolve();
 
-		// Delay 500ms only when the first request actually started (staggered to avoid API contention)
-		const secondDelayMs = isFirstMissing ? 500 : 0;
+		// Only stagger when both modes hit Gemini using the exact same model on a single API key.
+		// When using >=2 API keys, separate phonetic/translation models, or local conversion, fire in parallel (0ms delay).
+		const bothGemini = String(firstMode || '').startsWith('gemini') && String(secondMode || '').startsWith('gemini');
+		const hasMultipleKeys = (window.GeminiClient?.getApiKeys?.() || []).length >= 2;
+		const transModel = CONFIG?.visual?.["gemini:model"] || "gemini-3.6-flash";
+		const phonModel = CONFIG?.visual?.["gemini:phonetic-model"] || "gemini-3.5-flash-lite";
+		const usesDistinctModels = (isMode1Phonetic !== isMode2Phonetic) && (transModel !== phonModel);
+		const secondDelayMs = (isFirstMissing && bothGemini && !hasMultipleKeys && !usesDistinctModels) ? 200 : 0;
 		const promise2 = isSecondMissing ? new Promise(resolve => setTimeout(resolve, secondDelayMs)).then(() => {
 			return processMode(secondMode, lyrics).then(result => {
 				if (self.state.uri !== uri) return;

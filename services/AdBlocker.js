@@ -416,8 +416,7 @@
             ];
             mergedConfig.playerVars.fflags = mergeFeatureFlags(mergedConfig.playerVars.fflags, forcedFeatureFlags);
 
-            // Active Ad Watchdog & Skipping Logic
-            let adWatchdog = null;
+            // Active Ad Handling Logic (Mute ads & maintain strictly 1x playback rate)
             const checkPlayerAd = (player) => {
                 try {
                     const state = typeof player.getPlayerState === "function" ? player.getPlayerState() : -1;
@@ -430,15 +429,13 @@
                 return false;
             };
 
-            const skipActiveAd = (player) => {
+            const handlePlayerAdState = (player) => {
                 try {
                     const isAd = checkPlayerAd(player);
                     if (isAd) {
-                        player.setPlaybackRate?.(16);
                         player.mute?.();
-                        if (typeof player.skipAd === "function") player.skipAd();
                     } else {
-                        if (typeof player.getPlaybackRate === "function" && player.getPlaybackRate() > 1) {
+                        if (typeof player.getPlaybackRate === "function" && player.getPlaybackRate() !== 1) {
                             player.setPlaybackRate(1);
                         }
                     }
@@ -458,18 +455,13 @@
                                      checkPlayerAd(player);
 
                     if (isAdState) {
-                        skipActiveAd(player);
-                    }
-
-                    if (state === 1) { // Playing
-                        if (!adWatchdog) {
-                            adWatchdog = setInterval(() => skipActiveAd(player), 300);
-                        }
-                    } else if ([0, 2, -1].includes(state)) { // Ended, Paused, Unstarted
-                        if (adWatchdog) {
-                            clearInterval(adWatchdog);
-                            adWatchdog = null;
-                        }
+                        handlePlayerAdState(player);
+                    } else if (state === 1) { // Playing
+                        try {
+                            if (typeof player.getPlaybackRate === "function" && player.getPlaybackRate() !== 1) {
+                                player.setPlaybackRate(1);
+                            }
+                        } catch (_) {}
                     }
                 }
             };
@@ -516,16 +508,17 @@
                     document.querySelectorAll("iframe").forEach((iframe) => {
                         if (/youtube|youtu\.be/i.test(iframe.src)) {
                             try {
-                                iframe.contentWindow?.postMessage(JSON.stringify({
-                                    event: "command",
-                                    func: "setPlaybackRate",
-                                    args: [isAd ? 16 : 1]
-                                }), "*");
                                 if (isAd) {
                                     iframe.contentWindow?.postMessage(JSON.stringify({
                                         event: "command",
                                         func: "mute",
                                         args: []
+                                    }), "*");
+                                } else {
+                                    iframe.contentWindow?.postMessage(JSON.stringify({
+                                        event: "command",
+                                        func: "setPlaybackRate",
+                                        args: [1]
                                     }), "*");
                                 }
                             } catch (_) {}
@@ -544,15 +537,16 @@
         patchScriptElements();
         patchLinkElements();
         patchImageElements();
-        patchIframeSetter();
+        // Do not alter YouTube iframe src or wrap window.YT.Player to prevent breaking onReady communication
+        // patchIframeSetter();
+        // patchYouTubePlayer();
+        // observeDOM();
         patchWebSocket();
         patchWorkers();
         patchServiceWorkers();
         patchWindowOpen();
-        patchYouTubePlayer();
-        observeDOM();
         injectAdBlockStyles();
-        listenMessageAdEvents();
+        // listenMessageAdEvents();
         console.log(`${logPrefix} Initialized`);
     };
 

@@ -14,32 +14,19 @@ const ProviderNetease = (() => {
     async function fetchNetEase(targetUrl) {
         if (!targetUrl) return null;
 
-        // Priority 1: Spicetify.CosmosAsync (direct client request with Referer & Cookie, zero Worker quota)
+        // Priority 1: Official Spicetify.CosmosAsync.get (uses https://cors-proxy.spicetify.app/{url}, zero Cloudflare Worker quota)
         try {
             const data1 = await Spicetify.CosmosAsync.get(targetUrl, null, BASE_HEADERS);
             if (data1 && (data1.code === 200 || data1.result)) return data1;
         } catch (_) {}
 
-        // Priority 2: Dedicated hardened Cloudflare Worker
+        // Priority 2: Dedicated Cloudflare Worker fallback (only if cors-proxy.spicetify.app is unreachable)
         try {
             const proxiedUrl = DEDICATED_WORKER_TEMPLATE.replace("{url}", encodeURIComponent(targetUrl));
             const res = await fetch(proxiedUrl);
             if (res.ok) {
                 const data = await res.json();
                 if (data && (data.code === 200 || data.result)) return data;
-            }
-        } catch (_) {}
-
-        // Priority 3: Configured proxy in localStorage (if different)
-        try {
-            const configuredProxy = localStorage.getItem("spicetify:corsProxyTemplate");
-            if (configuredProxy && configuredProxy !== DEDICATED_WORKER_TEMPLATE && !configuredProxy.includes("corsproxy.io")) {
-                const proxiedUrl2 = configuredProxy.replace("{url}", encodeURIComponent(targetUrl));
-                const res2 = await fetch(proxiedUrl2);
-                if (res2.ok) {
-                    const data2 = await res2.json();
-                    if (data2 && (data2.code === 200 || data2.result)) return data2;
-                }
             }
         } catch (_) {}
 

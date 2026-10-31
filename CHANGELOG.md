@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.5] - 2026-11-01
+
+### Changed
+
+- **Native CORS Proxy Routing**: Restored Spicetify's native CORS proxy as the default for Musixmatch and NetEase while keeping the Cloudflare Worker as a fallback, preventing truncated query parameters and reducing Worker quota usage.
+- **Parallel Phonetic & Translation Requests**: Disabled thinking overhead on phonetic tasks (Furigana, Romaji, Pinyin) and removed request staggering when multiple API keys or a separate phonetic model are configured.
+
+### Fixed
+
+- **YouTube Background Ad-Bypass**: Fixed pre-roll ads slipping through or getting stuck on "Loading video..." by aborting active ad sessions in place before revealing the video background.
+- **Video Background Playback & Sync**: Fixed video backgrounds disappearing on track switch, auto-advances to the next candidate when a video fails to embed, and syncs immediately when seeking or adjusting video offset.
+- **Musixmatch Error Handling**: Fixed failed proxy responses being misidentified as valid payloads before token refresh or fallback routing could run.
+
 ## [1.9.4] - 2026-10-25
 
 ### Changed

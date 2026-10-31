@@ -18,27 +18,29 @@ const ProviderMusixmatch = (() => {
 		if (!targetUrl) return null;
 		let lastErrorStatus = null;
 
-		// 1. Primary: Native Spicetify.CosmosAsync (uses residential IP + full iOS app headers, avoids Cloudflare Worker datacenter IP blocks)
+		// 1. Primary: Official Spicetify.CosmosAsync.get (uses https://cors-proxy.spicetify.app/{url}, zero Cloudflare Worker quota)
 		try {
 			const res = await Spicetify.CosmosAsync.get(targetUrl, null, headers);
-			const code = res?.message?.header?.status_code;
-			if (res?.message && code !== 401 && code !== 402 && code !== 403) {
-				return res;
-			}
-			if (code === 401 || code === 402 || code === 403) {
+			if (res?.message && typeof res.message === "object") {
+				const code = res.message?.header?.status_code;
+				if (code !== 401 && code !== 402 && code !== 403) {
+					return res;
+				}
 				lastErrorStatus = code;
+				// Server responded with auth/rate-limit status; do not repeat the same token via Worker
+				return {
+					message: {
+						header: {
+							status_code: lastErrorStatus === 403 ? 401 : lastErrorStatus,
+						},
+					},
+				};
 			}
-		} catch (e) {
-			const errStatus = e?.status || e?.statusCode;
-			if (errStatus === 401 || errStatus === 402 || errStatus === 403) {
-				lastErrorStatus = errStatus;
-			}
-		}
+		} catch (_) {}
 
-		// 2. Fallback: Dedicated Cloudflare Worker CORS Proxy (bypasses ISP blocks if direct CosmosAsync failed)
+		// 2. Fallback: Dedicated Cloudflare Worker CORS Proxy (only if cors-proxy.spicetify.app is unreachable)
 		try {
-			const proxyTemplate = localStorage.getItem("spicetify:corsProxyTemplate") || DEDICATED_WORKER_TEMPLATE;
-			const proxiedUrl = proxyTemplate.replace("{url}", encodeURIComponent(targetUrl));
+			const proxiedUrl = DEDICATED_WORKER_TEMPLATE.replace("{url}", encodeURIComponent(targetUrl));
 			const res = await fetch(proxiedUrl);
 			if (res.status === 401 || res.status === 402 || res.status === 403) {
 				lastErrorStatus = res.status;
@@ -47,7 +49,13 @@ const ProviderMusixmatch = (() => {
 			if (text) {
 				try {
 					const data = JSON.parse(text);
-					if (data?.message) return data;
+					if (data?.message && typeof data.message === "object") {
+						const code = data.message?.header?.status_code;
+						if (code !== 401 && code !== 402 && code !== 403) {
+							return data;
+						}
+						lastErrorStatus = code;
+					}
 				} catch (_) {}
 			}
 		} catch (_) {}

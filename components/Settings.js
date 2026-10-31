@@ -587,10 +587,10 @@ const ServiceList = ({ itemsList, onListChange = () => { }, onToggle = () => { }
 
 const corsProxyTemplate = () => {
 	const [proxyValue, setProxyValue] = react.useState(
-		localStorage.getItem("spicetify:corsProxyTemplate") || "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}"
+		localStorage.getItem("spicetify:corsProxyTemplate") || "https://cors-proxy.spicetify.app/{url}"
 	);
 	return react.createElement("input", {
-		placeholder: "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}", value: proxyValue,
+		placeholder: "CORS Proxy Template", value: proxyValue,
 		onChange: (event) => {
 			const value = event.target.value; setProxyValue(value);
 			if (value === "" || !value) return localStorage.removeItem("spicetify:corsProxyTemplate");
@@ -842,7 +842,7 @@ const ConfigHelper = () => {
 						}
 					},
 						react.createElement("div", null,
-							react.createElement("div", { style: { fontWeight: "bold", fontSize: "14px", color: "var(--spice-text)" } }, `Lyric Plus Translate v${window.UpdateService?.CURRENT_VERSION || "1.9.4"}`),
+							react.createElement("div", { style: { fontWeight: "bold", fontSize: "14px", color: "var(--spice-text)" } }, `Lyric Plus Translate v${window.UpdateService?.CURRENT_VERSION || "1.9.5"}`),
 							react.createElement("div", { style: { fontSize: "12px", color: "var(--spice-subtext)", marginTop: "2px" } }, getText("settings.updateAppSubtitle"))
 						),
 						react.createElement("button", {

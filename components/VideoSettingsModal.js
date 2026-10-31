@@ -119,6 +119,7 @@ window.LyricsPlus.openVideoSettingsModal = function(self) {
 				if (result) {
 					self.setState({ videoBackground: result });
 					VideoManager.saveOffset(info.uri, newOffset);
+					window.dispatchEvent(new CustomEvent("lyricsPlusSyncRequest", { detail: { forceSeek: true, offset: newOffset } }));
 				}
 			}
 		};

@@ -98,11 +98,11 @@ if (window.LyricsPlus) {
     window.LyricsPlus.TrackSettings = TrackSettings;
 }
 
-// Auto-initialize default CORS proxy template if empty or legacy corsproxy.io
+// Clean up legacy or broken query-param CORS proxy templates so Spicetify uses its native default (https://cors-proxy.spicetify.app/{url})
 try {
     const curProxy = localStorage.getItem("spicetify:corsProxyTemplate");
-    if (!curProxy || curProxy.includes("corsproxy.io")) {
-        localStorage.setItem("spicetify:corsProxyTemplate", "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}");
+    if (curProxy && (curProxy.includes("corsproxy.io") || curProxy.includes("spicetify-yt-proxy.spicetifylyricplus.workers.dev"))) {
+        localStorage.removeItem("spicetify:corsProxyTemplate");
     }
 } catch (_) {}
 

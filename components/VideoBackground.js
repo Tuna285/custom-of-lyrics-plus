@@ -24,6 +24,8 @@ const VideoBackground = (() => {
         document.head.appendChild(tag);
     }
 
+    const sendLiveLog = () => {};
+
     const Component = ({ trackUri, brightness, blurAmount, scale, fullscreen, videoInfo }) => {
         const { useState, useEffect, useRef } = Spicetify.React;
         const react = Spicetify.React;
@@ -42,9 +44,52 @@ const VideoBackground = (() => {
         const lastSeekAttemptRef = useRef({ time: 0, attempts: 0 });
         const lastSeekTimeRef = useRef(0);
         const isMountedRef = useRef(true);
+        const isPlayerReadyRef = useRef(false);
+        const hasStartedPlayingRef = useRef(false);
         const tryCreateRef = useRef(null);
+        const isAdPlayingRef = useRef(false);
         const bypassAdAttemptsRef = useRef(0);
         const isRecreatingRef = useRef(false);
+        const adProgressCheckRef = useRef({ startMediaTime: -1, startWallTime: 0, lastCurrent: -1 });
+        const adHideTimeoutRef = useRef(null);
+        const fallbackInProgressRef = useRef(false);
+        const watchdogTimerRef = useRef(null);
+        const videoInfoRef = useRef(videoInfo);
+        videoInfoRef.current = videoInfo;
+        const trackUriRef = useRef(trackUri);
+        trackUriRef.current = trackUri;
+        const lastSpotifyProgressRef = useRef(0);
+
+        const setPlayerReadyState = (val) => {
+            isPlayerReadyRef.current = val;
+            setIsPlayerReady(val);
+        };
+
+        const setStartedPlayingState = (val) => {
+            hasStartedPlayingRef.current = val;
+            setHasStartedPlaying(val);
+        };
+
+        const setAdPlayingState = (val) => {
+            isAdPlayingRef.current = val;
+            setIsAdPlaying(val);
+            if (adHideTimeoutRef.current) {
+                clearTimeout(adHideTimeoutRef.current);
+                adHideTimeoutRef.current = null;
+            }
+            if (val) {
+                // Safety valve: never allow Loading video... to get stuck indefinitely
+                adHideTimeoutRef.current = setTimeout(() => {
+                    if (isMountedRef.current && isAdPlayingRef.current) {
+                        isAdPlayingRef.current = false;
+                        setIsAdPlaying(false);
+                        setPlayerReadyState(true);
+                        setStartedPlayingState(true);
+                        setIsYTReadyToRender(true);
+                    }
+                }, 6000);
+            }
+        };
 
         const brightnessValue = Math.min(Math.max(Number(brightness) || 50, 0), 100);
         const brightnessRatio = brightnessValue / 100;
@@ -56,6 +101,8 @@ const VideoBackground = (() => {
             return () => {
                 isMountedRef.current = false;
                 if (uiFlashTimeoutRef.current) clearTimeout(uiFlashTimeoutRef.current);
+                if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
+                if (adHideTimeoutRef.current) clearTimeout(adHideTimeoutRef.current);
                 if (playerRef.current) {
                     try { playerRef.current.destroy(); } catch (_) {}
                     playerRef.current = null;
@@ -64,45 +111,129 @@ const VideoBackground = (() => {
         }, []);
 
         const checkPlayerIsAd = (player, state) => {
-            if (!player) return false;
+            if (!player || !isPlayerReadyRef.current) return false;
             try {
                 if (state !== undefined && [105, 106, 107, 108, 109, 110, 111].includes(state)) return true;
                 if (typeof player.getAdState === "function" && player.getAdState() === 1) return true;
 
                 const videoData = typeof player.getVideoData === "function" ? player.getVideoData() : null;
                 if (videoData?.isAd) return true;
+
+                const progressState = player.playerInfo?.progressState;
+                if (progressState) {
+                    if (progressState.allowSeeking === true) {
+                        adProgressCheckRef.current = { startMediaTime: -1, startWallTime: 0, lastCurrent: -1 };
+                        return false;
+                    }
+                    // In YouTube's IFrame API, pre-roll ads play while playerState is -1 (unstarted) with allowSeeking: false and current > 0.3
+                    const pState = state !== undefined ? state : (typeof player.getPlayerState === "function" ? player.getPlayerState() : -1);
+                    if (progressState.allowSeeking === false && (progressState.current || 0) > 0.3 && pState === -1) {
+                        return true;
+                    }
+                }
             } catch (_) {}
             return false;
         };
 
-        const recreatePlayerToBypassAd = () => {
+        const triggerCandidateFallback = async (badVideoId) => {
+            if (fallbackInProgressRef.current || !isMountedRef.current) return;
+            fallbackInProgressRef.current = true;
+            console.warn(`[Lyrics+] Video ${badVideoId} cannot be embedded. Switching to next candidate...`);
+
+            try {
+                const currentTrack = Spicetify.Player.data?.item;
+                const trackInfo = window.lyricContainer?.infoFromTrack
+                    ? window.lyricContainer.infoFromTrack(currentTrack)
+                    : null;
+                const vm = window.VideoManager || window.LyricsPlus?.VideoManager;
+                const activeUri = trackUriRef.current || videoInfoRef.current?.uri;
+                if (trackInfo && (!activeUri || trackInfo.uri === activeUri) && vm?.nextCandidate) {
+                    const nextVideo = await vm.nextCandidate(trackInfo);
+                    if (nextVideo && window.lyricContainer) {
+                        window.lyricContainer.setState({ videoBackground: nextVideo });
+                    }
+                }
+            } catch (err) {
+                console.error("[Lyrics+] Candidate fallback error:", err);
+            } finally {
+                setTimeout(() => {
+                    fallbackInProgressRef.current = false;
+                }, 2000);
+            }
+        };
+
+        const abortAdInPlace = () => {
             if (!isMountedRef.current || isRecreatingRef.current) return;
-            if (bypassAdAttemptsRef.current >= 2) return;
+            const player = playerRef.current;
+            const activeVideoId = currentVideoIdRef.current || videoInfoRef.current?.video_id;
+            if (!player || !activeVideoId || typeof player.cueVideoById !== "function") return;
+            if (bypassAdAttemptsRef.current >= 3) return;
 
             isRecreatingRef.current = true;
             bypassAdAttemptsRef.current += 1;
-            console.log(`[Lyrics+] Ad detected (${bypassAdAttemptsRef.current}/2). Recreating player iframe to bypass...`);
+            adProgressCheckRef.current = { startMediaTime: -1, startWallTime: 0, lastCurrent: -1 };
+            setAdPlayingState(true);
+            console.log(`[Lyrics+] Ad detected (${bypassAdAttemptsRef.current}/3). Aborting ad in-place via cueVideoById...`);
 
-            if (playerRef.current) {
-                try { playerRef.current.destroy(); } catch (_) {}
-                playerRef.current = null;
-            }
-
-            setIsPlayerReady(false);
-            setIsAdPlaying(false);
+            try {
+                const spotifyTime = (Spicetify.Player.getProgress() || 0) / 1000;
+                const syncOffset = videoInfoRef.current?.sync_offset || 0;
+                const resumeTime = Math.max(1, Math.floor(spotifyTime + syncOffset));
+                player.cueVideoById({
+                    videoId: activeVideoId,
+                    startSeconds: resumeTime
+                });
+            } catch (_) {}
 
             setTimeout(() => {
-                if (!isMountedRef.current) return;
-                const spotifyTime = (Spicetify.Player.getProgress() || 0) / 1000;
-                const syncOffset = videoInfo?.sync_offset || 0;
-                const resumeTime = Math.max(2, Math.floor(spotifyTime + syncOffset));
-                if (typeof tryCreateRef.current === "function") {
-                    tryCreateRef.current(resumeTime);
+                isRecreatingRef.current = false;
+                if (!isMountedRef.current || !playerRef.current) return;
+                try {
+                    playerRef.current.mute?.();
+                    if (Spicetify.Player.isPlaying()) {
+                        playerRef.current.playVideo?.();
+                    }
+                } catch (_) {}
+            }, 500);
+        };
+
+        const handleAdDetected = () => {
+            if (!isMountedRef.current || isRecreatingRef.current) return;
+            try {
+                playerRef.current?.mute?.();
+                if (typeof playerRef.current?.skipAd === "function") {
+                    playerRef.current.skipAd();
                 }
+            } catch (_) {}
+
+            if (!isAdPlayingRef.current) {
+                setAdPlayingState(true);
+            }
+            if (bypassAdAttemptsRef.current < 3) {
+                abortAdInPlace();
+            }
+        };
+
+        const handleAdEnded = () => {
+            if (!isMountedRef.current) return;
+            adProgressCheckRef.current = { startMediaTime: -1, startWallTime: 0, lastCurrent: -1 };
+            if (isAdPlayingRef.current) {
+                setAdPlayingState(false);
+                setPlayerReadyState(true);
+                setStartedPlayingState(true);
+                setIsYTReadyToRender(true);
+                lastSeekTimeRef.current = 0;
                 setTimeout(() => {
-                    isRecreatingRef.current = false;
-                }, 1200);
-            }, 350);
+                    if (isMountedRef.current) syncTime(true);
+                }, 50);
+            }
+            try {
+                if (playerRef.current && typeof playerRef.current.getPlaybackRate === "function") {
+                    if (playerRef.current.getPlaybackRate() !== 1) {
+                        playerRef.current.setPlaybackRate(1);
+                    }
+                }
+            } catch (_) {}
         };
 
         // Monitor Spotify playback state
@@ -110,7 +241,7 @@ const VideoBackground = (() => {
             const update = () => {
                 const spotifyPlaying = Spicetify.Player.isPlaying();
                 setIsPlaying(spotifyPlaying);
-                if (playerRef.current && isPlayerReady) {
+                if (playerRef.current && isPlayerReadyRef.current) {
                     if (spotifyPlaying) {
                         try { playerRef.current.playVideo(); } catch (_) {}
                     }
@@ -124,9 +255,9 @@ const VideoBackground = (() => {
         // Load or switch video when videoInfo changes
         useEffect(() => {
             if (!videoInfo || !videoInfo.video_id) {
-                setIsPlayerReady(false);
+                setPlayerReadyState(false);
                 setIsYTReadyToRender(false);
-                setHasStartedPlaying(false);
+                setStartedPlayingState(false);
                 currentVideoIdRef.current = null;
                 return;
             }
@@ -134,21 +265,19 @@ const VideoBackground = (() => {
             const targetVideoId = videoInfo.video_id;
 
             // Fast Path: Reuse existing player iframe with loadVideoById (10x faster, no black flash)
-            if (playerRef.current && typeof playerRef.current.loadVideoById === "function" && isPlayerReady) {
+            if (playerRef.current && typeof playerRef.current.loadVideoById === "function" && isPlayerReadyRef.current && !isRecreatingRef.current) {
                 if (currentVideoIdRef.current !== targetVideoId) {
                     currentVideoIdRef.current = targetVideoId;
-                    setHasStartedPlaying(false);
+                    setStartedPlayingState(false);
                     setIsYTReadyToRender(false);
-                    setIsAdPlaying(false);
-                    if (playerRef.current) {
-                        playerRef.current._adBypassAttempts = 0;
-                        try {
-                            if (typeof playerRef.current.setPlaybackRate === "function") {
-                                playerRef.current.setPlaybackRate(1);
-                            }
-                        } catch (_) {}
-                    }
+                    setAdPlayingState(false);
                     bypassAdAttemptsRef.current = 0;
+                    adProgressCheckRef.current = { startMediaTime: -1, startWallTime: 0, lastCurrent: -1 };
+                    try {
+                        if (typeof playerRef.current.setPlaybackRate === "function") {
+                            playerRef.current.setPlaybackRate(1);
+                        }
+                    } catch (_) {}
                     try {
                         const spotifyTime = (Spicetify.Player.getProgress() || 0) / 1000;
                         const syncOffset = videoInfo.sync_offset || 0;
@@ -162,16 +291,32 @@ const VideoBackground = (() => {
                             playerRef.current.playVideo();
                         }
                     } catch (_) {}
+
+                    if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
+                    watchdogTimerRef.current = setTimeout(() => {
+                        if (!isMountedRef.current || isRecreatingRef.current) return;
+                        const p = playerRef.current;
+                        const state = p && typeof p.getPlayerState === "function" ? p.getPlayerState() : -1;
+                        if (state === 1 || state === 3 || (p && typeof p.getCurrentTime === "function" && p.getCurrentTime() > 0.1)) {
+                            setPlayerReadyState(true);
+                            setStartedPlayingState(true);
+                            setIsYTReadyToRender(true);
+                            setIsUIFlashing(false);
+                        } else if (typeof tryCreateRef.current === "function") {
+                            tryCreateRef.current();
+                        }
+                    }, 3000);
                 }
                 return;
             }
 
             currentVideoIdRef.current = targetVideoId;
-            setIsPlayerReady(false);
-            setHasStartedPlaying(false);
+            setPlayerReadyState(false);
+            setStartedPlayingState(false);
             setIsYTReadyToRender(false);
-            setIsAdPlaying(false);
+            setAdPlayingState(false);
             bypassAdAttemptsRef.current = 0;
+            adProgressCheckRef.current = { startMediaTime: -1, startWallTime: 0, lastCurrent: -1 };
 
             if (playerRef.current) {
                 try { playerRef.current.destroy(); } catch (_) {}
@@ -196,10 +341,30 @@ const VideoBackground = (() => {
                 playerDiv.appendChild(ytTarget);
 
                 const spotifyTime = (Spicetify.Player.getProgress() || 0) / 1000;
-                const syncOffset = videoInfo.sync_offset || 0;
+                const syncOffset = videoInfoRef.current?.sync_offset || 0;
                 const initialStart = typeof startOverride === "number"
                     ? startOverride
                     : Math.max(1, Math.floor(spotifyTime + syncOffset));
+
+                if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
+                watchdogTimerRef.current = setTimeout(() => {
+                    if (!isMountedRef.current || isRecreatingRef.current) return;
+                    const p = playerRef.current;
+                    if (p && checkPlayerIsAd(p)) {
+                        handleAdDetected();
+                        return;
+                    }
+                    if (p && typeof p.playVideo === "function" && Spicetify.Player.isPlaying()) {
+                        try {
+                            p.mute?.();
+                            p.playVideo();
+                        } catch (_) {}
+                    }
+                    setPlayerReadyState(true);
+                    setStartedPlayingState(true);
+                    setIsYTReadyToRender(true);
+                    setIsUIFlashing(false);
+                }, 3500);
 
                 playerRef.current = new window.YT.Player(ytTarget, {
                     height: "100%",
@@ -222,20 +387,11 @@ const VideoBackground = (() => {
                         hl: "en",
                         origin: window.location.origin || "https://xpui.app.spotify.com",
                         start: Math.max(1, Math.floor(initialStart)),
-                        adformat: "0_0",
-                        suppress_ads: 1,
-                        html5_disable_ads: true,
-                        disable_persistent_ads: true,
-                        kevlar_allow_multistep_video_ads: false,
-                        enable_desktop_ad_controls: false,
-                        disable_new_pause_state3_player_ads: true,
-                        player_ads_enable_gcf: false,
-                        web_player_disable_afa: true,
                     },
                     events: {
                         onReady: (event) => {
                             if (!isMountedRef.current) return;
-                            setIsPlayerReady(true);
+                            setPlayerReadyState(true);
                             event.target.mute();
 
                             try {
@@ -265,39 +421,35 @@ const VideoBackground = (() => {
                             }
                         },
                         onStateChange: (event) => {
-                            if (!isMountedRef.current) return;
+                            if (!isMountedRef.current || isRecreatingRef.current) return;
                             const state = event.data;
                             const player = event.target;
+
+                            setPlayerReadyState(true);
 
                             const isAd = checkPlayerIsAd(player, state);
 
                             if (isAd) {
-                                setIsAdPlaying(true);
-                                try {
-                                    player.mute?.();
-                                    if (typeof player.skipAd === "function") player.skipAd();
-                                } catch (_) {}
-                                recreatePlayerToBypassAd();
+                                handleAdDetected();
                                 return;
+                            } else {
+                                handleAdEnded();
                             }
-
-                            if (isAdPlaying) setIsAdPlaying(false);
-                            try {
-                                if (typeof player.getPlaybackRate === "function" && player.getPlaybackRate() > 1) {
-                                    player.setPlaybackRate(1);
-                                }
-                            } catch (_) {}
 
                             if (state === 2 && Spicetify.Player.isPlaying()) {
                                 setIsUIFlashing(true);
                                 if (uiFlashTimeoutRef.current) clearTimeout(uiFlashTimeoutRef.current);
                             }
 
-                            if (state === 1 || state === 3) {
+                            if (state === 1) {
+                                if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
                                 if (uiFlashTimeoutRef.current) clearTimeout(uiFlashTimeoutRef.current);
                                 uiFlashTimeoutRef.current = setTimeout(() => setIsUIFlashing(false), 300);
-                                setHasStartedPlaying(true);
-                                setIsYTReadyToRender(true);
+                                setPlayerReadyState(true);
+                                if (player.playerInfo?.progressState?.allowSeeking !== false && !isAdPlayingRef.current) {
+                                    setStartedPlayingState(true);
+                                    setIsYTReadyToRender(true);
+                                }
 
                                 try {
                                     if (typeof player.setOption === "function") {
@@ -307,6 +459,9 @@ const VideoBackground = (() => {
                                     if (typeof player.unloadModule === "function") {
                                         player.unloadModule("captions");
                                         player.unloadModule("cc");
+                                        player.unloadModule("endscreen");
+                                        player.unloadModule("annotations_module");
+                                        player.unloadModule("iv");
                                     }
                                 } catch (_) {}
                             }
@@ -319,26 +474,12 @@ const VideoBackground = (() => {
                         onError: async (event) => {
                             if (!isMountedRef.current) return;
                             const errorCode = event.data;
-                            console.error("[Lyrics+] YouTube Player Error:", errorCode);
-                            if ([2, 5, 100, 101, 150].includes(errorCode) && videoInfo && videoInfo.video_id) {
-                                const brokenId = videoInfo.video_id;
-                                console.warn(`[Lyrics+] Video ${brokenId} failed. Fallback...`);
-                                if (window.VideoManager?.blacklistVideo) {
-                                    await window.VideoManager.blacklistVideo(trackUri, brokenId);
-                                }
-                                const autoKey = `video-auto:${trackUri}`;
-                                if (window.IDBCache?.delete) {
-                                    await window.IDBCache.delete(autoKey);
-                                }
-                                if (window.lyricContainer?.fetchVideoBackground) {
-                                    const currentTrack = Spicetify.Player.data?.item;
-                                    const trackInfo = window.lyricContainer.infoFromTrack
-                                        ? window.lyricContainer.infoFromTrack(currentTrack)
-                                        : null;
-                                    if (trackInfo) {
-                                        window.lyricContainer.fetchVideoBackground(trackInfo);
-                                    }
-                                }
+                            const brokenId = currentVideoIdRef.current || videoInfoRef.current?.video_id;
+                            console.error("[Lyrics+] YouTube Player Error:", errorCode, "for video:", brokenId);
+                            if ([5, 100, 101, 150].includes(errorCode) && brokenId) {
+                                if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
+                                console.warn(`[Lyrics+] Video ${brokenId} failed with code ${errorCode}. Switching to next candidate...`);
+                                triggerCandidateFallback(brokenId);
                             }
                         }
                     }
@@ -347,133 +488,182 @@ const VideoBackground = (() => {
             tryCreateRef.current = tryCreate;
             tryCreate();
 
-            // Safety Watchdog: After 2.5s, force dismiss loading screen if player is alive and not playing an ad
-            const safetyTimer = setTimeout(() => {
-                if (isMountedRef.current && isPlayerReady && !isAdPlaying) {
-                    setHasStartedPlaying(true);
+            return () => {
+                if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
+            };
+        }, [videoInfo?.video_id]);
+
+        // Immediate response when user adjusts sync offset in VideoSettingsModal
+        const lastOffsetRef = useRef(videoInfo?.sync_offset);
+        useEffect(() => {
+            if (lastOffsetRef.current !== videoInfo?.sync_offset) {
+                lastOffsetRef.current = videoInfo?.sync_offset;
+                lastSeekTimeRef.current = 0;
+                syncTime(true);
+            }
+        }, [videoInfo?.sync_offset]);
+
+        // Sync & Watchdog Logic
+        const syncTime = (force = false) => {
+            const player = playerRef.current;
+            const currentVideoInfo = videoInfoRef.current || videoInfo;
+            if (!player || !isPlayerReadyRef.current || !currentVideoInfo || isRecreatingRef.current) return;
+            if (typeof player.getPlayerState !== "function") return;
+
+            const spotifyIsPlaying = Spicetify.Player.isPlaying();
+            const playerState = player.getPlayerState();
+
+            if (checkPlayerIsAd(player, playerState)) {
+                handleAdDetected();
+                if (playerState !== 1 && playerState !== 3) {
+                    try { player.playVideo(); } catch (_) {}
+                }
+                return;
+            } else if (isAdPlayingRef.current && player.playerInfo?.progressState?.allowSeeking === true) {
+                handleAdEnded();
+            }
+
+            // 🛡️ Watchdog: If main video is playing (state === 1 and allowSeeking !== false), clear loading indicator
+            if (typeof player.getCurrentTime === "function") {
+                const allowSeeking = player.playerInfo?.progressState?.allowSeeking;
+                if (playerState === 1 && allowSeeking !== false && !isAdPlayingRef.current && (!hasStartedPlayingRef.current || !isYTReadyToRender)) {
+                    setPlayerReadyState(true);
+                    setStartedPlayingState(true);
                     setIsYTReadyToRender(true);
                     setIsUIFlashing(false);
                 }
-            }, 2500);
-
-            return () => clearTimeout(safetyTimer);
-        }, [videoInfo?.video_id, isPlayerReady]);
-
-        // Sync & Watchdog Logic
-        useEffect(() => {
-            const syncTime = () => {
-                const player = playerRef.current;
-                if (!player || !isPlayerReady || !videoInfo) return;
-                if (typeof player.getPlayerState !== "function") return;
-
-                const spotifyIsPlaying = Spicetify.Player.isPlaying();
-                const playerState = player.getPlayerState();
-
-                // 🛡️ Ad-blocker Guard: If an ad is playing, do NOT sync/seek timeline to prevent stutter loops
-                const isAd = checkPlayerIsAd(player, playerState);
-                if (isAd) {
-                    if (!isAdPlaying) setIsAdPlaying(true);
-                    try {
-                        player.mute?.();
-                        if (typeof player.skipAd === "function") player.skipAd();
-                    } catch (_) {}
-                    recreatePlayerToBypassAd();
-                    return;
-                } else {
-                    if (isAdPlaying) {
-                        setIsAdPlaying(false);
-                    }
+                if ((playerState === 5 || playerState === -1) && spotifyIsPlaying) {
+                    player.playVideo();
                 }
+            }
 
-                // 🛡️ Watchdog: If video is moving or playing, immediately clear loading indicator
-                if (typeof player.getCurrentTime === "function") {
-                    const curr = player.getCurrentTime();
-                    if ((curr > 0.05 || playerState === 1) && (!hasStartedPlaying || !isYTReadyToRender) && !isAdPlaying) {
-                        setHasStartedPlaying(true);
-                        setIsYTReadyToRender(true);
-                        setIsUIFlashing(false);
-                    }
-                    if ((playerState === 5 || playerState === -1) && spotifyIsPlaying) {
-                        player.playVideo();
-                    }
+            if (!spotifyIsPlaying) {
+                if (playerState === 1) {
+                    player.pauseVideo();
                 }
-
-                if (!spotifyIsPlaying) {
-                    if (playerState === 1) {
-                        player.pauseVideo();
-                    }
-                } else {
-                    if (playerState !== 1 && playerState !== 3) {
-                        player.playVideo();
-                    }
+            } else {
+                if (playerState !== 1 && playerState !== 3) {
+                    player.playVideo();
                 }
+            }
 
-                const spotifyTime = Spicetify.Player.getProgress() / 1000;
-                const syncOffset = videoInfo.sync_offset || 0;
-                let targetVideoTime = spotifyTime + syncOffset;
-
-                if (targetVideoTime >= 0 && typeof player.getDuration === "function") {
-                    const videoDuration = player.getDuration();
-                    if (videoDuration > 0 && targetVideoTime >= videoDuration) {
-                        targetVideoTime = targetVideoTime % videoDuration;
-                    }
+            // Enforce strictly 1x playback rate
+            if (typeof player.getPlaybackRate === "function") {
+                if (player.getPlaybackRate() !== 1) {
+                    try { player.setPlaybackRate(1); } catch (_) {}
                 }
+            }
 
-                if (targetVideoTime >= 0 && typeof player.getCurrentTime === "function") {
-                    const currentVideoTime = player.getCurrentTime();
-                    const timeDiff = Math.abs(currentVideoTime - targetVideoTime);
+            const currentSpotifySec = (Spicetify.Player.getProgress() || 0) / 1000;
+            const lastSpotifySec = lastSpotifyProgressRef.current;
+            lastSpotifyProgressRef.current = currentSpotifySec;
 
-                    if (timeDiff > 0.5) {
-                        const now = Date.now();
-                        const isBuffering = playerState === 3;
-                        const isRecentlySeeked = (now - lastSeekTimeRef.current) < 1500;
+            // Detect user tua nhạc / scrubbing: normal 400ms tick moves by ~0.4s. If it jumps by > 1.2s, user sought!
+            const isUserSeek = lastSpotifySec > 0 && Math.abs(currentSpotifySec - lastSpotifySec) > 1.2;
+            const isForceSeek = Boolean(force || isUserSeek);
 
-                        if (!isBuffering && !isRecentlySeeked) {
-                            player.seekTo(targetVideoTime, true);
-                            lastSeekTimeRef.current = now;
+            const syncOffset = currentVideoInfo.sync_offset || 0;
+            let targetVideoTime = Math.max(0, currentSpotifySec + syncOffset);
 
-                            if (now - lastSeekAttemptRef.current.time < 2500) {
-                                lastSeekAttemptRef.current.attempts++;
-                            } else {
-                                lastSeekAttemptRef.current = { time: now, attempts: 1 };
-                            }
+            if (typeof player.getDuration === "function") {
+                const videoDuration = player.getDuration();
+                const safeDuration = Math.max(1, videoDuration - 1.5);
+                if (videoDuration > 0 && targetVideoTime >= safeDuration) {
+                    targetVideoTime = targetVideoTime % safeDuration;
+                }
+            }
+
+            if (typeof player.getCurrentTime === "function") {
+                const currentVideoTime = player.getCurrentTime();
+                const timeDiff = Math.abs(currentVideoTime - targetVideoTime);
+                const shouldSeek = isForceSeek ? (timeDiff > 0.15) : (timeDiff > 3.0);
+
+                if (shouldSeek) {
+                    const now = Date.now();
+                    const isBuffering = playerState === 3 || isAdPlayingRef.current;
+                    const isRecentlySeeked = !isForceSeek && ((now - lastSeekTimeRef.current) < 2000);
+
+                    if ((isForceSeek || !isBuffering) && !isRecentlySeeked) {
+                        player.seekTo(targetVideoTime, true);
+                        lastSeekTimeRef.current = now;
+
+                        if (now - lastSeekAttemptRef.current.time < 2500) {
+                            lastSeekAttemptRef.current.attempts++;
+                        } else {
+                            lastSeekAttemptRef.current = { time: now, attempts: 1 };
                         }
-                    } else {
-                        if (isAdPlaying) setIsAdPlaying(false);
-                        lastSeekAttemptRef.current.attempts = 0;
                     }
+                } else {
+                    lastSeekAttemptRef.current.attempts = 0;
                 }
-            };
+            }
+        };
 
-            const syncInterval = setInterval(syncTime, 500);
-            const handleInternalSync = () => syncTime();
+        useEffect(() => {
+            const syncInterval = setInterval(() => syncTime(false), 400);
+            const handleInternalSync = (e) => {
+                lastSeekTimeRef.current = 0;
+                if (typeof e?.detail?.offset === "number" && videoInfoRef.current) {
+                    videoInfoRef.current.sync_offset = e.detail.offset;
+                }
+                syncTime(true);
+            };
             window.addEventListener("lyricsPlusSyncRequest", handleInternalSync);
 
-            const onSeek = () => setTimeout(syncTime, 50);
-            Spicetify.Player.addEventListener("onseek", onSeek);
+            const handleProgress = (event) => {
+                const prog = typeof event?.data === "number" ? event.data : Spicetify.Player.getProgress();
+                const progSec = (prog || 0) / 1000;
+                if (lastSpotifyProgressRef.current > 0 && Math.abs(progSec - lastSpotifyProgressRef.current) > 1.2) {
+                    lastSeekTimeRef.current = 0;
+                    syncTime(true);
+                }
+            };
+            Spicetify.Player.addEventListener("onprogress", handleProgress);
 
             const onMessage = (e) => {
+                if (!isPlayerReadyRef.current || isRecreatingRef.current) return;
                 try {
                     if (!e.data || typeof e.data !== "string" || !e.data.includes("infoDelivery")) return;
                     const parsed = JSON.parse(e.data);
                     if (parsed?.event === "infoDelivery" && parsed?.info) {
                         const info = parsed.info;
-                        const isAd = Boolean(info.isAd || (info.adState !== undefined && info.adState > 0) || info.adVideoId);
-                        const p = playerRef.current;
+                        const progressState = info.progressState;
+                        let isUnseekableAd = false;
+                        if (progressState) {
+                            if (progressState.allowSeeking === true) {
+                                adProgressCheckRef.current = { startMediaTime: -1, startWallTime: 0, lastCurrent: progressState.current || 0 };
+                            } else if (progressState.allowSeeking === false && progressState.duration > 0) {
+                                const curr = progressState.current || 0;
+                                const pState = playerRef.current?.getPlayerState?.();
+                                // Pre-roll ads in YouTube embed run with playerState === -1 and allowSeeking === false while current advances
+                                if (pState === -1 && curr > 0.3) {
+                                    isUnseekableAd = true;
+                                } else if (pState === 1 && curr > 0.1) {
+                                    if (adProgressCheckRef.current.startMediaTime < 0 || curr < adProgressCheckRef.current.lastCurrent - 0.5) {
+                                        adProgressCheckRef.current.startMediaTime = curr;
+                                        adProgressCheckRef.current.startWallTime = Date.now();
+                                    }
+                                    adProgressCheckRef.current.lastCurrent = curr;
+                                    if (
+                                        adProgressCheckRef.current.startMediaTime < 1.5 &&
+                                        curr - adProgressCheckRef.current.startMediaTime >= 1.2 &&
+                                        Date.now() - adProgressCheckRef.current.startWallTime >= 1100
+                                    ) {
+                                        isUnseekableAd = true;
+                                    }
+                                }
+                            }
+                        }
+                        const isAd = Boolean(
+                            info.isAd ||
+                            (info.adState !== undefined && info.adState > 0) ||
+                            info.adVideoId ||
+                            isUnseekableAd
+                        );
                         if (isAd) {
-                            setIsAdPlaying(true);
-                            if (p) {
-                                try {
-                                    p.mute?.();
-                                    if (typeof p.skipAd === "function") p.skipAd();
-                                } catch (_) {}
-                            }
-                            recreatePlayerToBypassAd();
-                        } else if (info.isAd === false || info.adState === 0) {
-                            setIsAdPlaying(false);
-                            if (p && typeof p.getPlaybackRate === "function" && p.getPlaybackRate() > 1) {
-                                p.setPlaybackRate(1);
-                            }
+                            handleAdDetected();
+                        } else if (info.isAd === false || info.adState === 0 || (progressState && progressState.allowSeeking === true)) {
+                            handleAdEnded();
                         }
                     }
                 } catch (_) {}
@@ -483,10 +673,10 @@ const VideoBackground = (() => {
             return () => {
                 clearInterval(syncInterval);
                 window.removeEventListener("lyricsPlusSyncRequest", handleInternalSync);
-                Spicetify.Player.removeEventListener("onseek", onSeek);
+                Spicetify.Player.removeEventListener("onprogress", handleProgress);
                 window.removeEventListener("message", onMessage);
             };
-        }, [isPlayerReady, videoInfo, isPlaying, isAdPlaying]);
+        }, [isPlayerReady, videoInfo?.video_id, isPlaying]);
 
         // Loading indicator
         const LoadingIndicator = () => {
@@ -549,7 +739,7 @@ const VideoBackground = (() => {
                 }
             }),
             // Loading indicator — automatically hidden as soon as video starts playing or watchdog triggers
-            (!isPlayerReady || !hasStartedPlaying) && videoInfo && react.createElement(LoadingIndicator),
+            (!isPlayerReady || !hasStartedPlaying || isAdPlaying) && videoInfo && react.createElement(LoadingIndicator),
             // Video mount point — player div gets rendered here
             react.createElement("div", {
                 ref: playerDivRef,

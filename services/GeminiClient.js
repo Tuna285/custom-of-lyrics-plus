@@ -197,6 +197,28 @@ const GeminiClient = {
     },
     
     // Cancel all pending requests in both queues (call when track changes)
+    _preconnectedOrigins: new Set(),
+
+    ensureEndpointPreconnect(endpoint) {
+        if (typeof document === "undefined" || !document.head) return;
+        try {
+            const origin = new URL(endpoint || "https://generativelanguage.googleapis.com").origin;
+            if (!origin || this._preconnectedOrigins.has(origin)) return;
+            this._preconnectedOrigins.add(origin);
+
+            const preconnect = document.createElement("link");
+            preconnect.rel = "preconnect";
+            preconnect.href = origin;
+            preconnect.crossOrigin = "anonymous";
+            document.head.appendChild(preconnect);
+
+            const dnsPrefetch = document.createElement("link");
+            dnsPrefetch.rel = "dns-prefetch";
+            dnsPrefetch.href = origin;
+            document.head.appendChild(dnsPrefetch);
+        } catch (_) {}
+    },
+
     cancelAllQueues() {
         const cancelled = geminiQueueTranslation.cancelAll() + geminiQueuePhonetic.cancelAll();
         return cancelled;
@@ -537,7 +559,7 @@ const GeminiClient = {
      * Warns only on genuine capability mismatch: user wants "off" on a model whose thinking
      * cannot be disabled at runtime (e.g. Claude thinking models, DeepSeek-reasoner).
      */
-    applyReasoningEffort(body, endpoint, model, effort) {
+    applyReasoningEffort(body, endpoint, model, effort, silent = false) {
         if (!body || typeof body !== "object") return body;
         if (!effort || effort === "default") return body;
         const url = String(endpoint || "").toLowerCase();
@@ -641,7 +663,7 @@ const GeminiClient = {
             }
         }
 
-        if (!applied) this.warnReasoningEffortUnsupported(endpoint, model, effort);
+        if (!applied && !silent) this.warnReasoningEffortUnsupported(endpoint, model, effort);
         return body;
     },
 
@@ -895,6 +917,29 @@ const GeminiClient = {
             if (!match2) return;
             const line2OpenIdx = firstCloseIdx + match2.index + (match2[0].length - match2[1].length);
 
+            // Fast Completion Cut: If <1> opened outside any unclosed <thought> block and the final
+            // closing tag </lineCount> has already arrived, cut the stream immediately to save tail latency.
+            const prefixBeforeTag1 = contentBuf.slice(0, firstOpenIdx);
+            const hasUnclosedThought = /<(?:thought|think|redacted_thinking|reasoning)(?:\s+[^>]*)?>|<\|channel>thought/i.test(prefixBeforeTag1) &&
+                !/<\/\s*(?:thought|think|redacted_thinking|reasoning)\s*>|<channel\|>/i.test(prefixBeforeTag1);
+            if (!hasUnclosedThought && lineCount >= 3) {
+                const fullWidthFinal = String(lineCount).replace(/[0-9]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 65248));
+                const finalOpenRe = new RegExp(`[<＜【［](?:${lineCount}|${fullWidthFinal})[>＞】］]`);
+                const finalCloseRe = new RegExp(`[<＜【［][\\/／](?:${lineCount}|${fullWidthFinal})[>＞】］]`);
+                const afterLine2 = contentBuf.slice(line2OpenIdx);
+                const openFinalMatch = afterLine2.match(finalOpenRe);
+                if (openFinalMatch) {
+                    const afterFinalOpen = afterLine2.slice(openFinalMatch.index + openFinalMatch[0].length);
+                    const closeFinalMatch = afterFinalOpen.match(finalCloseRe);
+                    if (closeFinalMatch) {
+                        const cutIdx = line2OpenIdx + openFinalMatch.index + openFinalMatch[0].length + closeFinalMatch.index + closeFinalMatch[0].length;
+                        contentBuf = contentBuf.slice(0, cutIdx);
+                        earlyAbortReason = "complete-tags";
+                        return;
+                    }
+                }
+            }
+
             // Search for a second line-1 tag strictly after a closing tag or at the start of a newline after line 2 started
             const rest = contentBuf.slice(line2OpenIdx);
             const redraftMatch = rest.match(/(?:^|\n|[<＜【［][\/／][0-9０-９]+[>＞】］]\s*\n?)\s*([<＜【［][1１][>＞】］])/);
@@ -1008,6 +1053,7 @@ const GeminiClient = {
         DebugLogger.group(`${wantSmartPhonetic ? 'Phonetic' : 'Translation'} Request`);
 
         const endpoint = CONFIG?.visual?.["gemini:endpoint"] || "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+        this.ensureEndpointPreconnect(endpoint);
         let model = CONFIG?.visual?.["gemini:model"] || "gemini-3.6-flash";
         if (wantSmartPhonetic) {
             model = CONFIG?.visual?.["gemini:phonetic-model"] || "gemini-3.5-flash-lite";
@@ -1033,7 +1079,7 @@ const GeminiClient = {
 
         // Read reasoning effort early so prompt builders can tune their thinking rules
         // (strict anti-redraft on low, unleashed on high).
-        const reasoningEffort = CONFIG?.visual?.["gemini:reasoning-effort"] || "low";
+        const configuredEffort = CONFIG?.visual?.["gemini:reasoning-effort"] || "low";
 
         const ep = (endpoint || "").toLowerCase();
         const m = (model || "").toLowerCase();
@@ -1041,6 +1087,13 @@ const GeminiClient = {
         const supportsSystemRole = !(isGoogle && /^gemma-[123](?:[^\d]|$)/.test(m));
         const isGemma4Google = isGoogle && /^gemma-4(?:[^\d]|$)/.test(m);
         const isGeminiWithBudget = /gemini-(2\.5|[3-9])|flash-thinking|thinking-exp/.test(m);
+
+        // Phonetic tasks (Furigana / Romaji / Pinyin) are mechanical transcriptions:
+        // force "off" (unless Gemma 4 on Google API which forces native thinking tokens)
+        // so the prompt skips <thought> deliberation and the API suppresses thinking tokens.
+        const reasoningEffort = wantSmartPhonetic
+            ? (isGemma4Google ? "low" : "off")
+            : configuredEffort;
 
         // A model is thinking if it's Gemma 4 (forced thinking on Google API) OR
         // if it's Gemini with thinking budget and reasoning effort is not "off".
@@ -1120,9 +1173,11 @@ const GeminiClient = {
         }
 
         // Apply provider-specific reasoning-effort flags (already read above to feed the prompt).
-        // Phonetic tasks (Furigana / Romaji / Pinyin) are pure mechanical transcription and must never send reasoning flags.
-        if (!wantSmartPhonetic && reasoningEffort !== "default") {
-            this.applyReasoningEffort(body, endpoint, model, reasoningEffort);
+        // For phonetic tasks, pass "off" silently so thinking models disable deliberation where supported.
+        if (wantSmartPhonetic) {
+            this.applyReasoningEffort(body, endpoint, model, "off", true);
+        } else if (reasoningEffort !== "default") {
+            this.applyReasoningEffort(body, endpoint, model, reasoningEffort, false);
         }
 
         try {
@@ -1414,3 +1469,5 @@ const GeminiClient = {
 };
 
 window.GeminiClient = GeminiClient;
+GeminiClient.ensureEndpointPreconnect(typeof CONFIG !== "undefined" ? CONFIG?.visual?.["gemini:endpoint"] : null);
+

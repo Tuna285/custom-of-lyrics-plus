@@ -21,6 +21,9 @@ const VideoManager = {
     init() {
         try {
             localStorage.removeItem('ivlyrics-user-hash');
+            if (typeof IDBCache !== 'undefined' && IDBCache.deleteByPattern) {
+                IDBCache.deleteByPattern('video-blacklist:').catch(() => {});
+            }
         } catch (_) {}
         console.log("[VideoManager] Initialized (Client-Only Direct YouTube Mode with Retry)");
     },
@@ -749,9 +752,10 @@ const VideoManager = {
      * Blacklist a broken video ID for a specific track to prevent loading it again.
      * @param {string} trackUri - Spotify track URI
      * @param {string} videoId - YouTube Video ID
+     * @param {Object} [trackInfo] - Track info for clearing meta cache
      * @returns {Promise<void>}
      */
-    async blacklistVideo(trackUri, videoId) {
+    async blacklistVideo(trackUri, videoId, trackInfo = null) {
         if (!trackUri || !videoId) return;
         const key = `video-blacklist:${trackUri}`;
         try {
@@ -764,6 +768,39 @@ const VideoManager = {
         } catch (e) {
             console.warn("[VideoManager] Failed to blacklist video:", e);
         }
+
+        // Clear in-memory cache so subsequent fetch does not return the blacklisted video
+        if (this._currentVideo?.video_id === videoId || this._currentVideo?.uri === trackUri) {
+            this._currentVideo = null;
+        }
+        if (this._lastSearchUri === trackUri) {
+            this._lastSearchResults = [];
+        }
+
+        // Clear auto-cache in IndexedDB
+        try {
+            await IDBCache.delete(`video-auto:${trackUri}`);
+            if (trackInfo?.artist || trackInfo?.title) {
+                const metaKey = this._getMetaKey(trackInfo.artist, trackInfo.title);
+                if (metaKey) await IDBCache.delete(metaKey);
+            }
+        } catch (_) {}
+    },
+
+    /**
+     * Skip the current video candidate and fetch the next candidate for this track
+     * @param {Object} trackInfo
+     * @returns {Promise<Object|null>}
+     */
+    async nextCandidate(trackInfo) {
+        if (!trackInfo?.uri) return null;
+        const currentVideoId = this._currentVideo?.video_id;
+        if (currentVideoId) {
+            await this.blacklistVideo(trackInfo.uri, currentVideoId, trackInfo);
+        }
+        this._lastFetchUri = null;
+        this._currentVideo = null;
+        return await this.fetchVideoForTrack(trackInfo, null, false);
     },
 
     /**
@@ -793,8 +830,7 @@ const VideoManager = {
 VideoManager.init();
 
 // Expose globally
+window.VideoManager = VideoManager;
 if (window.LyricsPlus?.register) {
     window.LyricsPlus.register('VideoManager', VideoManager);
-} else {
-    window.VideoManager = VideoManager;
 }
