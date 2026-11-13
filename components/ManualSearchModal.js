@@ -32,8 +32,25 @@ const ManualSearchModal = (() => {
         if (typeof ProviderNetease === "undefined" || !ProviderNetease.searchSongs) return [];
 
         try {
-            const songs = await ProviderNetease.searchSongs(query, 8);
-            if (!Array.isArray(songs) || songs.length === 0) return [];
+            let songs = await ProviderNetease.searchSongs(query, 8);
+            if (!Array.isArray(songs)) songs = [];
+
+            const isInitialQuery = info && query.trim() === `${info.title} ${info.artist}`.trim();
+            if (isInitialQuery && typeof ProviderNetease.scoreCandidate === "function") {
+                const bestScore = songs.length ? Math.max(...songs.map(c => ProviderNetease.scoreCandidate(c, info))) : 0;
+                if (bestScore < 0.28 && info.title) {
+                    const titleSongs = await ProviderNetease.searchSongs(info.title, 8);
+                    if (Array.isArray(titleSongs) && titleSongs.length) {
+                        const existingIds = new Set(songs.map(s => s.id));
+                        for (const ts of titleSongs) {
+                            if (!existingIds.has(ts.id)) songs.push(ts);
+                        }
+                    }
+                }
+                songs = [...songs].sort((a, b) => ProviderNetease.scoreCandidate(b, info) - ProviderNetease.scoreCandidate(a, info));
+            }
+
+            if (songs.length === 0) return [];
 
             return songs.map(song => {
                 const artists = (song.ar || song.artists || []).map(a => a.name).join(", ");
@@ -474,121 +491,69 @@ const ManualSearchModal = (() => {
                 return results.filter(r => r.provider === selectedFilter);
             }, [results, selectedFilter]);
 
-            return react.createElement("div", { style: { padding: "8px", minWidth: "400px", maxWidth: "520px" } },
+            return react.createElement("div", { className: "lp-modal-body lp-modal-body--md" },
 
                 // Current track chip
-                info && react.createElement("div", {
-                    style: {
-                        display: "flex", alignItems: "center", gap: "10px",
-                        marginBottom: "14px", padding: "8px 12px",
-                        background: "rgba(255,255,255,0.05)", borderRadius: "8px",
-                    }
-                },
+                info && react.createElement("div", { className: "lp-card lp-track-card" },
                     info.image && react.createElement("img", {
                         src: info.image,
-                        style: { width: "36px", height: "36px", borderRadius: "4px", objectFit: "cover" }
+                        alt: "",
+                        className: "lp-track-thumb",
                     }),
-                    react.createElement("div", null,
-                        react.createElement("div", { style: { fontWeight: "bold", fontSize: "13px" } }, info.title),
-                        react.createElement("div", { style: { fontSize: "11px", color: "#aaa" } }, info.artist)
+                    react.createElement("div", { className: "lp-track-meta" },
+                        react.createElement("div", { className: "lp-track-title" }, info.title),
+                        react.createElement("div", { className: "lp-track-sub" }, info.artist)
                     )
                 ),
 
                 // Search input row
-                react.createElement("div", { style: { display: "flex", gap: "8px", marginBottom: "12px" } },
+                react.createElement("div", { className: "lp-search-row" },
                     react.createElement("input", {
                         type: "text",
+                        className: "lp-input",
                         value: query,
                         placeholder: getText("manualSearchModal.placeholder") || "Search by song title, artist, or romaji...",
                         onChange: e => setQuery(e.target.value),
                         onKeyDown: e => e.key === "Enter" && doSearch(),
                         autoFocus: true,
-                        style: {
-                            flex: 1, padding: "8px 12px", borderRadius: "6px",
-                            border: "1px solid #555", background: "rgba(255,255,255,0.06)",
-                            color: "var(--spice-text)", fontSize: "13px", outline: "none",
-                        },
                     }),
                     react.createElement("button", {
+                        type: "button",
+                        className: "lp-btn lp-btn-primary",
                         onClick: (e) => {
                             e.stopPropagation();
                             doSearch();
                         },
                         disabled: status === "loading",
-                        style: {
-                            padding: "7px 16px", borderRadius: "6px", border: "none",
-                            cursor: "pointer",
-                            fontWeight: "bold", fontSize: "13px",
-                            background: "var(--spice-button)", color: "#fff",
-                        },
                     }, status === "loading" ? "…" : (getText("manualSearchModal.search") || "Search"))
                 ),
 
                 // CJK Phonetic Suggestions
-                localSuggestions && react.createElement("div", {
-                    style: {
-                        marginBottom: "12px",
-                        padding: "6px 8px",
-                        background: "rgba(255,255,255,0.02)",
-                        borderRadius: "8px",
-                        border: "1px solid rgba(255,255,255,0.05)"
-                    }
-                },
-                    react.createElement("div", {
-                        style: {
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            marginBottom: "4px"
-                        }
-                    },
-                        react.createElement("span", { style: { fontSize: "11px", fontWeight: "bold", color: "#aaa" } },
-                            getText("manualSearchModal.cjkSuggestions") || "CJK Phonetic Suggestions:"
-                        )
+                localSuggestions && react.createElement("div", { className: "lp-card" },
+                    react.createElement("span", { className: "lp-section-label" },
+                        getText("manualSearchModal.cjkSuggestions") || "CJK Phonetic Suggestions:"
                     ),
-                    react.createElement("div", {
-                        style: {
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: "6px"
-                        }
-                    },
+                    react.createElement("div", { className: "lp-chip-row" },
                         Object.entries(localSuggestions).map(([langKey, val]) => {
                             if (!val || val.trim() === "" || val === `${info.title} ${info.artist}`) return null;
                             const labels = { romaji: "Romaji", romaja: "Romaja", pinyin: "Pinyin" };
                             const label = labels[langKey] || langKey;
                             return react.createElement("button", {
                                 key: langKey,
+                                type: "button",
+                                className: "lp-chip",
                                 onClick: (e) => {
                                     e.stopPropagation();
                                     setQuery(val);
                                     doSearch(val);
                                 },
-                                style: {
-                                    padding: "3px 8px",
-                                    borderRadius: "10px",
-                                    background: "rgba(255,255,255,0.06)",
-                                    border: "1px solid rgba(255,255,255,0.1)",
-                                    color: "#ccc",
-                                    fontSize: "10px",
-                                    cursor: "pointer"
-                                }
                             }, `${label}: ${val.split(" ").slice(0, -1).join(" ")}`);
                         })
                     )
                 ),
 
-                // Provider Filter Chips (Option 1)
-                results.length > 0 && react.createElement("div", {
-                    style: {
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        marginBottom: "12px",
-                        overflowX: "auto",
-                        paddingBottom: "4px"
-                    }
-                },
+                // Provider Filter Chips
+                results.length > 0 && react.createElement("div", { className: "lp-chip-row" },
                     [
                         { key: "all", label: getText("manualSearchModal.all") || "All" },
                         { key: "netease", label: "NetEase" },
@@ -602,120 +567,69 @@ const ManualSearchModal = (() => {
                         const meta = PROVIDER_META[chip.key];
                         return react.createElement("button", {
                             key: chip.key,
+                            type: "button",
+                            className: `lp-chip${isSelected ? " is-active" : ""}`,
+                            style: isSelected && meta ? {
+                                "--lp-chip-bg": meta.bg,
+                                "--lp-chip-border": meta.color,
+                                "--lp-chip-color": meta.textColor,
+                            } : undefined,
                             onClick: () => setSelectedFilter(chip.key),
-                            style: {
-                                padding: "4px 10px",
-                                borderRadius: "14px",
-                                fontSize: "11px",
-                                fontWeight: isSelected ? "bold" : "normal",
-                                cursor: "pointer",
-                                border: isSelected
-                                    ? `1px solid ${meta ? meta.color : "var(--spice-button)"}`
-                                    : "1px solid rgba(255,255,255,0.12)",
-                                background: isSelected
-                                    ? (meta ? meta.bg : "rgba(29, 185, 84, 0.2)")
-                                    : "rgba(255,255,255,0.04)",
-                                color: isSelected
-                                    ? (meta ? meta.textColor : "#fff")
-                                    : "var(--spice-subtext, #aaa)",
-                                transition: "all 0.15s ease",
-                            }
                         }, `${chip.label} (${count})`);
                     })
                 ),
 
                 // Status messages
                 status === "loading" && react.createElement("div", {
-                    style: { color: "var(--spice-button, #1db954)", fontSize: "12px", textAlign: "center", padding: "20px 0" }
+                    className: "lp-status-msg",
+                    style: { color: "var(--lp-accent)" },
                 }, getText("manualSearchModal.searching") || "Searching across providers…"),
 
                 status === "error" && react.createElement("div", {
-                    style: { color: "#ff6b6b", fontSize: "12px", marginBottom: "10px" }
+                    className: "lp-status-msg is-error",
                 }, errorMsg || (getText("manualSearchModal.failed") || "Search failed")),
 
                 status === "empty" && react.createElement("div", {
-                    style: { color: "#aaa", fontSize: "12px", textAlign: "center", padding: "20px 0" }
+                    className: "lp-status-msg",
                 }, getText("manualSearchModal.noResults") || "No lyrics found across any provider. Try searching by original name or romaji."),
 
                 // Results list
-                filteredResults.length > 0 && react.createElement("div", {
-                    style: {
-                        maxHeight: "300px", overflowY: "auto",
-                        display: "flex", flexDirection: "column", gap: "6px",
-                    }
-                },
+                filteredResults.length > 0 && react.createElement("div", { className: "lp-result-list" },
                     filteredResults.map((item) => {
                         const dur = fmt(item.durationMs);
                         const meta = PROVIDER_META[item.provider] || PROVIDER_META.netease;
                         const isPicked = item.id === selectedId;
+                        const syncBadgeClass = !item.hasLyrics
+                            ? "lp-badge lp-badge--danger"
+                            : (item.isSynced ? "lp-badge lp-badge--success" : "lp-badge lp-badge--warning");
 
                         return react.createElement("button", {
                             key: item.id,
+                            type: "button",
+                            className: `lp-result-item${isPicked ? " is-selected" : ""}`,
                             onClick: () => pick(item),
-                            style: {
-                                display: "flex", alignItems: "center", gap: "10px",
-                                width: "100%", padding: "8px 12px",
-                                background: isPicked ? "rgba(29,185,84,0.12)" : "rgba(255,255,255,0.04)",
-                                border: isPicked ? "1px solid rgba(29,185,84,0.35)" : "1px solid transparent",
-                                borderRadius: "8px", cursor: "pointer",
-                                textAlign: "left", color: "var(--spice-text)",
-                            }
                         },
-                            react.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                react.createElement("div", {
-                                    style: {
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "6px",
-                                        marginBottom: "2px"
-                                    }
-                                },
-                                    // Provider badge
+                            react.createElement("div", { className: "lp-track-meta" },
+                                react.createElement("div", { className: "lp-result-head", style: { justifyContent: "flex-start" } },
                                     react.createElement("span", {
+                                        className: "lp-badge lp-badge--provider",
                                         style: {
-                                            fontSize: "9px",
-                                            fontWeight: "bold",
-                                            padding: "1px 6px",
-                                            borderRadius: "4px",
-                                            backgroundColor: meta.bg,
-                                            color: meta.textColor,
-                                            border: `1px solid ${meta.border}`,
-                                            textTransform: "uppercase"
+                                            "--lp-provider-bg": meta.bg,
+                                            "--lp-provider-color": meta.textColor,
+                                            textTransform: "uppercase",
                                         }
                                     }, item.providerName),
 
-                                    // Song title
-                                    react.createElement("span", {
-                                        style: {
-                                            fontWeight: "bold", fontSize: "13px",
-                                            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
-                                        }
-                                    }, item.title),
+                                    react.createElement("span", { className: "lp-result-title" }, item.title),
 
-                                    // Synced/Unsynced badge
                                     item.hasLyrics !== undefined && react.createElement("span", {
-                                        style: {
-                                            fontSize: "9px",
-                                            fontWeight: "bold",
-                                            padding: "1px 5px",
-                                            borderRadius: "4px",
-                                            textTransform: "uppercase",
-                                            backgroundColor: !item.hasLyrics ? "rgba(235, 87, 87, 0.15)" : (item.isSynced ? "rgba(29, 185, 84, 0.15)" : "rgba(255, 165, 0, 0.15)"),
-                                            color: !item.hasLyrics ? "#eb5757" : (item.isSynced ? "#1db954" : "#ffa500"),
-                                            border: !item.hasLyrics ? "1px solid rgba(235, 87, 87, 0.25)" : (item.isSynced ? "1px solid rgba(29, 185, 84, 0.25)" : "1px solid rgba(255, 165, 0, 0.25)"),
-                                        }
+                                        className: syncBadgeClass,
+                                        style: { textTransform: "uppercase" },
                                     }, !item.hasLyrics ? "No Lyrics" : (item.isSynced ? "Synced" : "Unsynced"))
                                 ),
-                                react.createElement("div", {
-                                    style: {
-                                        fontSize: "11px", color: "#aaa",
-                                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
-                                    }
-                                }, item.artist)
+                                react.createElement("div", { className: "lp-result-sub" }, item.artist)
                             ),
-                            dur && react.createElement("div", {
-                                style: { fontSize: "11px", color: "#888", whiteSpace: "nowrap" }
-                            }, dur)
+                            dur && react.createElement("div", { className: "lp-result-dur" }, dur)
                         );
                     })
                 )

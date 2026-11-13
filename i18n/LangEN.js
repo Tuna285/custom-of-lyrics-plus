@@ -38,6 +38,7 @@ window.LANG_EN = {
     "generalBackground": "General Background",
     "appearanceColors": "Colors",
     "appearanceButton": "Button Style",
+    "backupAndStorage": "Personal Data & Backups",
     "aboutAndUpdates": "About & Updates"
   },
   "settings": {
@@ -233,7 +234,15 @@ window.LANG_EN = {
     },
     "usingThemeColor": "Using theme default",
     "checkForUpdates": "Check for Updates",
-    "updateAppSubtitle": "AI-powered lyrics translation & video background"
+    "updateAppSubtitle": "AI-powered lyrics translation & video background",
+    "backup": {
+      "permanentTracks": "Permanent track edits saved",
+      "cachedEntries": "AI & lyrics cache entries",
+      "exportBtn": "Export Backup (.json)",
+      "importBtn": "Import Backup (.json)",
+      "wipeBtn": "Clear Personal Edits",
+      "confirmWipeBtn": "Click again to confirm deletion"
+    }
   },
   "buttons": {
     "clearCache": "Clear all cached lyrics",
@@ -247,6 +256,7 @@ window.LANG_EN = {
   },
   "providers": {
     "local": { "name": "local", "desc": "Provide lyrics from cache/local files loaded from previous Spotify sessions." },
+    "lrcred": { "name": "lrc.red", "desc": "Lyrics from <a href=\"https://lrc.red\" target=\"_blank\" rel=\"noopener noreferrer\">lrc.red</a>. Supports synced and unsynced lyrics." },
     "musixmatch": { "name": "musixmatch", "desc": "Fully compatible with Spotify. Requires a token from the official Musixmatch app. If lyrics fail to load, refresh the token via the <code>Refresh Token</code> button. A CORS proxy may be required." },
     "lrclib": { "name": "lrclib", "desc": "Lyrics sourced from lrclib.net. Supports both synced and unsynced lyrics. Free and open-source." },
     "spotify": { "name": "spotify", "desc": "Lyrics sourced from the official Spotify API." },
@@ -295,7 +305,20 @@ window.LANG_EN = {
     "installCommandCopied": "Install command copied! Paste in PowerShell",
     "updateSkipped": "Update skipped",
     "updateAvailable": "Lyrics Plus v{version} available! Click to update",
-    "upToDate": "You are already using the latest version (v{version})!"
+    "upToDate": "You are already using the latest version (v{version})!",
+    "lineCopied": "Lyric line copied",
+    "translationLineCopied": "Translated line copied",
+    "bilingualLineCopied": "Bilingual line copied",
+    "lrcCopied": "LRC lyrics copied to clipboard",
+    "editSaved": "Edits saved permanently",
+    "lineReverted": "Line reverted to default",
+    "trackEditsReset": "Track edits reverted to original",
+    "saveFailed": "Failed to save edits",
+    "backupExported": "Backup exported ({count} tracks)",
+    "backupImported": "Restored {count} tracks from backup",
+    "backupFailed": "Backup export failed",
+    "backupInvalid": "Invalid backup file",
+    "personalDataCleared": "Personal track edits cleared"
   },
   "contextMenu": {
     "provider": "Translation Provider",
@@ -353,9 +376,22 @@ window.LANG_EN = {
       "toi_em": "Tôi - Em",
       "ta_nguoi": "Ta - Người",
       "tao_may": "Tao - Mày"
-    }
+    },
+    "editLineTitle": "Edit line",
+    "editThisLine": "Edit this line",
+    "copyHeader": "Copy",
+    "scopeLine": "This line",
+    "scopeAll": "Full song",
+    "copyOriginal": "Original",
+    "copyAllDisplayed": "All displayed",
+    "copyLrc": ".LRC format",
+    "openFullEditor": "Open Full Lyrics & Translation Editor",
+    "revertLine": "Revert to AI",
+    "cancel": "Cancel",
+    "save": "Save"
   },
   "tooltips": {
+    "editLyrics": "Edit Lyrics & Translation",
     "conversion": "Conversion",
     "adjustments": "Adjustments",
     "videoSettings": "Video settings",
@@ -435,5 +471,26 @@ window.LANG_EN = {
     "changelog": "View Changelog",
     "skipVersion": "Skip This Version",
     "later": "Later"
+  },
+  "editorModal": {
+    "title": "Lyrics & Translation Studio",
+    "untitled": "Current Track",
+    "rowMode": "Row by Row",
+    "rawLrcMode": "Raw LRC",
+    "timeColumn": "Timestamp",
+    "originalColumn": "Original Lyric",
+    "originalPlaceholder": "Lyric line...",
+    "snapTimeTooltip": "Snap current playback timestamp",
+    "seekToLine": "Seek playback to this line",
+    "insertRow": "Insert line below",
+    "deleteRow": "Delete line",
+    "addLine": "+ Add Line",
+    "resetTrackEdits": "Revert to Original",
+    "confirmReset": "Click again to revert all edits",
+    "lineCount": "{count} lines",
+    "saving": "Saving...",
+    "savePermanent": "Save Permanently",
+    "undo": "Undo",
+    "redo": "Redo"
   }
 };

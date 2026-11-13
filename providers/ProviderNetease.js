@@ -11,13 +11,19 @@ const ProviderNetease = (() => {
 
     const METADATA_CREDITS_REGEX = /^(作词人?|作曲人?|编曲人?|演唱(?:者)?|制作(?:人|助理|室|公司)?|製作(?:人|助理|室|公司)?|监制|監製|出品人?|发行人?|發行人?|企划|企劃|统筹|統籌|人声(?:编辑|修音|录音)?|配唱(?:制作人|制作)?|后期(?:制作|工程)?|录音(?:师|室|棚|助理|工程师)?|混音(?:师|室|棚|助理|工程师)?|母带(?:师|室|棚|工程|工程师|后期)?|音频(?:工程|工程师|编辑)?|声音(?:工程|工程师)?|作詞人?|作曲人?|編曲人?|歌詞|演奏|歌|唄|唱|アーティスト|歌手|プロデューサー|ディレクター|レコーディング(?:エンジニア)?|ミキシング(?:エンジニア)?|マスタリング(?:エンジニア)?|エンジニア|吉他(?:录音|演奏)?|贝斯(?:录音|演奏)?|鼓(?:录音|演奏)?|弦乐(?:录音|编写|演奏|监制)?|和音(?:编写|录音)?|和声(?:编写|录音)?|(?:Recording|Mixing|Mastering|Audio|Sound)\s+(?:Engineer|Studio|Producer)|(?:Vocal|Track|Sound)\s+(?:Producer|Editor|Director)|Lyricist|Composer|Arranger|Producer|Lyrics|Vocals|Mixer|Mastering|Guitar|Bass|Drums|Strings|Recording|Artist|Singer|Lời|Nhạc|Phối khí|Trình bày|Sáng tác|Hòa âm)\s*[:：]|^(Written by|Composed by|Arranged by|Produced by|Mixed by|Mastered by|Recorded by|Sound Produced by|Directed by|Performed by|Vocals by|Music by|Lyrics by)\b|(テーマソング|主題歌|オープニングテーマ|エンディングテーマ|挿入歌|イメージソング|テーマ曲|\bTheme Song\b|\bOpening Theme\b|\bEnding Theme\b|\bInsert Song\b)|^(LRC|Lrc|lrc|Offset|offset|by|By|提供|字幕|翻译|翻譯|校对|潤色)\s*[:：]/i;
 
+    function isValidLyricPayload(data) {
+        return !!(data && data.code === 200 && (data.lrc !== undefined || data.nolyric || data.uncollected));
+    }
+
     async function fetchNetEase(targetUrl) {
         if (!targetUrl) return null;
+        const isLyricUrl = targetUrl.includes("/api/song/lyric");
+        const isValid = (d) => d && (isLyricUrl ? isValidLyricPayload(d) : (d.code === 200 || d.result));
 
         // Priority 1: Official Spicetify.CosmosAsync.get (uses https://cors-proxy.spicetify.app/{url}, zero Cloudflare Worker quota)
         try {
             const data1 = await Spicetify.CosmosAsync.get(targetUrl, null, BASE_HEADERS);
-            if (data1 && (data1.code === 200 || data1.result)) return data1;
+            if (isValid(data1)) return data1;
         } catch (_) {}
 
         // Priority 2: Dedicated Cloudflare Worker fallback (only if cors-proxy.spicetify.app is unreachable)
@@ -26,7 +32,7 @@ const ProviderNetease = (() => {
             const res = await fetch(proxiedUrl);
             if (res.ok) {
                 const data = await res.json();
-                if (data && (data.code === 200 || data.result)) return data;
+                if (isValid(data)) return data;
             }
         } catch (_) {}
 
@@ -101,22 +107,22 @@ const ProviderNetease = (() => {
         if (typeof IDBCache !== "undefined") {
             try {
                 const cached = await IDBCache.get(`netease:raw_lyric:${id}`);
-                if (cached) return cached;
+                if (isValidLyricPayload(cached)) return cached;
             } catch (_) {}
         }
 
         let result = null;
         try {
-            const url = `https://interface.music.163.com/api/song/lyric?id=${id}&lv=-1&kv=-1&tv=-1`;
+            const url = `https://interface.music.163.com/api/song/lyric?lv=-1&kv=-1&tv=-1&id=${id}`;
             const json = await fetchNetEase(url);
-            if (json && json.code === 200) result = json;
+            if (isValidLyricPayload(json)) result = json;
         } catch (_) {}
 
         if (!result) {
             try {
-                const fallbackUrl = `https://music.163.com/api/song/lyric?id=${id}&lv=-1&kv=-1&tv=-1`;
+                const fallbackUrl = `https://music.163.com/api/song/lyric?lv=-1&kv=-1&tv=-1&id=${id}`;
                 const json2 = await fetchNetEase(fallbackUrl);
-                if (json2 && json2.code === 200) result = json2;
+                if (isValidLyricPayload(json2)) result = json2;
             } catch (_) {}
         }
 
@@ -146,20 +152,31 @@ const ProviderNetease = (() => {
     }
 
     function scoreCandidate(candidate, info) {
+        if (!info) return 0;
+        const deltaMs = Math.abs((candidate.dt || candidate.duration || 0) - (info.duration || 0));
+        if (info.duration > 0 && deltaMs > 45000) return 0;
+
         const isInstSearch = /instrumental|off vocal|karaoke|カラオケ|伴奏/i.test(info.title || "");
         const isInstCand = /instrumental|off vocal|karaoke|カラオケ|伴奏/i.test(candidate.name || "");
         const penalty = (!isInstSearch && isInstCand) ? 0.35 : 0;
 
         const artistStr = (candidate.ar || candidate.artists || []).map(a => a.name).join(" ");
-        const titleSim  = levenshtein(candidate.name, info.title);
+        let titleSim    = levenshtein(candidate.name, info.title);
         let artistSim   = levenshtein(artistStr, info.artist);
-        const deltaMs   = Math.abs((candidate.dt || candidate.duration || 0) - (info.duration || 0));
         const durScore  = Math.max(0, 1 - deltaMs / 10000);
 
         // Cross-script tolerance: When title matches tightly and duration is near-exact,
         // do not let script mismatch (e.g. Romaji "Atarayo" vs Kanji/Kana "あたらよ") zero out candidate score
         if (titleSim >= 0.85 && deltaMs < 4000 && artistSim < 0.4) {
             artistSim = 0.4;
+        }
+
+        // Cross-script alias tolerance: When Spotify uses English/Romanized title & artist (e.g. "Crystal Cloud" / "Blooming Bungei")
+        // and NetEase search index resolves to the original CJK track ("雲海" / "文藝天国") with a near-exact duration match (< 3s)
+        const hasCJK = (s) => /[\u3040-\u30ff\u4e00-\u9faf\uac00-\ud7af]/.test(s || "");
+        if (!hasCJK(info.title) && !hasCJK(info.artist) && (hasCJK(candidate.name) || hasCJK(artistStr)) && info.duration > 0 && deltaMs < 3000) {
+            if (titleSim < 0.5) titleSim = 0.5;
+            if (artistSim < 0.4) artistSim = 0.4;
         }
 
         return Math.max(0, titleSim * 0.4 + artistSim * 0.3 + durScore * 0.3 - penalty);
@@ -209,7 +226,7 @@ const ProviderNetease = (() => {
             if (typeof IDBCache !== "undefined" && info.uri) {
                 try {
                     const cached = await IDBCache.get(`netease:lyrics:${info.uri}`);
-                    if (cached?.notFound) {
+                    if (cached?.notFound && cached?.v === 2) {
                         DebugLogger.log(`[NetEase] Negative cache hit for "${info.title}"`);
                         return err("NetEase: cached not found");
                     }
@@ -264,7 +281,7 @@ const ProviderNetease = (() => {
             }
             if (!scored.length) {
                 if (typeof IDBCache !== "undefined" && info.uri) {
-                    IDBCache.set(`netease:lyrics:${info.uri}`, { notFound: true, savedAt: Date.now() }, 3 * 24 * 60 * 60 * 1000).catch(() => {});
+                    IDBCache.set(`netease:lyrics:${info.uri}`, { notFound: true, v: 2, savedAt: Date.now() }, 3 * 24 * 60 * 60 * 1000).catch(() => {});
                 }
                 return err("NetEase: no results");
             }
@@ -357,7 +374,7 @@ const ProviderNetease = (() => {
             }
 
             if (typeof IDBCache !== "undefined" && info.uri) {
-                IDBCache.set(`netease:lyrics:${info.uri}`, { notFound: true, savedAt: Date.now() }, 3 * 24 * 60 * 60 * 1000).catch(() => {});
+                IDBCache.set(`netease:lyrics:${info.uri}`, { notFound: true, v: 2, savedAt: Date.now() }, 3 * 24 * 60 * 60 * 1000).catch(() => {});
             }
             return err("NetEase: no valid lyrics found across top candidates");
 
@@ -806,7 +823,7 @@ const ProviderNetease = (() => {
         });
     }
 
-    return { findLyrics, fetchLyrics: findLyrics, openManualSearchModal, searchSongs, fetchLyricsById, parseLyrics };
+    return { findLyrics, fetchLyrics: findLyrics, openManualSearchModal, searchSongs, fetchLyricsById, parseLyrics, scoreCandidate };
 })();
 
 window.ProviderNetease = ProviderNetease;

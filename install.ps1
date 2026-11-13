@@ -69,6 +69,7 @@ $filesToDownload = @(
     "i18n/LangZH.js",
     "i18n/I18n.js",
     "parsers/LRCParser.js",
+    "parsers/Lyricsfile.js",
     "utils/Utils.js",
     "services/AdBlocker.js",
     "utils/Config.js",
@@ -84,9 +85,11 @@ $filesToDownload = @(
     "services/TranslationCoordinator.js",
     "components/Components.js",
     "providers/ProviderLRCLIB.js",
+    "providers/ProviderLRCRed.js",
     "providers/ProviderMusixmatch.js",
     "providers/ProviderNetease.js",
     "providers/Providers.js",
+    "components/LyricsContextMenu.js",
     "components/SyncedLyrics.js",
     "components/UnsyncedLyrics.js",
     "components/TabBar.js",
@@ -96,6 +99,7 @@ $filesToDownload = @(
     "components/MiniLyrics.js",
     "components/ManualSearchModal.js",
     "components/VideoSettingsModal.js",
+    "components/LyricsEditorModal.js",
     "components/VideoBackground.js"
 )
 

@@ -136,8 +136,11 @@ const SearchBar = class SearchBar extends react.Component {
     }
 
     componentDidMount() {
-        this.viewPort = document.querySelector(".main-view-container .os-viewport");
-        this.mainViewOffsetTop = document.querySelector(".Root__main-view").offsetTop;
+        this.viewPort =
+            document.querySelector(".main-view-container .os-viewport") ??
+            document.querySelector(".main-view-container__scroll-node");
+        const mainView = document.querySelector("#main-view") ?? document.querySelector(".Root__main-view");
+        this.mainViewOffsetTop = mainView?.offsetTop ?? 0;
         this.toggleCallback = () => {
             if (!(Spicetify.Platform.History.location.pathname === "/lyrics-plus" && this.container)) return;
 
@@ -166,7 +169,7 @@ const SearchBar = class SearchBar extends react.Component {
                 }
                 atNode %= this.state.foundNodes.length;
                 const rects = this.state.foundNodes[atNode].getBoundingClientRect();
-                this.viewPort.scrollBy(0, rects.y - 100);
+                this.viewPort?.scrollBy(0, rects.y - 100);
                 this.setState({ atNode });
             }
         };
@@ -412,10 +415,23 @@ const TranslatingIndicator = react.memo(({ isVisible, status, text = getText("ui
             react.createElement("div", { className: "lyrics-translating-dot" }),
             react.createElement("div", { className: "lyrics-translating-dot" })
         ),
-        // Show check icon for success
-        isSuccess && react.createElement("span", { className: "lyrics-translating-icon" }, "✓"),
-        // Show X icon for error
-        isError && react.createElement("span", { className: "lyrics-translating-icon error" }, "✗"),
+        // Show crisp SVG check icon for success
+        isSuccess && react.createElement("span", { className: "lyrics-translating-icon", "aria-hidden": "true" },
+            react.createElement("svg", {
+                width: 13, height: 13, viewBox: "0 0 24 24", fill: "none",
+                stroke: "currentColor", strokeWidth: 2.75, strokeLinecap: "round", strokeLinejoin: "round"
+            }, react.createElement("polyline", { points: "20 6 9 17 4 12" }))
+        ),
+        // Show crisp SVG X icon for error
+        isError && react.createElement("span", { className: "lyrics-translating-icon error", "aria-hidden": "true" },
+            react.createElement("svg", {
+                width: 13, height: 13, viewBox: "0 0 24 24", fill: "none",
+                stroke: "currentColor", strokeWidth: 2.75, strokeLinecap: "round", strokeLinejoin: "round"
+            },
+                react.createElement("line", { x1: 18, y1: 6, x2: 6, y2: 18 }),
+                react.createElement("line", { x1: 6, y1: 6, x2: 18, y2: 18 })
+            )
+        ),
         react.createElement("span", { className: "lyrics-translating-text" }, displayText)
     );
 });

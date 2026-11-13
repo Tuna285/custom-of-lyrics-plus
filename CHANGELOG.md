@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.6] - 2026-11-13
+
+### Added
+
+- **Lyrics Context Menu & Studio Editor**: Right-click any lyric line to quick-edit inline, copy by scope (current line or full song in original, translated, bilingual, or LRC format with ruby tags stripped cleanly), or open the Studio Editor to adjust timestamps, lines, translations, and phonetics.
+- **Unified Storage & Personal Backups**: Separated permanent user edits (custom lyrics, per-track delays, line overrides, and track pronouns) from clearable AI and lyrics caches so personal adjustments survive cache wipes and updates, with JSON export, import, and reset controls in Settings.
+- **Spanish, Indonesian & Thai Translation Support**: Added target translation support for Spanish (`es`), Indonesian (`id`), and Thai (`th`) with culturally calibrated register and phrasing rules.
+- **Gemini 4 Hydrogen Preset**: Added `gemini-4-hydrogen` to Settings model presets alongside per-generation Gemini reasoning effort alignment.
+- **lrc.red & Lyricsfile Support**: Added `lrc.red` as a synced and unsynced lyrics source alongside `LRCLIB` `Lyricsfile` parsing, ISRC lookup, and multi-artist track matching.
+
+### Changed
+
+- **Multi-Language Prompt Calibration**: Blocked literal Kanji-to-Hán-Việt calques in modern Vietnamese styles, handled generic statements without forcing partner pronouns, and refined syntax/register rules across all supported target languages.
+- **Permanent Cache Retention & Unified Reasoning Effort**: Removed the 1-year expiration on cached translations so entries persist until cleared, and applied the configured reasoning effort uniformly to both translation and phonetic models.
+- **Modal & Theme Unification**: Refreshed the Manual Search, Video Settings, and Options dialogs with shared card styling, unified custom accent/button color variables across modals and popovers, and replaced legacy text glyphs with crisp SVG status icons.
+
+### Fixed
+
+- **Video Background Initial & Resume Sync**: Fixed initial playback sync when tracks start or resume from background windows and tightened time-drift resync thresholds.
+- **NetEase Cross-Script Matching & Validation**: Added tolerance for Romanized/English Spotify metadata matching original CJK NetEase tracks, added title-only fallback queries when initial manual searches score poorly, and tightened NetEase response validation.
+- **CJK Language Detection**: Fixed Japanese tracks being misidentified as Korean due to isolated Hangul characters and stopped stale cached language state from overriding freshly loaded lyrics.
+- **Spotify 1.3.x Compatibility**: Updated playbar button hiding, tab bar resize observation, search bar navigation, and scroll viewport detection to work with newer Spotify desktop layouts.
+- **Spotify Empty Pause Lines**: Filtered blank timed lines returned by Spotify so short pauses no longer leave empty rows in lyrics views or the editor.
+
 ## [1.9.5] - 2026-11-01
 
 ### Changed

@@ -31,24 +31,37 @@ const CacheButton = () => {
 	const [isLoading, setIsLoading] = useState(false);
 
 	useEffect(() => {
-		try {
-			// Use cached-uris as a proxy for count since IDB count is async and expensive
-			const cachedUris = JSON.parse(localStorage.getItem("lyrics-plus:cached-uris") || "[]");
-			setCount(cachedUris.length);
-		} catch {
-			setCount(0);
-		}
+		let cancelled = false;
+		const loadCount = async () => {
+			try {
+				const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+				if (unified?.getStats) {
+					const stats = await unified.getStats();
+					if (!cancelled) setCount(stats.clearableTrackEstimate || 0);
+					return;
+				}
+				if (typeof DBManager !== "undefined" && DBManager.getCount) {
+					const c = await DBManager.getCount();
+					if (!cancelled) setCount(c);
+				}
+			} catch {
+				if (!cancelled) setCount(0);
+			}
+		};
+		loadCount();
+		return () => { cancelled = true; };
 	}, []);
 
 	const clearCache = async () => {
 		setIsLoading(true);
 		try {
+			const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
 			await CacheManager.clear();
-			if (typeof DBManager !== "undefined" && typeof DBManager.clear === "function") {
+			if (unified?.clearCachesOnly) {
+				await unified.clearCachesOnly();
+			} else if (typeof DBManager !== "undefined" && typeof DBManager.clear === "function") {
 				await DBManager.clear();
 			}
-			localStorage.removeItem("lyrics-plus:local-lyrics");
-			localStorage.removeItem("lyrics-plus:cached-uris"); // Clear count proxy
 			if (typeof CACHE !== "undefined") {
 				for (const k in CACHE) delete CACHE[k];
 			}
@@ -70,6 +83,147 @@ const CacheButton = () => {
 		"button",
 		{ className: "btn", onClick: clearCache, disabled: isLoading || count === 0 },
 		text
+	);
+};
+
+const BackupAndStorageSection = () => {
+	const [stats, setStats] = useState({ userTrackCount: 0, lyricsCacheCount: 0, aiCacheCount: 0, ephemeralCacheCount: 0 });
+	const [confirmWipe, setConfirmWipe] = useState(false);
+	const fileInputRef = useRef(null);
+
+	const refreshStats = async () => {
+		const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+		if (!unified?.getStats) return;
+		try {
+			const next = await unified.getStats();
+			setStats(next);
+		} catch { }
+	};
+
+	useEffect(() => {
+		refreshStats();
+	}, []);
+
+	useEffect(() => {
+		if (!confirmWipe) return;
+		const timer = setTimeout(() => setConfirmWipe(false), 4000);
+		return () => clearTimeout(timer);
+	}, [confirmWipe]);
+
+	const handleExport = async () => {
+		const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+		if (!unified?.exportBackup) return;
+		try {
+			const backup = await unified.exportBackup();
+			const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			const dateStr = new Date().toISOString().slice(0, 10);
+			a.href = url;
+			a.download = `lyrics-plus-backup-${dateStr}.json`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+			Spicetify.showNotification(
+				`✓ ${getText("notifications.backupExported", { count: backup.trackCount }, `Đã xuất sao lưu (${backup.trackCount} bài hát)`)}`,
+				false,
+				2500
+			);
+		} catch (e) {
+			console.error("[Lyrics+] Export backup failed:", e);
+			Spicetify.showNotification(getText("notifications.backupFailed", {}, "Sao lưu thất bại"), true, 3000);
+		}
+	};
+
+	const handleImportFile = async (e) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
+		try {
+			const text = await file.text();
+			const parsed = JSON.parse(text);
+			const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+			const res = await unified.importBackup(parsed, { mode: "merge" });
+			await refreshStats();
+			if (window.lyricContainer && Spicetify.Player?.data?.item) {
+				delete CACHE[Spicetify.Player.data.item.uri];
+				window.lyricContainer.fetchLyrics(Spicetify.Player.data.item);
+			}
+			Spicetify.showNotification(
+				`✓ ${getText("notifications.backupImported", { count: res.total }, `Đã khôi phục ${res.total} bài hát`)}`,
+				false,
+				3000
+			);
+		} catch (err) {
+			console.error("[Lyrics+] Import backup failed:", err);
+			Spicetify.showNotification(getText("notifications.backupInvalid", {}, "File sao lưu không hợp lệ"), true, 3000);
+		} finally {
+			e.target.value = "";
+		}
+	};
+
+	const handleWipeUserTracks = async () => {
+		if (!confirmWipe) {
+			setConfirmWipe(true);
+			return;
+		}
+		setConfirmWipe(false);
+		const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+		if (unified?.clearAllUserTracks) {
+			await unified.clearAllUserTracks();
+			await refreshStats();
+			if (window.lyricContainer && Spicetify.Player?.data?.item) {
+				delete CACHE[Spicetify.Player.data.item.uri];
+				window.lyricContainer.fetchLyrics(Spicetify.Player.data.item);
+			}
+			Spicetify.showNotification(`✓ ${getText("notifications.personalDataCleared", {}, "Đã xóa toàn bộ dữ liệu cá nhân")}`, false, 2500);
+		}
+	};
+
+	return react.createElement(
+		"div",
+		{ className: "lp-backup-card" },
+		react.createElement(
+			"div",
+			{ className: "lp-backup-stats" },
+			react.createElement(
+				"div",
+				{ className: "lp-backup-stat" },
+				react.createElement("span", { className: "lp-backup-stat-num" }, stats.userTrackCount),
+				react.createElement("span", { className: "lp-backup-stat-label" }, getText("settings.backup.permanentTracks", {}, "Bài đã chỉnh sửa / lưu vĩnh viễn"))
+			),
+			react.createElement(
+				"div",
+				{ className: "lp-backup-stat" },
+				react.createElement("span", { className: "lp-backup-stat-num" }, stats.aiCacheCount + stats.lyricsCacheCount),
+				react.createElement("span", { className: "lp-backup-stat-label" }, getText("settings.backup.cachedEntries", {}, "Cache AI & Lời bài hát"))
+			)
+		),
+		react.createElement(
+			"div",
+			{ className: "lp-backup-actions" },
+			react.createElement("button", { type: "button", className: "btn", onClick: handleExport }, getText("settings.backup.exportBtn", {}, "Xuất sao lưu (.json)")),
+			react.createElement("button", { type: "button", className: "btn", onClick: () => fileInputRef.current?.click() }, getText("settings.backup.importBtn", {}, "Nhập sao lưu (.json)")),
+			react.createElement(
+				"button",
+				{
+					type: "button",
+					className: `btn ${confirmWipe ? "lp-btn-danger-outline" : ""}`,
+					disabled: stats.userTrackCount === 0,
+					onClick: handleWipeUserTracks,
+				},
+				confirmWipe
+					? getText("settings.backup.confirmWipeBtn", {}, "Bấm lại để xác nhận xóa")
+					: getText("settings.backup.wipeBtn", {}, "Xóa dữ liệu cá nhân")
+			),
+			react.createElement("input", {
+				ref: fileInputRef,
+				type: "file",
+				accept: ".json",
+				style: { display: "none" },
+				onChange: handleImportFile,
+			})
+		)
 	);
 };
 
@@ -268,13 +422,15 @@ const ConfigDynamicKeys = ({ name, defaultValue, onChange = () => { }, info = ""
 		updateKeys(newKeys);
 	};
 
-	return react.createElement("div", { className: "setting-row dynamic-keys-row", style: { alignItems: "flex-start" } },
-		react.createElement("label", { className: "col description" }, 
+	return react.createElement("div", { className: "setting-row lp-dynamic-keys-row" },
+		react.createElement("label", { className: "col description" },
 			name,
-			info && react.createElement("span", { className: "info-text", style: { display: "block", fontSize: "11px", opacity: 0.6, marginTop: "4px", lineHeight: "1.4" } }, info)
+			info && react.createElement("span", {
+				style: { display: "block", fontSize: "11.5px", color: "var(--lp-text-muted)", marginTop: "4px", lineHeight: "1.45", fontWeight: 400 }
+			}, info)
 		),
-		react.createElement("div", { className: "col action dynamic-keys-container", style: { display: "flex", flexDirection: "column", gap: "8px", width: "100%", maxWidth: "300px" } },
-			keys.map((keyVal, idx) => react.createElement("div", { key: idx, className: "dynamic-key-item", style: { display: "flex", gap: "8px", alignItems: "center", width: "100%" } },
+		react.createElement("div", { className: "col action lp-dynamic-keys-list" },
+			keys.map((keyVal, idx) => react.createElement("div", { key: idx, className: "lp-dynamic-key-item" },
 				react.createElement("input", {
 					value: keyVal,
 					onChange: (e) => handleKeyChange(idx, e.target.value),
@@ -282,26 +438,35 @@ const ConfigDynamicKeys = ({ name, defaultValue, onChange = () => { }, info = ""
 					type: "password",
 					autoComplete: "off",
 					spellCheck: false,
-					style: { flexGrow: 1, width: "100%" }
 				}),
 				react.createElement("button", {
-					className: "btn small",
+					type: "button",
+					className: "lp-btn-icon is-danger",
+					"aria-label": `Remove API Key ${idx + 1}`,
+					title: "Remove",
 					onClick: (e) => {
 						e.stopPropagation();
 						e.preventDefault();
 						removeKeyField(idx);
 					},
-					style: { padding: "4px 8px", minWidth: "30px", background: "rgba(255, 0, 0, 0.15)", color: "#ff5555", border: "none", cursor: "pointer", borderRadius: "4px" }
-				}, "X")
+				}, react.createElement("svg", {
+					width: 14, height: 14, viewBox: "0 0 24 24", fill: "none",
+					stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round",
+					"aria-hidden": "true"
+				},
+					react.createElement("line", { x1: 18, y1: 6, x2: 6, y2: 18 }),
+					react.createElement("line", { x1: 6, y1: 6, x2: 18, y2: 18 })
+				))
 			)),
 			react.createElement("button", {
-				className: "btn small add-key-btn",
+				type: "button",
+				className: "btn lp-btn-sm add-key-btn",
+				style: { alignSelf: "flex-start" },
 				onClick: (e) => {
 					e.stopPropagation();
 					e.preventDefault();
 					addKeyField();
 				},
-				style: { alignSelf: "flex-start", marginTop: "4px", padding: "4px 12px" }
 			}, "+ Add API Key")
 		)
 	);
@@ -392,10 +557,10 @@ const ConfigRange = ({ name, defaultValue, min = 0, max = 100, step = 5, onChang
 	
 	return react.createElement("div", { className: "setting-row" },
 		react.createElement("label", { className: "col description" }, name),
-		react.createElement("div", { className: "col action", style: { display: "flex", alignItems: "center", gap: "8px" } },
+		react.createElement("div", { className: "col action" },
 			react.createElement("input", {
 				type: "range",
-				className: "lyrics-range-slider",
+				className: "lp-range",
 				min,
 				max,
 				step,
@@ -404,23 +569,14 @@ const ConfigRange = ({ name, defaultValue, min = 0, max = 100, step = 5, onChang
 			}),
 			react.createElement("input", {
 				type: "number",
-				className: "lyrics-range-number",
+				className: "lp-range-number",
 				min,
 				max,
 				step,
 				value,
 				onChange: handleInputChange,
-				style: { 
-					width: "55px", 
-					textAlign: "center",
-					padding: "4px",
-					background: "rgba(255,255,255,0.1)",
-					border: "1px solid rgba(255,255,255,0.2)",
-					borderRadius: "4px",
-					color: "inherit"
-				}
 			}),
-			react.createElement("span", { style: { opacity: 0.7 } }, "%")
+			react.createElement("span", { style: { color: "var(--lp-text-muted)", fontSize: "12px" } }, "%")
 		)
 	);
 };
@@ -529,7 +685,7 @@ const ServiceOption = ({ item, onToggle, onSwap, isFirst = false, isLast = false
 	const providerDescPath = `providers.${item.name}.desc`;
 	const localizedName = getText(providerNamePath);
 	const localizedDesc = getText(providerDescPath);
-	const displayName = localizedName === providerNamePath ? item.name : localizedName;
+	const displayName = localizedName === providerNamePath ? (item.label || item.name) : localizedName;
 	const displayDesc = localizedDesc === providerDescPath ? item.desc : localizedDesc;
 
 	const setTokenCallback = useCallback((token) => { setToken(token); onTokenChange(item.name, token); }, [item.token]);
@@ -702,6 +858,8 @@ const ConfigHelper = () => {
 	];
 
 	const MODEL_PRESETS = [
+		// Google Gemini 4.x series
+		"gemini-4-hydrogen",
 		// Google Gemini 3.x series
 		"gemini-3.8-flash",
 		"gemini-3.7-flash",
@@ -753,6 +911,9 @@ const ConfigHelper = () => {
 		
 		// Persist to both storages for all settings (survive spicetify apply)
 		ConfigUtils.setPersisted(`${APP_NAME}:visual:${name}`, value);
+		if (name.startsWith("ui-") && typeof Utils !== "undefined" && Utils.syncUiThemeVariables) {
+			Utils.syncUiThemeVariables(CONFIG.visual);
+		}
 
 		if (name !== "musixmatch-translation-language") lyricContainerUpdate?.();
 
@@ -828,40 +989,23 @@ const ConfigHelper = () => {
 			];
 			content = react.createElement("div", null,
 				react.createElement(OptionList, { items: advSettings, onChange }),
+				react.createElement(CollapsibleSection, { title: getText("sections.backupAndStorage", {}, "Sao lưu & Dữ liệu cá nhân") },
+					react.createElement(BackupAndStorageSection, null)
+				),
 				react.createElement(CollapsibleSection, { title: getText("sections.aboutAndUpdates") },
-					react.createElement("div", {
-						style: {
-							padding: "14px 16px",
-							background: "rgba(255, 255, 255, 0.04)",
-							borderRadius: "8px",
-							display: "flex",
-							justifyContent: "space-between",
-							alignItems: "center",
-							gap: "12px",
-							margin: "8px 0 16px 0"
-						}
-					},
+					react.createElement("div", { className: "lp-update-card" },
 						react.createElement("div", null,
-							react.createElement("div", { style: { fontWeight: "bold", fontSize: "14px", color: "var(--spice-text)" } }, `Lyric Plus Translate v${window.UpdateService?.CURRENT_VERSION || "1.9.5"}`),
-							react.createElement("div", { style: { fontSize: "12px", color: "var(--spice-subtext)", marginTop: "2px" } }, getText("settings.updateAppSubtitle"))
+							react.createElement("div", { className: "lp-update-title" }, `Lyric Plus Translate v${window.UpdateService?.CURRENT_VERSION || "1.9.6"}`),
+							react.createElement("div", { className: "lp-update-sub" }, getText("settings.updateAppSubtitle"))
 						),
 						react.createElement("button", {
+							type: "button",
+							className: "lp-btn lp-btn-primary",
 							onClick: () => {
 								if (window.UpdateService?.checkForUpdates) {
 									window.UpdateService.checkForUpdates(false);
 								}
 							},
-							style: {
-								padding: "8px 16px",
-								background: "var(--spice-button)",
-								color: "var(--spice-text)",
-								border: "none",
-								borderRadius: "20px",
-								cursor: "pointer",
-								fontWeight: "bold",
-								fontSize: "12px",
-								whiteSpace: "nowrap"
-							}
 						}, getText("settings.checkForUpdates"))
 					)
 				),
@@ -875,7 +1019,7 @@ const ConfigHelper = () => {
 			break;
 	}
 
-	return react.createElement("div", { style: { display: "flex", flexDirection: "column", height: "100%" } },
+	return react.createElement("div", { style: { display: "flex", flexDirection: "column" } },
 		react.createElement("div", { className: "config-tabs" },
 			tabKeys.map(tabKey => react.createElement("div", {
 				className: `config-tab ${activeTab === tabKey ? "active" : ""}`,
@@ -887,205 +1031,15 @@ const ConfigHelper = () => {
 };
 
 function openConfig() {
+	if (typeof Utils !== "undefined" && Utils.syncUiThemeVariables) {
+		Utils.syncUiThemeVariables(CONFIG.visual);
+	}
 	const configContainer = react.createElement(
 		"div",
 		{
 			id: `${APP_NAME}-config-container`,
-			style: {
-				"--lp-ui-switch-on": CONFIG.visual["ui-switch-on-color"] || "var(--spice-button)",
-				"--lp-ui-switch-off": CONFIG.visual["ui-switch-off-color"] || "rgba(var(--spice-rgb-subtext), 0.2)",
-				"--lp-ui-btn-bg": CONFIG.visual["ui-button-bg-color"] || "var(--spice-button-disabled, rgba(255,255,255,0.08))",
-				"--lp-ui-btn-text": CONFIG.visual["ui-button-text-color"] || "var(--spice-text)",
-				"--lp-fab-bg": CONFIG.visual["ui-fab-bg-color"] || "rgba(var(--spice-rgb-main, 20, 20, 20), 0.72)",
-				"--lp-fab-icon": CONFIG.visual["ui-fab-icon-color"] || "var(--spice-button)",
-				"--lp-ui-accent": CONFIG.visual["ui-accent-color"] || "var(--spice-button)",
-			}
+			className: "lp-config-shell lp-config-shell--full",
 		},
-		react.createElement("style", {
-			dangerouslySetInnerHTML: {
-				__html: `
-#${APP_NAME}-config-container { 
-	display: flex; 
-	flex-direction: column; 
-	height: 100%; 
-	max-height: 70vh;
-	font-family: var(--font-family, CircularSp, CircularSp-Arab, CircularSp-Hebr, CircularSp-Cyrl, CircularSp-Grek, CircularSp-Deva, var(--fallback-fonts, sans-serif));
-}
-#${APP_NAME}-config-container .setting-group {
-	border-bottom: 1px solid rgba(255,255,255,.05);
-	border-radius: 6px;
-	transition: background 0.15s ease;
-}
-#${APP_NAME}-config-container .setting-group:hover { background: rgba(255,255,255,.03); }
-#${APP_NAME}-config-container .setting-row {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto;
-	gap: 16px;
-	align-items: center;
-	padding: 12px 16px;
-	min-height: 50px;
-}
-#${APP_NAME}-config-container .setting-group .setting-row:hover { background: transparent; }
-#${APP_NAME}-config-container .setting-group:has(.setting-desc) .setting-row { padding-bottom: 6px; }
-#${APP_NAME}-config-container .setting-desc {
-	display: block;
-	margin: 0;
-	padding: 0 16px 10px 16px;
-	font-size: 11.5px;
-	line-height: 1.5;
-	opacity: 0.45;
-	color: var(--spice-subtext, var(--spice-text));
-}
-#${APP_NAME}-config-container .setting-desc code {
-	font-family: monospace;
-	background: rgba(255,255,255,.08);
-	padding: 1px 4px;
-	border-radius: 3px;
-	font-size: 10.5px;
-}
-#${APP_NAME}-config-container .provider-row {
-	grid-template-columns: minmax(0, 1fr) auto;
-	align-items: start;
-	padding-bottom: 10px;
-}
-#${APP_NAME}-config-container .provider-meta { display: flex; flex-direction: column; gap: 4px; }
-#${APP_NAME}-config-container .provider-title { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; }
-#${APP_NAME}-config-container .provider-desc {
-	padding: 0;
-	font-size: 13px;
-	line-height: 1.55;
-	opacity: 0.66;
-	max-width: 720px;
-}
-#${APP_NAME}-config-container .provider-input-row { padding: 0 16px 12px 16px; }
-#${APP_NAME}-config-container .provider-token-input {
-	width: 100%;
-	min-width: 0;
-	font-family: var(--font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-	font-size: 12.5px;
-}
-#${APP_NAME}-config-container .col.description { font-weight: 500; font-size: 14px; opacity: .9; }
-#${APP_NAME}-config-container .col.action { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
-#${APP_NAME}-config-container input, #${APP_NAME}-config-container select {
-	background: rgba(255,255,255,.08);
-	border: 1px solid transparent;
-	border-radius: 4px;
-	padding: 8px 12px;
-	color: inherit;
-	min-width: 200px;
-	transition: 0.2s ease;
-}
-#${APP_NAME}-config-container input:focus, #${APP_NAME}-config-container select:focus {
-	background: rgba(255,255,255,.12);
-	border-color: var(--lp-ui-accent, var(--spice-button));
-	box-shadow: 0 0 0 2px color-mix(in srgb, var(--lp-ui-accent, var(--spice-button)) 30%, transparent);
-	outline: none;
-}
-#${APP_NAME}-config-container select {
-	background: rgba(46,46,46,.9);
-	border-color: rgba(255,255,255,.16);
-}
-#${APP_NAME}-config-container select option {
-	background: #2b2b2b;
-	color: #f2f2f2;
-}
-#${APP_NAME}-config-container .lp-combo-action { width: 100%; max-width: 360px; }
-#${APP_NAME}-config-container .lp-combo-input {
-	width: 100%;
-	min-width: 240px;
-	font-family: var(--font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-	font-size: 12.5px;
-}
-#${APP_NAME}-config-container h2 { font-size: 13px; margin: 0 0 4px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.6; }
-.cors-proxy-section { padding: 16px 16px 8px; border-top: 1px solid rgba(255,255,255,.05); margin-top: 8px; }
-.cors-proxy-section .cors-proxy-desc { padding: 0 0 10px 0; font-size: 12px; opacity: 0.5; line-height: 1.55; }
-.cors-proxy-section input { width: 100%; margin-top: 4px; box-sizing: border-box; }
-
-/* Tabs */
-.config-tabs {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 6px;
-	box-sizing: border-box;
-	max-width: 100%;
-	position: sticky;
-	top: 0;
-	z-index: 2;
-	background: transparent;
-	border-bottom: 1px solid rgba(255,255,255,.05);
-	margin: 0 0 16px;
-	padding: 8px 16px 10px;
-	overflow: visible;
-}
-.config-tab {
-	flex: 1 1 112px;
-	min-width: 0;
-	padding: 8px 12px;
-	cursor: pointer;
-	opacity: 0.7;
-	border: 1px solid transparent;
-	border-radius: 999px;
-	transition:
-		opacity 0.16s ease,
-		background-color 0.16s ease,
-		border-color 0.16s ease,
-		color 0.16s ease;
-	font-weight: 600;
-	font-size: 14px;
-	text-align: center;
-	white-space: normal;
-	overflow-wrap: anywhere;
-	line-height: 1.2;
-}
-.config-tab:hover { opacity: 1; background: rgba(255,255,255,.05); }
-.config-tab.active { opacity: 1; border-color: rgba(255,255,255,.25); background: rgba(255,255,255,.08); color: var(--spice-text); }
-
-/* Collapsible Sections */
-.config-section { margin-bottom: 24px; }
-.config-section-header {
-	padding: 12px 0;
-	border-bottom: 1px solid rgba(255,255,255,.1);
-	cursor: pointer;
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	font-weight: 700;
-	font-size: 14px;
-	text-transform: uppercase;
-	letter-spacing: 0.5px;
-	user-select: none;
-	color: var(--spice-text);
-}
-.config-section-header:hover { opacity: 0.8; }
-.config-section-content { display: none; padding-top: 8px; }
-.config-section.open .config-section-content { display: block; }
-.chevron { transition: transform 0.3s ease; }
-.config-section.open .chevron { transform: rotate(180deg); }
-
-/* Scrollable Content */
-.config-content { flex: 1; overflow-y: auto; padding-right: 8px; }
-.config-content::-webkit-scrollbar { width: 8px; }
-.config-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 4px; }
-
-.small-info { font-size: 12px; opacity: 0.7; margin-top: 4px; display: block; }
-.lp-color-action { gap: 10px !important; }
-#${APP_NAME}-config-container input[type="color"].lp-color-swatch {
-	width: 36px !important;
-	height: 36px !important;
-	padding: 2px !important;
-	border-radius: 8px !important;
-	border: 1px solid rgba(255,255,255,.2) !important;
-	cursor: pointer !important;
-	background: none !important;
-	min-width: unset !important;
-}
-#${APP_NAME}-config-container input[type="color"].lp-color-swatch::-webkit-color-swatch-wrapper { padding: 0; border-radius: 6px; }
-#${APP_NAME}-config-container input[type="color"].lp-color-swatch::-webkit-color-swatch { border: none; border-radius: 6px; }
-
-`
-			}
-		}),
 		react.createElement(ConfigHelper)
 	);
 

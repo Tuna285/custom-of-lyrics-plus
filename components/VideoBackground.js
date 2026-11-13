@@ -43,6 +43,7 @@ const VideoBackground = (() => {
         const uiFlashTimeoutRef = useRef(null);
         const lastSeekAttemptRef = useRef({ time: 0, attempts: 0 });
         const lastSeekTimeRef = useRef(0);
+        const needsInitialSyncRef = useRef(true);
         const isMountedRef = useRef(true);
         const isPlayerReadyRef = useRef(false);
         const hasStartedPlayingRef = useRef(false);
@@ -279,9 +280,10 @@ const VideoBackground = (() => {
                         }
                     } catch (_) {}
                     try {
+                        needsInitialSyncRef.current = true;
                         const spotifyTime = (Spicetify.Player.getProgress() || 0) / 1000;
                         const syncOffset = videoInfo.sync_offset || 0;
-                        const startSecs = Math.max(1, Math.floor(spotifyTime + syncOffset));
+                        const startSecs = Math.max(0, spotifyTime + syncOffset);
                         playerRef.current.loadVideoById({
                             videoId: targetVideoId,
                             startSeconds: startSecs
@@ -340,11 +342,12 @@ const VideoBackground = (() => {
                 const ytTarget = document.createElement("div");
                 playerDiv.appendChild(ytTarget);
 
+                needsInitialSyncRef.current = true;
                 const spotifyTime = (Spicetify.Player.getProgress() || 0) / 1000;
                 const syncOffset = videoInfoRef.current?.sync_offset || 0;
                 const initialStart = typeof startOverride === "number"
                     ? startOverride
-                    : Math.max(1, Math.floor(spotifyTime + syncOffset));
+                    : Math.max(0, spotifyTime + syncOffset);
 
                 if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
                 watchdogTimerRef.current = setTimeout(() => {
@@ -386,7 +389,7 @@ const VideoBackground = (() => {
                         cc_lang_pref: "none",
                         hl: "en",
                         origin: window.location.origin || "https://xpui.app.spotify.com",
-                        start: Math.max(1, Math.floor(initialStart)),
+                        start: Math.max(0, Math.floor(initialStart)),
                     },
                     events: {
                         onReady: (event) => {
@@ -449,6 +452,13 @@ const VideoBackground = (() => {
                                 if (player.playerInfo?.progressState?.allowSeeking !== false && !isAdPlayingRef.current) {
                                     setStartedPlayingState(true);
                                     setIsYTReadyToRender(true);
+                                    if (needsInitialSyncRef.current) {
+                                        needsInitialSyncRef.current = false;
+                                        lastSeekTimeRef.current = 0;
+                                        setTimeout(() => {
+                                            if (isMountedRef.current) syncTime(true);
+                                        }, 60);
+                                    }
                                 }
 
                                 try {
@@ -576,12 +586,12 @@ const VideoBackground = (() => {
             if (typeof player.getCurrentTime === "function") {
                 const currentVideoTime = player.getCurrentTime();
                 const timeDiff = Math.abs(currentVideoTime - targetVideoTime);
-                const shouldSeek = isForceSeek ? (timeDiff > 0.15) : (timeDiff > 3.0);
+                const shouldSeek = isForceSeek ? (timeDiff > 0.15) : (timeDiff > 0.65);
 
                 if (shouldSeek) {
                     const now = Date.now();
                     const isBuffering = playerState === 3 || isAdPlayingRef.current;
-                    const isRecentlySeeked = !isForceSeek && ((now - lastSeekTimeRef.current) < 2000);
+                    const isRecentlySeeked = !isForceSeek && ((now - lastSeekTimeRef.current) < 2500);
 
                     if ((isForceSeek || !isBuffering) && !isRecentlySeeked) {
                         player.seekTo(targetVideoTime, true);
@@ -670,11 +680,38 @@ const VideoBackground = (() => {
             };
             window.addEventListener("message", onMessage);
 
+            let resumeFollowupTimer = null;
+            let lastResumeSyncAt = 0;
+            const handleWindowResume = () => {
+                if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+                const now = Date.now();
+                if (now - lastResumeSyncAt < 150) return;
+                lastResumeSyncAt = now;
+                lastSeekTimeRef.current = 0;
+                syncTime(true);
+                if (resumeFollowupTimer) clearTimeout(resumeFollowupTimer);
+                // Re-check once Chromium finishes un-throttling the iframe decoder
+                resumeFollowupTimer = setTimeout(() => {
+                    resumeFollowupTimer = null;
+                    if (!isMountedRef.current) return;
+                    const p = playerRef.current;
+                    if (p && typeof p.getPlayerState === "function" && p.getPlayerState() === 3) return;
+                    syncTime(true);
+                }, 450);
+            };
+            document.addEventListener("visibilitychange", handleWindowResume);
+            window.addEventListener("focus", handleWindowResume);
+            window.addEventListener("pageshow", handleWindowResume);
+
             return () => {
                 clearInterval(syncInterval);
+                if (resumeFollowupTimer) clearTimeout(resumeFollowupTimer);
                 window.removeEventListener("lyricsPlusSyncRequest", handleInternalSync);
                 Spicetify.Player.removeEventListener("onprogress", handleProgress);
                 window.removeEventListener("message", onMessage);
+                document.removeEventListener("visibilitychange", handleWindowResume);
+                window.removeEventListener("focus", handleWindowResume);
+                window.removeEventListener("pageshow", handleWindowResume);
             };
         }, [isPlayerReady, videoInfo?.video_id, isPlaying]);
 

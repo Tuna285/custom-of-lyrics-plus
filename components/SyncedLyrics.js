@@ -101,7 +101,34 @@ const estimateLineDuration = (line, stats) => {
     return Math.max(MIN_LINE_DUR, len * (stats?.msPerChar || DEFAULT_MS_PER_CHAR));
 };
 
-const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, isKara, trackUri, ...props }) => {
+const renderLineContextPopover = (menuState, setMenuState, lyrics, trackUri, onOpenEditor) => {
+    const PopoverComp = (typeof LyricsContextMenu !== "undefined" && LyricsContextMenu?.Popover) || window.LyricsPlus?.LyricsContextMenu?.Popover;
+    if (!PopoverComp || !menuState) return null;
+    return react.createElement(PopoverComp, {
+        menuState,
+        lyrics,
+        trackUri,
+        onClose: () => setMenuState(null),
+        onOpenEditor,
+    });
+};
+
+const createLineContextHandler = (setMenuState, lyrics, rawIndex, subText) => {
+    if (typeof rawIndex !== "number" || rawIndex < 0) return undefined;
+    return (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setMenuState({
+            x: event.clientX,
+            y: event.clientY,
+            rawIndex,
+            line: lyrics?.[rawIndex],
+            lineTransText: subText ? Utils.extractPlainText(subText) : "",
+        });
+    };
+};
+
+const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, isKara, trackUri, onOpenEditor, ...props }) => {
     const lyrics = rawLyrics || [];
     const isReallySynced = lyrics.length > 0 && lyrics.some(l => l.startTime !== undefined);
     if (!isReallySynced && lyrics.length > 0) {
@@ -111,11 +138,13 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
             copyright,
             isKara,
             trackUri,
+            onOpenEditor,
             ...props
         });
     }
 
     const [position, setPosition] = useState(0);
+    const [contextMenuState, setContextMenuState] = useState(null);
     const activeLineEle = useRef();
     const lyricContainerEle = useRef();
     const handleSyncedWheel = useCallback((event) => {
@@ -135,7 +164,8 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
     });
 
     const lyricWithEmptyLines = useMemo(() => {
-        const raw = [emptyLine, emptyLine, ...lyrics];
+        const tagged = lyrics.map((l, idx) => ({ ...l, rawIndex: idx }));
+        const raw = [emptyLine, emptyLine, ...tagged];
         const processed = [];
         let newIndex = 0;
         const timingStats = computeTimingStats(lyrics);
@@ -294,7 +324,7 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                 },
                 key: trackUri || lyricsId,
             },
-            activeLines.map(({ text, lineNumber, startTime, originalText, text2 }, i) => {
+            activeLines.map(({ text, lineNumber, startTime, originalText, text2, rawIndex }, i) => {
                 let className = "lyrics-lyricsContainer-LyricsLine";
                 const activeElementIndex = Math.min(activeLineIndex, CONFIG.visual["lines-before"] + 1);
                 let ref;
@@ -385,16 +415,11 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                                 Spicetify.Player.seek(startTime);
                             }
                         },
+                        onContextMenu: createLineContextHandler(setContextMenuState, lyrics, rawIndex, subText),
                     },
                     react.createElement(
                         "p",
                         {
-                            onContextMenu: (event) => {
-                                event.preventDefault();
-                                Spicetify.Platform.ClipboardAPI.copy(Utils.convertParsedToLRC(lyrics, CONFIG.visual["translate:display-mode"] === "below").original)
-                                    .then(() => Spicetify.showNotification("✓ " + getText("notifications.lyricsCopied"), false, 2000))
-                                    .catch(() => Spicetify.showNotification(getText("notifications.lyricsCopyFailed"), true, 2000));
-                            },
                             // For Furigana/Hiragana HTML strings
                             ...(typeof mainText === "string" && !isKara ? { dangerouslySetInnerHTML: { __html: Utils.rubyTextToHTML(mainText) } } : {}),
                         },
@@ -430,13 +455,15 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
         react.createElement(CreditFooter, {
             provider,
             copyright,
-        })
+        }),
+        renderLineContextPopover(contextMenuState, setContextMenuState, lyrics, trackUri, onOpenEditor)
     );
 });
 
-const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, isKara, trackUri }) => {
+const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, isKara, trackUri, onOpenEditor }) => {
     const lyrics = rawLyrics || [];
     const [position, setPosition] = useState(0);
+    const [contextMenuState, setContextMenuState] = useState(null);
     const activeLineRef = useRef(null);
     const pageRef = useRef(null);
 
@@ -447,7 +474,8 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
     });
 
     const padded = useMemo(() => {
-        const raw = [emptyLine, ...lyrics];
+        const tagged = lyrics.map((l, idx) => ({ ...l, rawIndex: idx }));
+        const raw = [emptyLine, ...tagged];
         const processed = [];
         const timingStats = computeTimingStats(lyrics);
 
@@ -603,7 +631,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
         react.createElement("p", {
             className: "lyrics-lyricsContainer-LyricsUnsyncedPadding",
         }),
-        padded.map(({ text, startTime, originalText, text2 }, i) => {
+        padded.map(({ text, startTime, originalText, text2, rawIndex }, i) => {
             const isActive = !isReallySynced || i === activeLineIndex;
             const { mainText, subText, subText2 } = Utils.getDisplayTexts(text, originalText, text2);
 
@@ -690,16 +718,11 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
                             Spicetify.Player.seek(startTime);
                         }
                     },
+                    onContextMenu: createLineContextHandler(setContextMenuState, lyrics, rawIndex, subText),
                 },
                 react.createElement(
                     "p",
                     {
-                        onContextMenu: (event) => {
-                            event.preventDefault();
-                            Spicetify.Platform.ClipboardAPI.copy(Utils.convertParsedToLRC(lyrics, CONFIG.visual["translate:display-mode"] === "below").original)
-                                .then(() => Spicetify.showNotification("✓ " + getText("notifications.lyricsCopied"), false, 2000))
-                                .catch(() => Spicetify.showNotification(getText("notifications.lyricsCopyFailed"), true, 2000));
-                        },
                         // For Furigana/Hiragana HTML strings
                         ...(typeof mainText === "string" && !isKara ? { dangerouslySetInnerHTML: { __html: Utils.rubyTextToHTML(mainText) } } : {}),
                     },
@@ -732,7 +755,8 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
             provider,
             copyright,
         }),
-        react.createElement(SearchBar, null)
+        react.createElement(SearchBar, null),
+        renderLineContextPopover(contextMenuState, setContextMenuState, lyrics, trackUri, onOpenEditor)
     );
 });
 

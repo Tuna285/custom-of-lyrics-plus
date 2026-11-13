@@ -100,11 +100,18 @@ window.LyricsPlus.TranslationCoordinator = {
 		const processMode = async (mode, baseLyrics) => {
 			if (!mode || mode === "none") return null;
 			try {
+				let res;
 				if (String(mode).startsWith("gemini")) {
-					return await this.getGeminiTranslation(self, lyricsState, baseLyrics, mode);
+					res = await this.getGeminiTranslation(self, lyricsState, baseLyrics, mode);
 				} else {
-					return await this.getTraditionalConversion(self, lyricsState, baseLyrics, originalLanguage, mode);
+					res = await this.getTraditionalConversion(self, lyricsState, baseLyrics, originalLanguage, mode);
 				}
+				const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+				if (unified?.applyModeOverrides && Array.isArray(res)) {
+					const targetLang = CONFIG.visual["translate:target-language"] || "vi";
+					res = unified.applyModeOverrides(currentUri, mode, targetLang, res, baseLyrics);
+				}
+				return res;
 			} catch (error) {
 				const prog = self.state.translationStatus;
 				if (prog?.type === "progress" && prog?.trackUri === self.state.uri) {
@@ -192,13 +199,26 @@ window.LyricsPlus.TranslationCoordinator = {
 		self._lastStyleKey = currentStyleKey;
 		self._lastPronounKey = currentPronounKey;
 
-		// Async cache preload: Check CacheManager for cached translations
+		// Async cache preload: Check UnifiedDB overrides + CacheManager for cached translations
 		const tryLoadCachedTranslation = async (mode) => {
-			if (!mode || mode === "none" || !String(mode).startsWith("gemini")) return null;
+			if (!mode || mode === "none") return null;
+			const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+			const targetLang = currentTargetLang || CONFIG.visual["translate:target-language"] || "vi";
+
+			if (unified?.ready) {
+				await unified.ready();
+			}
+
+			if (!String(mode).startsWith("gemini")) {
+				// Non-Gemini mode: return immediately ONLY if user saved a complete custom override
+				return unified?.applyModeOverrides
+					? unified.applyModeOverrides(currentUri, mode, targetLang, null, lyrics)
+					: null;
+			}
+
 			try {
 				const styleKey = CONFIG.visual["translate:translation-style"] || "smart_adaptive";
 				const pronounKey = CONFIG.visual["translate:pronoun-mode"] || "default";
-				const targetLang = currentTargetLang || CONFIG.visual["translate:target-language"] || "vi";
 				const isPhonetic = (mode === "gemini_romaji" || mode === "gemini_furigana");
 				// Phonetic tasks are independent of translation style and pronoun
 				const cacheKey2 = isPhonetic
@@ -223,21 +243,16 @@ window.LyricsPlus.TranslationCoordinator = {
 						CacheManager.delete(cacheKey2);
 						memCached = null;
 					} else {
-						return memCached;
+						return unified?.applyModeOverrides
+							? unified.applyModeOverrides(currentUri, mode, targetLang, memCached, lyrics)
+							: memCached;
 					}
 				}
 
-				// Check persistent localStorage (legacy fallback)
-				const persistKey = `${APP_NAME}:gemini-cache`;
-				const persistedCache = JSON.parse(localStorage.getItem(persistKey)) || {};
-				const persisted = persistedCache[cacheKey2] || (isPhonetic ? persistedCache[`${currentUri}:${mode}:${styleKey}:${pronounKey}`] : null);
-
-				if (persisted?.data && (isPhonetic || (persisted.styleKey === styleKey && persisted.pronounKey === pronounKey))) {
-					if (Array.isArray(lyrics) && lyrics.length > 0 && Array.isArray(persisted.data) && persisted.data.length !== lyrics.length) {
-						return null;
-					}
-					CacheManager.set(cacheKey2, persisted.data); // Load into session cache
-					return persisted.data;
+				// Fallback: check complete user override even when AI cache has not run yet
+				if (unified?.applyModeOverrides) {
+					const userOnly = unified.applyModeOverrides(currentUri, mode, targetLang, null, lyrics);
+					if (Array.isArray(userOnly)) return userOnly;
 				}
 			} catch (e) {
 				console.warn("[Lyrics+] Cache preload failed:", e);
@@ -942,55 +957,11 @@ window.LyricsPlus.TranslationCoordinator = {
 
 		const provider = CONFIG.visual["translate:translated-lyrics-source"];
 
-		// For Gemini AI, always detect language from lyrics (no override needed)
-		if (provider === "geminiVi" || !provider) {
-			if (self.state.language) {
-				if (window.lyricsPlusDebug) {
-					console.log("Gemini mode - Using cached language:", self.state.language);
-				}
-				return self.state.language;
-			}
-
-			const detectedLanguage = Utils.detectLanguage(lyrics);
-
-			if (window.lyricsPlusDebug) {
-				console.log("Gemini mode - Language detection result:", {
-					detectedLanguage,
-					lyricsLength: lyrics?.length,
-					firstLineText: lyrics?.[0]?.text?.substring(0, 50)
-				});
-			}
-
-			return detectedLanguage;
+		if (provider !== "geminiVi" && provider && CONFIG.visual["translate:detect-language-override"] !== "off") {
+			return CONFIG.visual["translate:detect-language-override"];
 		}
 
-		// For Kuromoji mode, use language override if set
-		if (CONFIG.visual["translate:detect-language-override"] !== "off") {
-			const overrideLanguage = CONFIG.visual["translate:detect-language-override"];
-			if (window.lyricsPlusDebug) {
-				console.log("Traditional mode - Using language override:", overrideLanguage);
-			}
-			return overrideLanguage;
-		}
-
-		if (self.state.language) {
-			if (window.lyricsPlusDebug) {
-				console.log("Traditional mode - Using cached language:", self.state.language);
-			}
-			return self.state.language;
-		}
-
-		const detectedLanguage = Utils.detectLanguage(lyrics);
-
-		if (window.lyricsPlusDebug) {
-			console.log("Kuromoji mode - Language detection result:", {
-				detectedLanguage,
-				lyricsLength: lyrics?.length,
-				firstLineText: lyrics?.[0]?.text?.substring(0, 50)
-			});
-		}
-
-		return detectedLanguage;
+		return Utils.detectLanguage(lyrics);
 	},
 
 	async translateLyrics(self, language, lyrics, targetConvert) {
@@ -1122,13 +1093,6 @@ window.LyricsPlus.TranslationCoordinator = {
 		try {
 			await DBManager.set(uri, fullLyricsData);
 
-			const cachedUris = JSON.parse(localStorage.getItem(`${APP_NAME}:cached-uris`) || "[]");
-			if (!cachedUris.includes(uri)) {
-				cachedUris.push(uri);
-				if (cachedUris.length > 500) cachedUris.shift();
-				localStorage.setItem(`${APP_NAME}:cached-uris`, JSON.stringify(cachedUris));
-			}
-
 			if (!self.state.isCached) {
 				self.setState({ isCached: true });
 			}
@@ -1140,12 +1104,6 @@ window.LyricsPlus.TranslationCoordinator = {
 	async deleteLocalLyrics(self, uri) {
 		try {
 			await DBManager.delete(uri);
-			const cachedUris = JSON.parse(localStorage.getItem(`${APP_NAME}:cached-uris`) || "[]");
-			const index = cachedUris.indexOf(uri);
-			if (index > -1) {
-				cachedUris.splice(index, 1);
-				localStorage.setItem(`${APP_NAME}:cached-uris`, JSON.stringify(cachedUris));
-			}
 			self.setState({ isCached: false });
 		} catch (e) {
 			console.error("[Lyrics+] Failed to delete from IndexedDB:", e);
@@ -1566,6 +1524,20 @@ window.LyricsPlus.TranslationCoordinator = {
 				self.setState(nextState, () => {
 					this.resetTranslationCache(self, self.currentTrackUri);
 					this.saveLocalLyrics(self, self.currentTrackUri, nextState);
+					const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+					if (unified?.patchUserTrack && self.currentTrackUri) {
+						unified.patchUserTrack(self.currentTrackUri, {
+							lyrics: {
+								synced: nextState.synced,
+								unsynced: nextState.unsynced,
+								karaoke: nextState.karaoke,
+								genius: nextState.genius,
+								provider: "local",
+								language: detectedLanguage,
+								updatedAt: Date.now(),
+							},
+						}).catch(() => {});
+					}
 				});
 				Spicetify.showNotification("✓ " + getText("notifications.loadedLyricsFromFile", { types: parsedKeys.join(", ") }), false, 3000);
 			} catch (e) {

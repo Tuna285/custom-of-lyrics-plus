@@ -559,6 +559,31 @@ const GeminiClient = {
      * Warns only on genuine capability mismatch: user wants "off" on a model whose thinking
      * cannot be disabled at runtime (e.g. Claude thinking models, DeepSeek-reasoner).
      */
+    /**
+     * Resolve effective Google Gemini (OpenAI-compat) `reasoning_effort` and whether
+     * thinking tokens stay active, matching Google's per-model support matrix:
+     *   - Gemini 2.5 Flash / Flash-Lite: "none" disables thinking.
+     *   - Gemini 3.0–3.6 Flash / Flash-Lite: "minimal" is the lowest supported level ("none" unsupported).
+     *   - Gemini 3.7+ / 4.x / Pro models: "minimal" and "none" error; floor is "low".
+     */
+    resolveGoogleGeminiReasoningEffort(model, effort) {
+        const m = String(model || "").toLowerCase();
+        if (effort !== "off") {
+            return { apiEffort: effort, applied: true, isThinkingActive: true };
+        }
+        const isPro = /-pro(?:[^\w]|$)/.test(m);
+        if (!isPro && /gemini-2\.5/.test(m)) {
+            return { apiEffort: "none", applied: true, isThinkingActive: false };
+        }
+        if (!isPro && /gemini-3(?:\.[0-6])?(?:[^\d.]|$)/.test(m)) {
+            return { apiEffort: "minimal", applied: true, isThinkingActive: false };
+        }
+        if (isPro || /gemini-(?:3\.[7-9]|3\.\d{2,}|[4-9])/.test(m)) {
+            return { apiEffort: "low", applied: false, isThinkingActive: true };
+        }
+        return { apiEffort: null, applied: true, isThinkingActive: false };
+    },
+
     applyReasoningEffort(body, endpoint, model, effort, silent = false) {
         if (!body || typeof body !== "object") return body;
         if (!effort || effort === "default") return body;
@@ -575,26 +600,20 @@ const GeminiClient = {
         // ── Google Gemini (OpenAI-compat or Vertex) ──────────────────────────
         if (url.includes("generativelanguage.googleapis.com") || url.includes("aiplatform.googleapis.com")) {
             // Three classes on Google's endpoint:
-            //   1) Gemini 2.5+ / 3.x / thinking-exp — supports `thinking_config.thinking_budget`
-            //      via extra_body (Gemini-only native field).
-            //   2) Gemma 4 (26B MoE + 31B dense) — both think natively. Since ~May 2026,
-            //      JSON schema mode no longer implicitly suppresses thinking server-side.
-            //      Use top-level `reasoning_effort` (OpenAI compat) to control.
+            //   1) Gemini 2.5+ / 3.x / 4.x / thinking-exp — mapped via top-level `reasoning_effort`
+            //      respecting per-generation minimum levels (`none` vs `minimal` vs `low`).
+            //   2) Gemma 4 (26B MoE + 31B dense) — both think natively and reject thinking params.
             //   3) Gemma 1/2/3, older Gemini — no thinking at all.
             const isGeminiWithBudget = /gemini-(2\.5|[3-9])|flash-thinking|thinking-exp/.test(m);
             const isGemma4 = /gemma-4/.test(m);
             if (isGeminiWithBudget) {
-                // Google's OpenAI-compatible endpoint:
-                // Only Gemini 3.7+ accepts top-level reasoning_effort: "none". Older/other models throw HTTP 400.
-                if (effort === "off") {
-                    if (/gemini-(?:3\.[7-9]|[4-9])/.test(m)) {
-                        body.reasoning_effort = "none";
-                    } else {
-                        delete body.reasoning_effort;
-                    }
+                const resolved = this.resolveGoogleGeminiReasoningEffort(m, effort);
+                if (resolved.apiEffort) {
+                    body.reasoning_effort = resolved.apiEffort;
                 } else {
-                    body.reasoning_effort = effort;
+                    delete body.reasoning_effort;
                 }
+                applied = resolved.applied;
             } else if (isGemma4) {
                 // Gemma 4 (26B + 31B) thinks natively via <|think|> chat template token.
                 // Google's hosted API does NOT accept reasoning_effort or thinking_config
@@ -1084,20 +1103,22 @@ const GeminiClient = {
         const ep = (endpoint || "").toLowerCase();
         const m = (model || "").toLowerCase();
         const isGoogle = ep.includes("generativelanguage.googleapis.com");
+        const isGoogleEndpoint = isGoogle || ep.includes("aiplatform.googleapis.com");
         const supportsSystemRole = !(isGoogle && /^gemma-[123](?:[^\d]|$)/.test(m));
         const isGemma4Google = isGoogle && /^gemma-4(?:[^\d]|$)/.test(m);
         const isGeminiWithBudget = /gemini-(2\.5|[3-9])|flash-thinking|thinking-exp/.test(m);
 
-        // Phonetic tasks (Furigana / Romaji / Pinyin) are mechanical transcriptions:
-        // force "off" (unless Gemma 4 on Google API which forces native thinking tokens)
-        // so the prompt skips <thought> deliberation and the API suppresses thinking tokens.
-        const reasoningEffort = wantSmartPhonetic
-            ? (isGemma4Google ? "low" : "off")
-            : configuredEffort;
+        // Apply global reasoning-effort setting uniformly to both translation and phonetic models.
+        const reasoningEffort = configuredEffort;
+        const googlePlan = (isGoogleEndpoint && isGeminiWithBudget)
+            ? this.resolveGoogleGeminiReasoningEffort(m, reasoningEffort)
+            : null;
 
         // A model is thinking if it's Gemma 4 (forced thinking on Google API) OR
-        // if it's Gemini with thinking budget and reasoning effort is not "off".
-        const isThinkingActive = isGemma4Google || (isGeminiWithBudget && reasoningEffort !== "off");
+        // if its thinking budget stays active at the resolved effort level.
+        const isThinkingActive = isGemma4Google || (isGeminiWithBudget && (googlePlan ? googlePlan.isThinkingActive : reasoningEffort !== "off"));
+        // Keep prompt rules aligned when a model cannot turn thinking off (Gemma 4, Gemini 3.7+/4/Pro).
+        const promptEffort = (reasoningEffort === "off" && isThinkingActive) ? "low" : reasoningEffort;
 
         // Calculate max_tokens budget. If the model is actively thinking, the reasoning block
         // will consume thousands of tokens. We must dynamically scale the token budget based
@@ -1105,9 +1126,8 @@ const GeminiClient = {
         // and cap it at 16000 (standard provider maximum).
         let tokens = this.estimateMaxTokens(lineCount, wantSmartPhonetic, wantFurigana);
         if (isThinkingActive) {
-            const budgetOffset = reasoningEffort === "off" ? 0 
-                               : reasoningEffort === "low" ? 512 
-                               : reasoningEffort === "medium" ? 2048 
+            const budgetOffset = (reasoningEffort === "off" || reasoningEffort === "low") ? 512
+                               : reasoningEffort === "medium" ? 2048
                                : 8192;
             tokens = Math.min(16000, Math.max(tokens + budgetOffset, 6144));
         }
@@ -1121,9 +1141,9 @@ const GeminiClient = {
                     user: Prompts.buildMinimalFallbackPrompt({ artist, title, text, wantSmartPhonetic, wantFurigana, targetLang })
                 };
             } else if (wantSmartPhonetic) {
-                prompt = Prompts.buildJsonSchemaPhoneticPrompt({ artist, title, text, wantFurigana, reasoningEffort });
+                prompt = Prompts.buildJsonSchemaPhoneticPrompt({ artist, title, text, wantFurigana, reasoningEffort: promptEffort });
             } else {
-                prompt = Prompts.buildJsonSchemaTranslationPrompt({ artist, title, text, styleKey, pronounKey, reasoningEffort, targetLang, trackMetadata });
+                prompt = Prompts.buildJsonSchemaTranslationPrompt({ artist, title, text, styleKey, pronounKey, reasoningEffort: promptEffort, targetLang, trackMetadata });
             }
 
             body = {
@@ -1145,7 +1165,7 @@ const GeminiClient = {
                     user: Prompts.buildMinimalFallbackTagsPrompt({ artist, title, text, wantSmartPhonetic, wantFurigana, targetLang })
                 };
             } else {
-                prompt = Prompts.buildPromptEngPrompt({ artist, title, text, styleKey, pronounKey, wantSmartPhonetic, wantFurigana, reasoningEffort, targetLang, trackMetadata });
+                prompt = Prompts.buildPromptEngPrompt({ artist, title, text, styleKey, pronounKey, wantSmartPhonetic, wantFurigana, reasoningEffort: promptEffort, targetLang, trackMetadata });
             }
 
             let msgs = [];
@@ -1172,11 +1192,8 @@ const GeminiClient = {
             };
         }
 
-        // Apply provider-specific reasoning-effort flags (already read above to feed the prompt).
-        // For phonetic tasks, pass "off" silently so thinking models disable deliberation where supported.
-        if (wantSmartPhonetic) {
-            this.applyReasoningEffort(body, endpoint, model, "off", true);
-        } else if (reasoningEffort !== "default") {
+        // Apply provider-specific reasoning-effort flags uniformly from global setting.
+        if (reasoningEffort !== "default") {
             this.applyReasoningEffort(body, endpoint, model, reasoningEffort, false);
         }
 

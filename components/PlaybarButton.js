@@ -18,7 +18,7 @@
 
 	const style = document.createElement("style");
 	style.innerHTML = `
-		.main-nowPlayingBar-lyricsButton {
+		.main-nowPlayingBar-lyricsButton, [data-testid="now-playing-bar"] [data-testid="lyrics-button"] {
 			display: none !important;
 		}
 		li[data-id="/lyrics-plus"] {

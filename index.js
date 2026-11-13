@@ -197,8 +197,12 @@ class LyricsContainer extends react.Component {
 			duration: Number(meta.duration),
 			album: meta.album_title,
 			artist: meta.artist_name,
+			artists: Object.entries(meta)
+				.filter(([key]) => /^artist_name(?::\d+)?$/.test(key))
+				.map(([, name]) => name),
 			title: meta.title,
 			uri: track.uri,
+			isrc: meta.isrc || track.external_ids?.isrc,
 			image: meta.image_url,
 			year: year || null,
 			isExplicit: !!isExplicit,
@@ -519,6 +523,11 @@ class LyricsContainer extends react.Component {
 		}
 		this.currentTrackInfo = info;
 
+		const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+		if (unified?.ready) {
+			await unified.ready();
+		}
+
 		// Update track-scoped pronoun mode: default to 'default' (Auto) unless user saved a custom choice for this track
 		const TrackSettings = window.LyricsPlus?.TrackSettings || window.TrackSettings;
 		if (TrackSettings && info.uri) {
@@ -536,9 +545,17 @@ class LyricsContainer extends react.Component {
 		this.fetchVideoBackground(info);
 
 		let tempState;
-		// 1. Check RAM cache first
+		// 0. Always check permanent user_tracks first (survives Clear Cache & updates)
 		let cachedLyrics = null;
-		if (!refresh) {
+		const userTrack = !refresh && info.uri ? unified?.getUserTrackSync?.(info.uri) : null;
+		if (userTrack?.lyrics && (userTrack.lyrics.synced || userTrack.lyrics.unsynced || userTrack.lyrics.karaoke || userTrack.lyrics.genius)) {
+			cachedLyrics = userTrack.lyrics;
+			CACHE[info.uri] = { ...CACHE[info.uri], ...userTrack.lyrics, uri: info.uri };
+			isCached = true;
+		}
+
+		// 1. Check RAM cache next
+		if (!cachedLyrics && !refresh) {
 			cachedLyrics = (mode === -1 ? CACHE[info.uri] : CACHE[info.uri]?.[CONFIG.modes?.[mode]]) ? CACHE[info.uri] : null;
 
 			// In Auto Mode (mode === -1): if cached RAM lyrics are unsynced-only and never verified across all providers,
@@ -547,7 +564,7 @@ class LyricsContainer extends react.Component {
 				cachedLyrics = null;
 			}
 
-			// 2. If RAM cache missed, check IndexedDB (DBManager) before showing loader or fetching from network
+			// 2. If RAM cache missed, check IndexedDB (DBManager -> lyrics-cache) before showing loader or fetching from network
 			if (!cachedLyrics && typeof DBManager !== "undefined" && info.uri) {
 				try {
 					const dbData = await DBManager.get(info.uri);
@@ -589,17 +606,9 @@ class LyricsContainer extends react.Component {
 				// Cache lyrics in RAM
 				CACHE[resp.uri] = resp;
 
-				// Auto-persist lyrics to IndexedDB for instant 0ms offline/subsequent playback
+				// Auto-persist lyrics to IndexedDB (lyrics-cache) for instant offline playback
 				if (typeof DBManager !== "undefined" && (resp.synced || resp.unsynced || resp.karaoke || resp.genius)) {
 					DBManager.set(resp.uri, resp).catch((e) => console.warn("[Lyrics+] Auto-persist to DBManager failed:", e));
-					try {
-						const cachedUris = JSON.parse(localStorage.getItem(`${APP_NAME}:cached-uris`) || "[]");
-						if (!cachedUris.includes(resp.uri)) {
-							cachedUris.push(resp.uri);
-							if (cachedUris.length > 500) cachedUris.shift();
-							localStorage.setItem(`${APP_NAME}:cached-uris`, JSON.stringify(cachedUris));
-						}
-					} catch (_) {}
 				}
 			}
 
@@ -661,14 +670,16 @@ class LyricsContainer extends react.Component {
 			}
 		}
 
+		const newLyrics = tempState.synced || tempState.unsynced || tempState.genius || [];
+		const defaultLanguage = Utils.detectLanguage(newLyrics);
+		tempState.language = defaultLanguage;
+
 		this.lyricsSource(tempState, finalMode);
 
 		// if song changed one time
 		if (tempState.uri !== this.state.uri || refresh) {
 			// when a song starts for the first time and language-override is selected, the lyrics are converted to the specified language.
 			// however, when switching it off again, the detected language needs to be known, so defaultLanguage has been introduced.
-			const newLyrics = tempState.synced || tempState.unsynced || tempState.genius || [];
-			const defaultLanguage = Utils.detectLanguage(newLyrics);
 			const language =
 				CONFIG.visual["translate:detect-language-override"] !== "off" ? CONFIG.visual["translate:detect-language-override"] : defaultLanguage;
 			const friendlyLanguage = language && new Intl.DisplayNames(["en"], { type: "language" }).of(language.split("-")[0])?.toLowerCase();
@@ -726,7 +737,7 @@ class LyricsContainer extends react.Component {
 			? this.state.currentLyrics
 			: tempState.currentLyrics;
 
-		this.setState({ ...tempState, currentLyrics: currentLyricsToApply, ...translationOverrides }, () => {
+		this.setState({ ...tempState, currentLyrics: currentLyricsToApply, ...translationOverrides, language: defaultLanguage }, () => {
 			this.currentMusixmatchLanguage = CONFIG.visual["musixmatch-translation-language"];
 			if (shouldRefreshMusixmatchTranslation) {
 				this.refreshMusixmatchTranslation();
@@ -806,10 +817,7 @@ class LyricsContainer extends react.Component {
 		if (CONFIG.visual["translate:detect-language-override"] !== "off") {
 			return CONFIG.visual["translate:detect-language-override"];
 		}
-		if (this.state.language) {
-			return this.state.language;
-		}
-		return Utils.detectLanguage(lyrics);
+		return Utils.detectLanguage(lyrics) || this.state.language;
 	}
 
 	async translateLyrics(language, lyrics, targetConvert) {
@@ -900,7 +908,13 @@ class LyricsContainer extends react.Component {
 	}
 
 	resetDelay() {
-		CONFIG.visual.delay = Number(localStorage.getItem(`lyrics-delay:${Spicetify.Player.data.item.uri}`)) || 0;
+		const uri = Spicetify.Player?.data?.item?.uri;
+		const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+		if (uri && unified?.getTrackDelaySync) {
+			CONFIG.visual.delay = unified.getTrackDelaySync(uri);
+			return;
+		}
+		CONFIG.visual.delay = (uri ? Number(localStorage.getItem(`lyrics-delay:${uri}`)) : 0) || 0;
 	}
 
 	async onVersionChange(items, index) {
@@ -945,40 +959,38 @@ class LyricsContainer extends react.Component {
 			lyrics.genius = null;
 		}
 
-		const localLyrics = JSON.parse(localStorage.getItem(`${APP_NAME}:local-lyrics`)) || {};
-		localLyrics[uri] = lyrics;
-		localStorage.setItem(`${APP_NAME}:local-lyrics`, JSON.stringify(localLyrics));
+		const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+		const meta = this.currentTrackInfo ? { title: this.currentTrackInfo.title, artist: this.currentTrackInfo.artist } : null;
+		if (unified?.patchUserTrack) {
+			unified.patchUserTrack(uri, {
+				lyrics: { ...lyrics, updatedAt: Date.now() },
+				...(meta ? { meta } : {}),
+			}).catch((e) => console.warn("[Lyrics+] Failed to save to UnifiedDB:", e));
+		} else {
+			const localLyrics = JSON.parse(localStorage.getItem(`${APP_NAME}:local-lyrics`)) || {};
+			localLyrics[uri] = lyrics;
+			localStorage.setItem(`${APP_NAME}:local-lyrics`, JSON.stringify(localLyrics));
+		}
 
 		if (typeof DBManager !== "undefined") {
 			DBManager.set(uri, lyrics).catch((e) => console.warn("[Lyrics+] Failed to save to DBManager:", e));
-			try {
-				const cachedUris = JSON.parse(localStorage.getItem(`${APP_NAME}:cached-uris`) || "[]");
-				if (!cachedUris.includes(uri)) {
-					cachedUris.push(uri);
-					if (cachedUris.length > 500) cachedUris.shift();
-					localStorage.setItem(`${APP_NAME}:cached-uris`, JSON.stringify(cachedUris));
-				}
-			} catch (_) {}
 		}
 
 		this.setState({ isCached: true });
 	}
 
 	deleteLocalLyrics(uri) {
-		const localLyrics = JSON.parse(localStorage.getItem(`${APP_NAME}:local-lyrics`)) || {};
-		delete localLyrics[uri];
-		localStorage.setItem(`${APP_NAME}:local-lyrics`, JSON.stringify(localLyrics));
+		const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+		if (unified?.patchUserTrack) {
+			unified.patchUserTrack(uri, { lyrics: null }).catch((e) => console.warn("[Lyrics+] Failed to delete from UnifiedDB:", e));
+		} else {
+			const localLyrics = JSON.parse(localStorage.getItem(`${APP_NAME}:local-lyrics`)) || {};
+			delete localLyrics[uri];
+			localStorage.setItem(`${APP_NAME}:local-lyrics`, JSON.stringify(localLyrics));
+		}
 
 		if (typeof DBManager !== "undefined") {
 			DBManager.delete(uri).catch((e) => console.warn("[Lyrics+] Failed to delete from DBManager:", e));
-			try {
-				const cachedUris = JSON.parse(localStorage.getItem(`${APP_NAME}:cached-uris`) || "[]");
-				const idx = cachedUris.indexOf(uri);
-				if (idx > -1) {
-					cachedUris.splice(idx, 1);
-					localStorage.setItem(`${APP_NAME}:cached-uris`, JSON.stringify(cachedUris));
-				}
-			} catch (_) {}
 		}
 
 		if (CACHE[uri]) {
@@ -990,14 +1002,286 @@ class LyricsContainer extends react.Component {
 
 	lyricsSaved(uri) {
 		if (!uri) return false;
-		const localLyrics = JSON.parse(localStorage.getItem(`${APP_NAME}:local-lyrics`)) || {};
-		if (localLyrics[uri]) return true;
-		try {
-			const cachedUris = JSON.parse(localStorage.getItem(`${APP_NAME}:cached-uris`) || "[]");
-			return cachedUris.includes(uri);
-		} catch (_) {
-			return false;
+		const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+		const rec = unified?.getUserTrackSync?.(uri);
+		if (rec?.lyrics && (rec.lyrics.synced || rec.lyrics.unsynced || rec.lyrics.karaoke || rec.lyrics.genius)) {
+			return true;
 		}
+		try {
+			const localLyrics = JSON.parse(localStorage.getItem(`${APP_NAME}:local-lyrics`)) || {};
+			if (localLyrics[uri]) return true;
+		} catch (_) {}
+		return false;
+	}
+
+	_getActiveEditorModes(lyricsList) {
+		const lang = this.provideLanguageCode(lyricsList);
+		const friendly = lang && new Intl.DisplayNames(["en"], { type: "language" }).of(lang.split("-")[0])?.toLowerCase();
+		const modeKey = friendly || "gemini";
+		const mode1 = CONFIG.visual[`translation-mode:${modeKey}`] || ConfigUtils.getPersisted(`lyrics-plus:visual:translation-mode:${modeKey}`) || "none";
+		const mode2 = CONFIG.visual[`translation-mode-2:${modeKey}`] || ConfigUtils.getPersisted(`lyrics-plus:visual:translation-mode-2:${modeKey}`) || "none";
+		const getModeName = (m) => {
+			if (!m || m === "none") return "";
+			if (window.LyricsPlus?.getDisplayModeOptionLabel) {
+				return window.LyricsPlus.getDisplayModeOptionLabel(m, friendly);
+			}
+			return m;
+		};
+		return {
+			mode1,
+			mode2,
+			mode1Label: getModeName(mode1),
+			mode2Label: getModeName(mode2),
+			targetLang: CONFIG.visual["translate:target-language"] || "vi",
+		};
+	}
+
+	async handleInlineLineSave({
+		trackUri,
+		rawIndex,
+		origText,
+		prevOrigText,
+		mode1,
+		mode1Text,
+		prevMode1Text,
+		mode2,
+		mode2Text,
+		prevMode2Text,
+		targetLang,
+	}) {
+		if (!trackUri || typeof rawIndex !== "number" || rawIndex < 0) return;
+		const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+		const meta = this.currentTrackInfo ? { title: this.currentTrackInfo.title, artist: this.currentTrackInfo.artist } : null;
+		const baseList = this.state.synced || this.state.unsynced || this.state.currentLyrics || [];
+		const lineCount = baseList.length;
+
+		let updatedSynced = this.state.synced ? [...this.state.synced] : null;
+		let updatedUnsynced = this.state.unsynced ? [...this.state.unsynced] : null;
+		let lyricsChanged = origText !== prevOrigText;
+
+		if (lyricsChanged) {
+			if (updatedSynced?.[rawIndex]) {
+				updatedSynced[rawIndex] = { ...updatedSynced[rawIndex], text: origText || "♪", originalText: origText || "♪" };
+			}
+			if (updatedUnsynced?.[rawIndex]) {
+				updatedUnsynced[rawIndex] = { ...updatedUnsynced[rawIndex], text: origText || "♪", originalText: origText || "♪" };
+			}
+			const nextLyricsData = {
+				synced: updatedSynced,
+				unsynced: updatedUnsynced,
+				karaoke: this.state.karaoke,
+				genius: this.state.genius,
+				provider: this.state.provider || "Custom",
+				copyright: this.state.copyright || "",
+				language: this.state.language || Utils.detectLanguage(updatedSynced || updatedUnsynced),
+				_manualSelected: true,
+				updatedAt: Date.now(),
+			};
+			if (unified?.patchUserTrack) {
+				await unified.patchUserTrack(trackUri, { lyrics: nextLyricsData, ...(meta ? { meta } : {}) });
+			}
+			if (typeof DBManager !== "undefined") {
+				DBManager.set(trackUri, nextLyricsData).catch(() => {});
+			}
+			CACHE[trackUri] = { ...CACHE[trackUri], ...nextLyricsData };
+		}
+
+		this._dmResults = this._dmResults || {};
+		this._dmResults[trackUri] = this._dmResults[trackUri] || {};
+
+		const patchModeSlot = async (mode, newText, oldText) => {
+			if (!mode || mode === "none" || newText === oldText) return;
+			if (unified?.setModeLineOverride) {
+				await unified.setModeLineOverride(trackUri, mode, targetLang, rawIndex, newText, lineCount, meta);
+			}
+			const currentArr = this._dmResults[trackUri][mode]
+				? [...this._dmResults[trackUri][mode]]
+				: baseList.map((l) => ({ ...l, originalText: l.text }));
+			const targetItem = currentArr[rawIndex] || baseList[rawIndex] || {};
+			currentArr[rawIndex] = {
+				...targetItem,
+				originalText: origText || targetItem.originalText || baseList[rawIndex]?.text || "",
+				text: newText,
+				_userEdited: true,
+			};
+			this._dmResults[trackUri][mode] = currentArr;
+		};
+
+		await patchModeSlot(mode1, mode1Text, prevMode1Text);
+		if (mode2 && mode2 !== mode1) {
+			await patchModeSlot(mode2, mode2Text, prevMode2Text);
+		}
+
+		const nextBase = updatedSynced || updatedUnsynced || this.state.currentLyrics || [];
+		const activeMode1 = mode1 && mode1 !== "none" ? this._dmResults[trackUri][mode1] : null;
+		const activeMode2 = mode2 && mode2 !== "none" && mode2 !== mode1 ? this._dmResults[trackUri][mode2] : null;
+		const nextCurrentLyrics = TranslationUtils.optimizeTranslations(nextBase, activeMode1, activeMode2, false);
+
+		this.setState({
+			...(lyricsChanged ? { synced: updatedSynced, unsynced: updatedUnsynced, isCached: true } : {}),
+			currentLyrics: Array.isArray(nextCurrentLyrics) ? nextCurrentLyrics : nextBase,
+		});
+		Spicetify.showNotification(`✓ ${getText("notifications.editSaved", {}, "Đã lưu chỉnh sửa vĩnh viễn")}`, false, 2000);
+	}
+
+	async handleRevertLineOverrides({ trackUri, rawIndex, mode1, mode2, targetLang }) {
+		if (!trackUri || typeof rawIndex !== "number") return;
+		const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+		if (mode1 && mode1 !== "none") {
+			await unified?.removeModeLineOverride?.(trackUri, mode1, targetLang, rawIndex);
+			if (this._dmResults?.[trackUri]) delete this._dmResults[trackUri][mode1];
+		}
+		if (mode2 && mode2 !== "none" && mode2 !== mode1) {
+			await unified?.removeModeLineOverride?.(trackUri, mode2, targetLang, rawIndex);
+			if (this._dmResults?.[trackUri]) delete this._dmResults[trackUri][mode2];
+		}
+		this.lastProcessedUri = null;
+		this.forceUpdate();
+		Spicetify.showNotification(`✓ ${getText("notifications.lineReverted", {}, "Đã khôi phục dòng gốc")}`, false, 2000);
+	}
+
+	openLyricsEditor(focusIndex = null) {
+		const EditorModal = (typeof LyricsEditorModal !== "undefined" && LyricsEditorModal) || window.LyricsPlus?.LyricsEditorModal;
+		if (!EditorModal?.open || !this.currentTrackUri) return;
+
+		const trackUri = this.currentTrackUri;
+		const baseLyrics = this.state.synced || this.state.unsynced || this.state.currentLyrics || [];
+		const { mode1, mode2, mode1Label, mode2Label, targetLang } = this._getActiveEditorModes(baseLyrics);
+		const dm = this._dmResults?.[trackUri] || {};
+		const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+		const userRec = unified?.getUserTrackSync?.(trackUri);
+
+		EditorModal.open({
+			trackUri,
+			trackTitle: this.currentTrackInfo?.title || "",
+			trackArtist: this.currentTrackInfo?.artist || "",
+			provider: this.state.provider || "",
+			baseLyrics,
+			mode1,
+			mode2,
+			mode1Label,
+			mode2Label,
+			mode1List: mode1 && mode1 !== "none" ? dm[mode1] : null,
+			mode2List: mode2 && mode2 !== "none" && mode2 !== mode1 ? dm[mode2] : null,
+			targetLang,
+			hasUserEdits: Boolean(
+				userRec?.lyrics ||
+				(userRec?.translations && Object.keys(userRec.translations).length > 0) ||
+				(userRec?.phonetics && Object.keys(userRec.phonetics).length > 0)
+			),
+			focusIndex,
+			onSave: async ({ payload, initialRows, finalRows }) => {
+				const meta = this.currentTrackInfo ? { title: this.currentTrackInfo.title, artist: this.currentTrackInfo.artist } : null;
+				const origChanged =
+					initialRows.length !== finalRows.length ||
+					initialRows.some((r, i) => r.origText !== finalRows[i]?.origText || r.timeStr !== finalRows[i]?.timeStr);
+				const m1Changed = Boolean(
+					mode1 &&
+					mode1 !== "none" &&
+					(initialRows.length !== finalRows.length || initialRows.some((r, i) => r.mode1Text !== finalRows[i]?.mode1Text)) &&
+					payload.mode1Lines.some((s) => s.trim() !== "")
+				);
+				const m2Changed = Boolean(
+					mode2 &&
+					mode2 !== "none" &&
+					mode2 !== mode1 &&
+					(initialRows.length !== finalRows.length || initialRows.some((r, i) => r.mode2Text !== finalRows[i]?.mode2Text)) &&
+					payload.mode2Lines.some((s) => s.trim() !== "")
+				);
+
+				let nextSynced = this.state.synced;
+				let nextUnsynced = this.state.unsynced;
+				let nextProvider = this.state.provider;
+
+				if (origChanged) {
+					nextSynced = payload.synced;
+					nextUnsynced = payload.unsynced;
+					nextProvider = this.state.provider && this.state.provider !== "Custom" ? this.state.provider : "Custom";
+					const detectedLang = Utils.detectLanguage(nextSynced || nextUnsynced);
+					const nextLyricsData = {
+						synced: nextSynced,
+						unsynced: nextUnsynced,
+						karaoke: null,
+						genius: null,
+						provider: nextProvider,
+						copyright: this.state.copyright || "",
+						language: detectedLang,
+						_manualSelected: true,
+						updatedAt: Date.now(),
+					};
+					if (unified?.patchUserTrack) {
+						await unified.patchUserTrack(trackUri, { lyrics: nextLyricsData, ...(meta ? { meta } : {}) });
+					}
+					if (typeof DBManager !== "undefined") {
+						DBManager.set(trackUri, nextLyricsData).catch(() => {});
+					}
+					CACHE[trackUri] = { ...CACHE[trackUri], ...nextLyricsData };
+				}
+
+				this._dmResults = this._dmResults || {};
+				this._dmResults[trackUri] = this._dmResults[trackUri] || {};
+				const nextBase = nextSynced || nextUnsynced || [];
+
+				const applyEditedMode = async (m, linesArr) => {
+					if (unified?.setModeFullOverrides) {
+						await unified.setModeFullOverrides(trackUri, m, targetLang, linesArr, meta);
+					}
+					this._dmResults[trackUri][m] = nextBase.map((line, i) => ({
+						...line,
+						originalText: line?.text || "",
+						text: linesArr[i] || line?.text || "",
+						_userEdited: true,
+					}));
+				};
+
+				if (m1Changed) {
+					await applyEditedMode(mode1, payload.mode1Lines);
+				} else if (origChanged && initialRows.length !== finalRows.length && mode1 && mode1 !== "none") {
+					await unified?.clearModeOverrides?.(trackUri, mode1, targetLang);
+					delete this._dmResults[trackUri][mode1];
+					if (typeof this.resetTranslationCache === "function") {
+						await this.resetTranslationCache(trackUri, [mode1]);
+					}
+				}
+
+				if (m2Changed) {
+					await applyEditedMode(mode2, payload.mode2Lines);
+				} else if (origChanged && initialRows.length !== finalRows.length && mode2 && mode2 !== "none" && mode2 !== mode1) {
+					await unified?.clearModeOverrides?.(trackUri, mode2, targetLang);
+					delete this._dmResults[trackUri][mode2];
+					if (typeof this.resetTranslationCache === "function") {
+						await this.resetTranslationCache(trackUri, [mode2]);
+					}
+				}
+
+				const finalM1 = mode1 && mode1 !== "none" ? this._dmResults[trackUri][mode1] : null;
+				const finalM2 = mode2 && mode2 !== "none" && mode2 !== mode1 ? this._dmResults[trackUri][mode2] : null;
+				const combined = TranslationUtils.optimizeTranslations(nextBase, finalM1, finalM2, false);
+				const nextMode = nextSynced ? SYNCED : UNSYNCED;
+				this.state.explicitMode = nextMode;
+				this.lastProcessedUri = null;
+
+				this.setState({
+					...(origChanged ? { synced: nextSynced, unsynced: nextUnsynced, karaoke: null, provider: nextProvider, isCached: true, mode: nextMode } : {}),
+					currentLyrics: Array.isArray(combined) ? combined : nextBase,
+				});
+				Spicetify.showNotification(`✓ ${getText("notifications.editSaved", {}, "Đã lưu chỉnh sửa vĩnh viễn")}`, false, 2000);
+			},
+			onReset: async (uri) => {
+				if (unified?.patchUserTrack) {
+					await unified.patchUserTrack(uri, { lyrics: null, translations: {}, phonetics: {} });
+				}
+				if (typeof DBManager !== "undefined") {
+					await DBManager.delete(uri).catch(() => {});
+				}
+				delete CACHE[uri];
+				if (this._dmResults) delete this._dmResults[uri];
+				if (Spicetify.Player?.data?.item) {
+					this.fetchLyrics(Spicetify.Player.data.item, -1, true);
+				}
+				Spicetify.showNotification(`✓ ${getText("notifications.trackEditsReset", {}, "Đã khôi phục bản gốc")}`, false, 2000);
+			},
+		});
 	}
 
 	processLyricsFromFile(event) {
@@ -1067,7 +1351,10 @@ class LyricsContainer extends react.Component {
 		};
 
 		this.viewPort =
-			document.querySelector(".Root__main-view .os-viewport") ?? document.querySelector(".Root__main-view .main-view-container__scroll-node");
+			document.querySelector(".main-view-container .os-viewport") ??
+			document.querySelector(".main-view-container__scroll-node") ??
+			document.querySelector(".Root__main-view .os-viewport") ??
+			document.querySelector(".Root__main-view .main-view-container__scroll-node");
 
 		this.configButton = new Spicetify.Menu.Item("Lyrics Plus config", false, openConfig, "lyrics");
 		this.configButton.register();
@@ -1157,6 +1444,7 @@ class LyricsContainer extends react.Component {
 		}
 
 		Utils.loadGoogleFont?.(CONFIG.visual["font-family"]);
+		Utils.syncUiThemeVariables?.(CONFIG.visual);
 
 		this.styleVariables = {
 			...this.styleVariables,
@@ -1278,7 +1566,7 @@ class LyricsContainer extends react.Component {
 		let showTranslationButton;
 
 		this.lyricsSource(this.state, mode);
-		const lang = this.provideLanguageCode(this.state.currentLyrics);
+		const lang = this.provideLanguageCode(this.state.synced || this.state.unsynced || this.state.currentLyrics);
 		const friendlyLanguage = lang && new Intl.DisplayNames(["en"], { type: "language" }).of(lang.split("-")[0])?.toLowerCase();
 		const hasMusixmatchLanguages = Array.isArray(this.state.musixmatchAvailableTranslations) && this.state.musixmatchAvailableTranslations.length > 0;
 		const hasTranslation = this.state.neteaseTranslation !== null || this.state.musixmatchTranslation !== null || hasMusixmatchLanguages;
@@ -1295,6 +1583,7 @@ class LyricsContainer extends react.Component {
 					provider: this.state.provider,
 					copyright: this.state.copyright,
 					reRenderLyricsPage: this.reRenderLyricsPage,
+					onOpenEditor: (idx) => this.openLyricsEditor(idx),
 				});
 			} else if (mode === SYNCED && this.state.synced) {
 				activeItem = react.createElement(CONFIG.visual["synced-compact"] ? SyncedLyricsPage : SyncedExpandedLyricsPage, {
@@ -1303,6 +1592,7 @@ class LyricsContainer extends react.Component {
 					provider: this.state.provider,
 					copyright: this.state.copyright,
 					reRenderLyricsPage: this.reRenderLyricsPage,
+					onOpenEditor: (idx) => this.openLyricsEditor(idx),
 				});
 			} else if (mode === UNSYNCED && this.state.unsynced) {
 				activeItem = react.createElement(UnsyncedLyricsPage, {
@@ -1311,6 +1601,7 @@ class LyricsContainer extends react.Component {
 					provider: this.state.provider,
 					copyright: this.state.copyright,
 					reRenderLyricsPage: this.reRenderLyricsPage,
+					onOpenEditor: (idx) => this.openLyricsEditor(idx),
 				});
 			} else if (mode === GENIUS && this.state.genius) {
 				activeItem = react.createElement(GeniusPage, {
@@ -1450,17 +1741,19 @@ class LyricsContainer extends react.Component {
 												...CACHE[selectedLyrics.uri],
 												...selectedLyrics
 											};
-											// 2. Persist manual selection to IndexedDB (DBManager)
-											if (typeof DBManager !== "undefined" && selectedLyrics.uri) {
-												DBManager.set(selectedLyrics.uri, selectedLyrics).catch((e) => console.warn("[Lyrics+] Failed to save manual selection to DBManager:", e));
-												try {
-													const cachedUris = JSON.parse(localStorage.getItem(`${APP_NAME}:cached-uris`) || "[]");
-													if (!cachedUris.includes(selectedLyrics.uri)) {
-														cachedUris.push(selectedLyrics.uri);
-														if (cachedUris.length > 500) cachedUris.shift();
-														localStorage.setItem(`${APP_NAME}:cached-uris`, JSON.stringify(cachedUris));
-													}
-												} catch (_) {}
+											// 2. Persist manual selection permanently in UnifiedDB (user_tracks) + DBManager (lyrics-cache)
+											if (selectedLyrics.uri) {
+												const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+												const meta = this.currentTrackInfo ? { title: this.currentTrackInfo.title, artist: this.currentTrackInfo.artist } : null;
+												if (unified?.patchUserTrack) {
+													unified.patchUserTrack(selectedLyrics.uri, {
+														lyrics: { ...selectedLyrics, _manualSelected: true, updatedAt: Date.now() },
+														...(meta ? { meta } : {}),
+													}).catch((e) => console.warn("[Lyrics+] Failed to save manual selection to UnifiedDB:", e));
+												}
+												if (typeof DBManager !== "undefined") {
+													DBManager.set(selectedLyrics.uri, selectedLyrics).catch((e) => console.warn("[Lyrics+] Failed to save manual selection to DBManager:", e));
+												}
 											}
 											let finalMode = -1;
 											if (selectedLyrics.karaoke) {
@@ -1474,10 +1767,12 @@ class LyricsContainer extends react.Component {
 											}
 											this.state.explicitMode = finalMode;
 											const newCurrentLyrics = selectedLyrics.synced || selectedLyrics.unsynced || selectedLyrics.genius || null;
+											const detectedLanguage = Array.isArray(newCurrentLyrics) ? Utils.detectLanguage(newCurrentLyrics) : null;
 											this.setState({
 												...emptyState,
 												...selectedLyrics,
 												currentLyrics: newCurrentLyrics,
+												language: detectedLanguage,
 												romaji: null,
 												furigana: null,
 												hiragana: null,
@@ -1725,7 +2020,29 @@ class LyricsContainer extends react.Component {
 							})
 						);
 					})(),
-				// 8. Open Settings modal button (⚙)tton
+				// 7b. Edit Lyrics & Translation Studio button
+				(this.state.synced || this.state.unsynced) &&
+					react.createElement(
+						Spicetify.ReactComponent.TooltipWrapper,
+						{ label: getText("tooltips.editLyrics", {}, "Edit Lyrics & Translation") },
+						react.createElement(
+							"button",
+							{
+								className: "lyrics-config-button",
+								onClick: () => this.openLyricsEditor(null),
+							},
+							react.createElement("svg", {
+								width: 16,
+								height: 16,
+								viewBox: "0 0 16 16",
+								fill: "currentColor",
+								dangerouslySetInnerHTML: {
+									__html: '<path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25a1.75 1.75 0 0 1 .445-.758l8.61-8.61zm1.414 1.06a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354l-1.086-1.086zM11.189 6.25 9.75 4.81l-6.286 6.287a.25.25 0 0 0-.064.108l-.558 1.953 1.953-.558a.25.25 0 0 0 .108-.064l6.286-6.286z"/>',
+								},
+							})
+						)
+					),
+				// 8. Open Settings modal button (⚙)
 				react.createElement(
 					Spicetify.ReactComponent.TooltipWrapper,
 					{

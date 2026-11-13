@@ -73,12 +73,23 @@ const TrackSettings = {
 
     getPronoun(uri) {
         if (!uri) return "default";
+        const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+        if (unified?.getTrackPronounSync) {
+            return unified.getTrackPronounSync(uri);
+        }
         const all = this._getAll();
         return all[uri] || "default";
     },
 
     setPronoun(uri, pronounKey) {
         if (!uri) return;
+        const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+        if (unified?.setTrackPronoun) {
+            unified.setTrackPronoun(uri, pronounKey).catch((e) => {
+                console.warn("[Lyrics+] Failed to save track pronoun to UnifiedDB:", e);
+            });
+            return;
+        }
         const all = this._getAll();
         if (!pronounKey || pronounKey === "default") {
             delete all[uri];
@@ -238,6 +249,12 @@ const CONFIG = {
         "mini-lyrics": ConfigUtils.get("lyrics-plus:visual:mini-lyrics", false),
     },
     providers: {
+        lrcred: {
+            label: "lrc.red",
+            on: ConfigUtils.get("lyrics-plus:provider:lrcred:on"),
+            desc: 'Lyrics from <a href="https://lrc.red" target="_blank" rel="noopener noreferrer">lrc.red</a>. Supports synced and unsynced lyrics.',
+            modes: [SYNCED, UNSYNCED],
+        },
         lrclib: {
             on: ConfigUtils.get("lyrics-plus:provider:lrclib:on"),
             desc: "Lyrics sourced from lrclib.net. Supports both synced and unsynced lyrics. LRCLIB is a free and open-source lyrics provider.",
@@ -297,6 +314,17 @@ try {
         localStorage.setItem("lyrics-plus:services-order", JSON.stringify(CONFIG.providersOrder));
     }
 
+    // Migration for existing users: Ensure lrcred is included ahead of lrclib and turned ON
+    if (!CONFIG.providersOrder.includes("lrcred")) {
+        const idxLrclib = CONFIG.providersOrder.indexOf("lrclib");
+        const idxMxm = CONFIG.providersOrder.indexOf("musixmatch");
+        const insertIdx = idxLrclib !== -1 ? idxLrclib : (idxMxm !== -1 ? idxMxm + 1 : CONFIG.providersOrder.length);
+        CONFIG.providersOrder.splice(insertIdx, 0, "lrcred");
+        CONFIG.providers.lrcred.on = true;
+        localStorage.setItem("lyrics-plus:provider:lrcred:on", "true");
+        localStorage.setItem("lyrics-plus:services-order", JSON.stringify(CONFIG.providersOrder));
+    }
+
     // Catch any other missing providers
     const missing = Object.keys(CONFIG.providers).filter(p => !CONFIG.providersOrder.includes(p));
     if (missing.length > 0) {
@@ -305,7 +333,7 @@ try {
     }
 } catch {
     // Default order for new users (lrclib ahead of netease to minimize Cloudflare proxy usage)
-    CONFIG.providersOrder = ["spotify", "musixmatch", "lrclib", "netease", "local"];
+    CONFIG.providersOrder = ["spotify", "musixmatch", "lrcred", "lrclib", "netease", "local"];
     
     // Ensure all providers are turned ON by default for new users
     Object.keys(CONFIG.providers).forEach(p => {

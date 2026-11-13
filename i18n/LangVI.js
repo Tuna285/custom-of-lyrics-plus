@@ -39,6 +39,7 @@ window.LANG_VI = {
     "generalBackground": "Nền chung",
     "appearanceColors": "Màu sắc Giao diện",
     "appearanceButton": "Kiểu Nút",
+    "backupAndStorage": "Sao lưu & Dữ liệu cá nhân",
     "aboutAndUpdates": "Thông tin & Cập nhật"
   },
   "settings": {
@@ -234,7 +235,15 @@ window.LANG_VI = {
     },
     "usingThemeColor": "Dùng màu mặc định của Theme",
     "checkForUpdates": "Kiểm tra cập nhật",
-    "updateAppSubtitle": "Dịch lời bài hát AI & Video nền"
+    "updateAppSubtitle": "Dịch lời bài hát AI & Video nền",
+    "backup": {
+      "permanentTracks": "Bài đã chỉnh sửa / lưu vĩnh viễn",
+      "cachedEntries": "Mục cache AI & lời bài hát",
+      "exportBtn": "Xuất sao lưu (.json)",
+      "importBtn": "Nhập sao lưu (.json)",
+      "wipeBtn": "Xóa dữ liệu cá nhân",
+      "confirmWipeBtn": "Bấm lại để xác nhận xóa"
+    }
   },
   "buttons": {
     "clearCache": "Xóa Cache đã lưu",
@@ -289,7 +298,20 @@ window.LANG_VI = {
     "installCommandCopied": "Đã sao chép lệnh cài đặt! Dán vào PowerShell",
     "updateSkipped": "Đã bỏ qua cập nhật",
     "updateAvailable": "Lyrics Plus v{version} đã có sẵn! Bấm để cập nhật",
-    "upToDate": "Bạn đang sử dụng phiên bản mới nhất (v{version})!"
+    "upToDate": "Bạn đang sử dụng phiên bản mới nhất (v{version})!",
+    "lineCopied": "Đã chép dòng lời",
+    "translationLineCopied": "Đã chép dòng dịch",
+    "bilingualLineCopied": "Đã chép dòng song ngữ",
+    "lrcCopied": "Đã chép định dạng LRC vào clipboard",
+    "editSaved": "Đã lưu chỉnh sửa vĩnh viễn",
+    "lineReverted": "Đã khôi phục dòng mặc định",
+    "trackEditsReset": "Đã khôi phục toàn bộ bản gốc bài hát",
+    "saveFailed": "Lưu chỉnh sửa thất bại",
+    "backupExported": "Đã xuất sao lưu ({count} bài hát)",
+    "backupImported": "Đã khôi phục {count} bài hát từ sao lưu",
+    "backupFailed": "Xuất sao lưu thất bại",
+    "backupInvalid": "File sao lưu không hợp lệ",
+    "personalDataCleared": "Đã xóa toàn bộ dữ liệu cá nhân"
   },
   "contextMenu": {
     "provider": "Nguồn dịch",
@@ -347,9 +369,22 @@ window.LANG_VI = {
       "toi_em": "Tôi - Em",
       "ta_nguoi": "Ta - Người",
       "tao_may": "Tao - Mày"
-    }
+    },
+    "editLineTitle": "Chỉnh sửa dòng",
+    "editThisLine": "Chỉnh sửa dòng này",
+    "copyHeader": "Sao chép",
+    "scopeLine": "Dòng này",
+    "scopeAll": "Toàn bài",
+    "copyOriginal": "Lời gốc",
+    "copyAllDisplayed": "Tất cả đang hiển thị",
+    "copyLrc": "Định dạng .LRC",
+    "openFullEditor": "Chỉnh sửa toàn bộ lời & bản dịch",
+    "revertLine": "Khôi phục AI",
+    "cancel": "Hủy",
+    "save": "Lưu"
   },
   "tooltips": {
+    "editLyrics": "Chỉnh sửa Lời & Bản dịch",
     "conversion": "Chuyển đổi",
     "adjustments": "Tinh chỉnh",
     "videoSettings": "Cài đặt Video",
@@ -371,6 +406,7 @@ window.LANG_VI = {
   },
   "providers": {
     "local": { "name": "local", "desc": "Cung cấp lời bài hát từ cache/tệp cục bộ đã tải ở các phiên Spotify trước." },
+    "lrcred": { "name": "lrc.red", "desc": "Lời bài hát từ <a href=\"https://lrc.red\" target=\"_blank\" rel=\"noopener noreferrer\">lrc.red</a>. Hỗ trợ synced và unsynced." },
     "musixmatch": { "name": "musixmatch", "desc": "Tương thích đầy đủ với Spotify. Cần token từ ứng dụng Musixmatch chính thức. Nếu lỗi tải lời, hãy bấm <code>Refresh token</code>. Có thể cần CORS proxy." },
     "lrclib": { "name": "lrclib", "desc": "Lời bài hát từ lrclib.net. Hỗ trợ cả synced và unsynced, miễn phí và mã nguồn mở." },
     "spotify": { "name": "spotify", "desc": "Lời bài hát từ Spotify API chính thức." },
@@ -436,5 +472,26 @@ window.LANG_VI = {
     "changelog": "Xem Chi Tiết",
     "skipVersion": "Bỏ Qua Bản Này",
     "later": "Để Sau"
+  },
+  "editorModal": {
+    "title": "Chỉnh sửa Lời & Bản dịch",
+    "untitled": "Bài hát hiện tại",
+    "rowMode": "Từng dòng",
+    "rawLrcMode": "Raw LRC",
+    "timeColumn": "Thời gian",
+    "originalColumn": "Lời gốc",
+    "originalPlaceholder": "Lời bài hát...",
+    "snapTimeTooltip": "Gán mốc thời gian đang phát",
+    "seekToLine": "Phát thử từ dòng này",
+    "insertRow": "Thêm dòng bên dưới",
+    "deleteRow": "Xóa dòng",
+    "addLine": "+ Thêm dòng",
+    "resetTrackEdits": "Khôi phục bản gốc",
+    "confirmReset": "Bấm lại để khôi phục mặc định",
+    "lineCount": "{count} dòng",
+    "saving": "Đang lưu...",
+    "savePermanent": "Lưu vĩnh viễn",
+    "undo": "Hoàn tác",
+    "redo": "Làm lại"
   }
 };

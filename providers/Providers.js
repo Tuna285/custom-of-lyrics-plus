@@ -23,7 +23,11 @@ const Providers = {
 			return { error: "No lyrics", uri: info.uri };
 		}
 
-		const lines = lyrics.lines;
+		const lines = (lyrics.lines || []).filter((line) => typeof line?.words === "string" && line.words.trim() !== "");
+		if (!lines.length) {
+			return { error: "No lyrics", uri: info.uri };
+		}
+
 		if (lyrics.syncType === "LINE_SYNCED") {
 			result.synced = lines.map((line) => ({
 				startTime: Number(line.startTimeMs) || 0,
@@ -98,6 +102,7 @@ const Providers = {
 
 		return result;
 	},
+	lrcred: (info) => ProviderLRCRed.findLyrics(info),
 	lrclib: async (info) => {
 		const result = {
 			uri: info.uri,
@@ -114,6 +119,15 @@ const Providers = {
 		} catch {
 			result.error = "No lyrics";
 			return result;
+		}
+
+		if (list?.lyricsfile && typeof Lyricsfile !== "undefined") {
+			try {
+				const parsed = await Lyricsfile.parseYaml(list.lyricsfile, info.duration);
+				return { ...parsed, karaoke: null, uri: info.uri, provider: "lrclib", copyright: null };
+			} catch (err) {
+				console.warn("[Lyrics+] Failed to parse LRCLIB lyricsfile:", err);
+			}
 		}
 
 		const synced = ProviderLRCLIB.getSynced(list);

@@ -5,33 +5,30 @@
 const CacheManager = {
     _l1Cache: new Map(),      // L1: RAM cache (small LRU)
     _l1MaxSize: 20,           // Only keep ~20 recent items in RAM
-    _ttl: 365 * 24 * 60 * 60 * 1000, // 1 year TTL
+    _ttl: null,               // Permanent until user clears cache
     _persistKey: 'lyrics-plus:translation-cache',
     _migrated: false,
 
     /**
-     * Migrate localStorage to IndexedDB (one-time)
-     * Called internally on first get/set
+     * Ensure UnifiedDB migration has finished before accessing L2 cache
      */
     async _migrate() {
         if (this._migrated) return;
+        const unified = (typeof UnifiedDB !== 'undefined' && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+        if (unified?.ready) {
+            await unified.ready();
+            this._migrated = true;
+            return;
+        }
         this._migrated = true;
-
         try {
-            const migratedFlag = localStorage.getItem('lyrics-plus:idb-migrated');
-            if (migratedFlag === 'true') return;
-
             const persisted = localStorage.getItem(this._persistKey);
             if (persisted) {
                 const data = JSON.parse(persisted);
                 const count = await IDBCache.bulkImport(data);
                 if (count > 0) {
-                    console.log(`[Cache] Migrated ${count} entries from localStorage to IndexedDB`);
                     localStorage.removeItem(this._persistKey);
-                    localStorage.setItem('lyrics-plus:idb-migrated', 'true');
                 }
-            } else {
-                localStorage.setItem('lyrics-plus:idb-migrated', 'true');
             }
         } catch (e) {
             console.warn('[Cache] Migration failed:', e);
@@ -50,7 +47,7 @@ const CacheManager = {
         // Check L1 first (instant)
         const l1Item = this._l1Cache.get(key);
         if (l1Item) {
-            if (Date.now() < l1Item.expiry) {
+            if (!l1Item.expiry || Date.now() < l1Item.expiry) {
                 l1Item.lastAccessed = Date.now();
                 return l1Item.data;
             }
@@ -79,7 +76,7 @@ const CacheManager = {
         if (!key || typeof key !== 'string') return null;
         
         const l1Item = this._l1Cache.get(key);
-        if (l1Item && Date.now() < l1Item.expiry) {
+        if (l1Item && (!l1Item.expiry || Date.now() < l1Item.expiry)) {
             l1Item.lastAccessed = Date.now();
             return l1Item.data;
         }
@@ -105,7 +102,7 @@ const CacheManager = {
 
         this._l1Cache.set(key, {
             data,
-            expiry: Date.now() + this._ttl,
+            expiry: this._ttl ? Date.now() + this._ttl : null,
             lastAccessed: Date.now()
         });
     },
@@ -169,6 +166,11 @@ const CacheManager = {
      */
     async clear() {
         this._l1Cache.clear();
+        this._pendingWrites.clear();
+        if (this._writeTimeout) {
+            clearTimeout(this._writeTimeout);
+            this._writeTimeout = null;
+        }
         await this._migrate();
         await IDBCache.clear();
         console.log('[Cache] All cache cleared');
@@ -230,7 +232,12 @@ const CacheManager = {
         return {
             l1Size: this._l1Cache.size,
             l1MaxSize: this._l1MaxSize,
-            ttlDays: this._ttl / (24 * 60 * 60 * 1000)
+            ttlDays: this._ttl ? this._ttl / (24 * 60 * 60 * 1000) : Infinity
         };
     }
 };
+
+window.CacheManager = CacheManager;
+if (window.LyricsPlus) {
+    window.LyricsPlus.CacheManager = CacheManager;
+}

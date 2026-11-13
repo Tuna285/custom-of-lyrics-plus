@@ -53,8 +53,12 @@ const LyricsFetcher = {
             duration: Number(meta.duration),
             album: meta.album_title,
             artist: meta.artist_name,
+            artists: Object.entries(meta)
+                .filter(([key]) => /^artist_name(?::\d+)?$/.test(key))
+                .map(([, name]) => name),
             title: meta.title,
             uri: track.uri,
+            isrc: meta.isrc || track.external_ids?.isrc,
             image: meta.image_url,
             year: year || null,
             isExplicit: !!isExplicit,

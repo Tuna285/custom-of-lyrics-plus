@@ -116,124 +116,15 @@ const SettingRowDescription = ({ icon, text }) => {
 
 // Helper: open a compact options modal using existing settings styles
 function openOptionsModal(title, items, onChange, eventType = null) {
+	if (typeof Utils !== "undefined" && Utils.syncUiThemeVariables) {
+		Utils.syncUiThemeVariables(CONFIG.visual);
+	}
 	const container = react.createElement(
 		"div",
 		{
 			id: `${APP_NAME}-config-container`,
-			style: {
-				"--lp-ui-switch-on": CONFIG.visual["ui-switch-on-color"] || "var(--spice-button)",
-				"--lp-ui-switch-off": CONFIG.visual["ui-switch-off-color"] || "rgba(255,255,255,0.16)",
-				"--lp-ui-btn-bg": CONFIG.visual["ui-button-bg-color"] || "rgba(255,255,255,0.08)",
-				"--lp-ui-btn-text": CONFIG.visual["ui-button-text-color"] || "#ffffff",
-				"--lp-fab-bg": CONFIG.visual["ui-fab-bg-color"] || "rgba(20,20,20,0.72)",
-				"--lp-fab-icon": CONFIG.visual["ui-fab-icon-color"] || "var(--spice-button)",
-			}
+			className: "lp-config-shell lp-config-shell--compact",
 		},
-		react.createElement("style", {
-			dangerouslySetInnerHTML: {
-				__html: `
-#${APP_NAME}-config-container {
-	padding: 8px 16px 14px;
-	background: linear-gradient(180deg, rgba(20,20,20,.92), rgba(20,20,20,.82));
-	border-radius: 10px;
-}
-#${APP_NAME}-config-container .setting-row {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto;
-	gap: 12px;
-	align-items: center;
-	padding: 10px 0;
-	border-bottom: 1px solid rgba(255,255,255,.06);
-}
-#${APP_NAME}-config-container .setting-row:hover {
-	background: rgba(255,255,255,.03);
-	border-radius: 8px;
-}
-#${APP_NAME}-config-container .setting-row-with-icon {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-}
-#${APP_NAME}-config-container .setting-row:last-child { border-bottom: none; }
-#${APP_NAME}-config-container .col.description { font-weight: 600; opacity: .9; }
-#${APP_NAME}-config-container .col.action { display: inline-flex; gap: 8px; align-items: center; justify-content: flex-end; }
-#${APP_NAME}-config-container input, #${APP_NAME}-config-container select {
-	background: rgba(255,255,255,.04);
-	border: 1px solid rgba(255,255,255,.08);
-	border-radius: 4px;
-	padding: 8px 12px;
-	width: min(320px, 100%);
-	outline: none;
-	transition: background .2s ease;
-	color: rgba(255,255,255,.95);
-}
-#${APP_NAME}-config-container select:hover {
-	background: rgba(255,255,255,.1);
-}
-#${APP_NAME}-config-container select option {
-	background-color: #121212;
-	color: #f2f2f2;
-}
-#${APP_NAME}-config-container select option:hover {
-	background-color: #2a2a2a;
-	color: #fff;
-}
-#${APP_NAME}-config-container select option:checked {
-	background-color: #2a2a2a;
-	color: #fff;
-}
-#${APP_NAME}-config-container .adjust-value { min-width: 48px; text-align: center; }
-#${APP_NAME}-config-container .switch, #${APP_NAME}-config-container .btn { height: 28px; }
-.lyrics-range-slider {
-	-webkit-appearance: none !important;
-	appearance: none !important;
-	width: 120px !important;
-	height: 4px !important;
-	background: rgba(255,255,255,.3) !important;
-	border-radius: 2px !important;
-	padding: 0 !important;
-	border: none !important;
-	cursor: pointer !important;
-	outline: none !important;
-}
-.lyrics-range-slider::-webkit-slider-thumb {
-	-webkit-appearance: none !important;
-	appearance: none !important;
-	width: 14px !important;
-	height: 14px !important;
-	background: var(--spice-button, #1db954) !important;
-	border-radius: 50% !important;
-	cursor: pointer !important;
-	border: none !important;
-	margin-top: -5px;
-}
-.lyrics-range-slider::-moz-range-thumb {
-	width: 14px !important;
-	height: 14px !important;
-	background: var(--spice-button, #1db954) !important;
-	border-radius: 50% !important;
-	cursor: pointer !important;
-	border: none !important;
-}
-.lyrics-range-slider::-webkit-slider-runnable-track {
-	height: 4px;
-	background: rgba(255,255,255,.3);
-	border-radius: 2px;
-}
-.lyrics-range-number {
-	width: 50px !important;
-	padding: 4px 6px !important;
-	text-align: center !important;
-	font-size: 13px !important;
-}
-.lyrics-range-number::-webkit-inner-spin-button,
-.lyrics-range-number::-webkit-outer-spin-button {
-	-webkit-appearance: none;
-	margin: 0;
-}
-`
-			}
-		}),
 		react.createElement(OptionList, Object.assign({ items, onChange }, eventType ? { type: eventType } : {}))
 	);
 
@@ -319,7 +210,10 @@ const getTargetLanguageOptions = () => {
 		ja: "日本語 (Japanese)",
 		ko: "한국어 (Korean)",
 		zh: "中文 (Chinese)",
-		uk: "Українська (Ukrainian)"
+		uk: "Українська (Ukrainian)",
+		es: "Español (Spanish)",
+		id: "Bahasa Indonesia (Indonesian)",
+		th: "ภาษาไทย (Thai)"
 	};
 };
 
@@ -543,11 +437,16 @@ const AdjustmentsMenu = react.memo(({ mode }) => {
 				Spicetify.Config.visual[name] = value;
 			} catch { }
 			localStorage.setItem(`${APP_NAME}:visual:${name}`, value);
-			// Persist per-track delay as used by resetDelay()
+			// Persist per-track delay in UnifiedDB (user_tracks)
 			if (name === "delay") {
 				const uri = Spicetify?.Player?.data?.item?.uri;
 				if (uri) {
-					try { localStorage.setItem(`lyrics-delay:${uri}`, String(value)); } catch { }
+					const unified = (typeof UnifiedDB !== "undefined" && UnifiedDB) || window.LyricsPlus?.UnifiedDB;
+					if (unified?.setTrackDelay) {
+						unified.setTrackDelay(uri, value).catch(() => {});
+					} else {
+						try { localStorage.setItem(`lyrics-delay:${uri}`, String(value)); } catch { }
+					}
 				}
 			}
 			if ((name.startsWith("translation-mode:") || name.startsWith("translation-mode-2:")) && window.lyricContainer) {
