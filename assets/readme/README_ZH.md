@@ -14,7 +14,7 @@
 > 专为 Spicetify 打造的 **Lyrics Plus** 定制版本，专注于高质量歌词翻译、多语言发音注音（罗马字/注音/假名）以及视频背景。连接 Google Gemini API，自然准确地翻译歌词。
 
 > [!NOTE]
-> **现已支持 6 种目标语言翻译:** 越南语 (`vi`)、英语 (`en`)、日语 (`ja`)、韩语 (`ko`)、中文 (`zh`) 和乌克兰语 (`uk`)。
+> **现已支持 9 种目标语言翻译:** 越南语 (`vi`)、英语 (`en`)、日语 (`ja`)、韩语 (`ko`)、中文 (`zh`)、乌克兰语 (`uk`)、西班牙语 (`es`)、印尼语 (`id`) 和泰语 (`th`)。
 
 ---
 
@@ -22,15 +22,15 @@
 
 ### 1. 使用 Google Gemini API 翻译歌词
 
-连接 Google Gemini API，自然准确地翻译歌词。
+连接 Google Gemini API（或任意 OpenAI 兼容端点），自然准确地翻译歌词。
 
-- **6 种目标语言** —— 支持翻译成越南语、英语、日语、韩语、中文或乌克兰语。
-- **内置 Gemini 模型预设** —— 一键选择 Gemini 模型（`gemini-3.8-flash`、`gemini-3.7-flash` 等）或输入自定义模型名称。
+- **9 种目标语言** —— 支持翻译成越南语、英语、日语、韩语、中文、乌克兰语、西班牙语、印尼语和泰语。
+- **内置 Gemini 与 Gemma 模型预设** —— 一键选择模型预设（`gemini-4-hydrogen`、`gemini-3.8-flash`–`3.5-flash`、`gemma-4-26b-a4b-it`、`gemma-4-31b-it`）或输入自定义模型名称。
 - **双显示模式** —— 振假名（日语 `<ruby>`）、罗马字（日语）、罗马字（韩语）、拼音（中文）+ 目标语言 AI 翻译。
 - **翻译风格** —— 6 种风格（智能自适应、诗意、青春动漫、街头说唱、复古经典、直译）以匹配歌曲氛围。
 - **代词模式** —— 针对越南语的语境代词映射（自动、Anh-Em、Tớ-Cậu、Tao-Mày…），在整个曲目中保持一致的人称叙事。
 - **多 API 密钥轮询** —— 支持添加多个 API 密钥（可从 [Google AI Studio](https://aistudio.google.com/) 免费获取），具备自动轮询负载均衡和配额用尽时即时故障转移功能。
-- **实时 AI 推理过程** —— 实时流式显示模型的思考过程。
+- **实时 AI 推理过程** —— 实时流式显示模型的思考过程，并可调节推理强度（`off`、`low`、`medium`、`high`）。
 - **预翻译** —— 在播放前在后台翻译下一首曲目，可调整提前时间。
 - **响应格式** —— 选择提示词工程（通用）或 JSON Schema。
 
@@ -44,12 +44,12 @@
 
 <img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/51520969-7a8f-44e5-bf70-3262e9d658c7" />
 
-### 3. 现代界面与优化体验
+### 3. 歌词工作室编辑器、个人备份与多源同步
 
-- **透明背景** —— 与任意 Spicetify 主题和谐融合。
-- **自动隐藏控件** —— 设置按钮仅在悬停时显示，最大化显示空间。
-- **流畅过渡** —— 优化动画，实现平滑无缝的歌词切换。
-- **多语言界面** —— 完整本地化为 5 种语言：简体中文、英语、越南语、日语、韩语。
+- **右键菜单 & 工作室编辑器** —— 右键任意歌词行即可原地微调、按范围复制（单句或整首的原文、译文、双语或去除注音标签的 LRC），或打开工作室编辑器编辑时间戳、歌词、注音与译文。
+- **统一存储 & 个人备份** —— 个人修改与延时设置独立保存，清理缓存或更新后依然保留，并在设置中提供 JSON 导出／导入／重置功能。
+- **多歌词源 & 手动搜索** —— 支持 Spotify、Musixmatch、`lrc.red` (`Lyricsfile`)、LRCLIB、NetEase、Local，并提供多源手动搜索弹窗。
+- **现代界面与自定义** —— 透明背景融合 Spicetify 主题、悬停自动显示控件、自定义按钮与主题配色，以及 5 种界面语言（简体中文、英语、越南语、日语、韩语）。
 
 ---
 
@@ -98,9 +98,9 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 1. 打开 Spotify，点击头像 → **Lyric Plus Translate config**
 2. 进入 **Translation** 标签并配置：
    - **API Endpoint** —— 默认 Google Gemini 端点（支持自定义代理 URL）。
-   - **Model Name** —— 从预设（`gemini-3.8-flash`、`gemini-3.7-flash` 等）中选择或输入自定义模型名称。
+   - **Model Name** —— 从预设（`gemini-4-hydrogen`、`gemini-3.8-flash`、`gemma-4-31b-it` 等）中选择或输入自定义模型名称。
    - **API Keys** —— 添加一个或多个 API 密钥（可从 [Google AI Studio](https://aistudio.google.com/) 免费获取）。支持多密钥轮询及配额不足时自动切换。
-   - **Reasoning Effort** —— 调节思考预算（`off`、`low`、`medium`、`high`、`auto`）。
+   - **Reasoning Effort** —— 调节思考预算（`off`、`low`、`medium`、`high`）。
    - **Response Format** —— *Prompt Engineering*（通用）或 *JSON Schema*。
    - **Pre-translation** —— 开启/关闭并设置提前时间。
 3. 将鼠标悬停在歌词上，点击翻译图标（⇄）自定义**目标语言**、**显示模式**、**翻译风格**和**代词**。
@@ -119,12 +119,12 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 
 ### AI 模式（LLM 翻译）
 
-| 源语言             | 显示模式 1 (发音注音)             | 显示模式 2 (翻译)                   |
-| ------------------ | -------------------------------- | ----------------------------------- |
-| 日语 (日本語)       | 振假名、罗马字 (AI / Local)       | 6 种语言 (VI, EN, JA, KO, ZH, UK)   |
-| 韩语 (한국어)       | 罗马字 (AI / Local)              | 6 种语言 (VI, EN, JA, KO, ZH, UK)   |
-| 中文 (中文)         | 拼音 (AI / Local)                | 6 种语言 (VI, EN, JA, KO, ZH, UK)   |
-| 其他所有语言       | —                                | 6 种语言 (VI, EN, JA, KO, ZH, UK)   |
+| 源语言             | 显示模式 1 (发音注音)             | 显示模式 2 (翻译)                                |
+| ------------------ | -------------------------------- | ------------------------------------------------ |
+| 日语 (日本語)       | 振假名、罗马字 (AI / Local)       | 9 种语言 (VI, EN, JA, KO, ZH, UK, ES, ID, TH)   |
+| 韩语 (한국어)       | 罗马字 (AI / Local)              | 9 种语言 (VI, EN, JA, KO, ZH, UK, ES, ID, TH)   |
+| 中文 (中文)         | 拼音 (AI / Local)                | 9 种语言 (VI, EN, JA, KO, ZH, UK, ES, ID, TH)   |
+| 其他所有语言       | —                                | 9 种语言 (VI, EN, JA, KO, ZH, UK, ES, ID, TH)   |
 
 
 

@@ -12,7 +12,7 @@
 > A personalized version of **Lyrics Plus** for Spicetify, rebuilt to focus on high-quality lyric translation, phonetic transcription (Furigana, Romaji, Pinyin), and video backgrounds. Powered by the Google Gemini API to translate lyrics naturally and accurately.
 
 > [!NOTE]
-> **Supporting 6 target languages:** Tiếng Việt (`vi`), English (`en`), 日本語 (`ja`), 한국어 (`ko`), 中文 (`zh`), and Українська (`uk`).
+> **Supporting 9 target languages:** Tiếng Việt (`vi`), English (`en`), 日本語 (`ja`), 한국어 (`ko`), 中文 (`zh`), Українська (`uk`), Español (`es`), Bahasa Indonesia (`id`), and ภาษาไทย (`th`).
 
 ---
 
@@ -20,15 +20,15 @@
 
 ### 1. Lyric Translation with Google Gemini API
 
-Connects to Google Gemini API to translate lyrics naturally and accurately.
+Connects to Google Gemini API (or any OpenAI-compatible endpoint) to translate lyrics naturally and accurately.
 
-- **6 Target Languages** — Translate into Vietnamese, English, Japanese, Korean, Chinese, or Ukrainian.
-- **Built-in Gemini Models** — One-click pickers for Gemini models (Gemini 3.8/3.7/3.6 Flash, etc.) or type a custom model name.
+- **9 Target Languages** — Translate into Vietnamese, English, Japanese, Korean, Chinese, Ukrainian, Spanish, Indonesian, or Thai with culturally calibrated phrasing.
+- **Built-in Gemini & Gemma Models** — One-click presets (`gemini-4-hydrogen`, `gemini-3.8-flash`–`3.5-flash`, `gemma-4-26b-a4b-it`, `gemma-4-31b-it`) or type any custom model name.
 - **Dual display modes** — Furigana (Japanese `<ruby>`), Romaji (Japanese), Romaja (Korean), Pinyin (Chinese) + AI Translation in your selected target language.
 - **Translation Style** — 6 tones (Smart Adaptive, Poetic, Youth-Anime, Street-Rap, Vintage, Literal) to match the mood of the song.
 - **Pronoun Mode** — Contextual pronoun mapping for Vietnamese (Auto, Anh-Em, Tớ-Cậu, Tao-Mày…) to maintain consistent narrative voice.
 - **Multi-Key API Rotation** — Add multiple API keys (free from [Google AI Studio](https://aistudio.google.com/)) with automatic round-robin load balancing and quota failover.
-- **Live AI Reasoning** — Stream the model's thinking process in real time.
+- **Live AI Reasoning** — Stream the model's thinking process in real time, with configurable reasoning effort (`off`, `low`, `medium`, `high`).
 - **Pre-translation** — Translates the next track in the background before it plays, with adjustable lead time.
 - **Response format** — Choose Prompt Engineering (universal) or JSON Schema.
 
@@ -44,12 +44,12 @@ Animated YouTube music-video backdrops for the lyrics page. Automatically skips 
 <img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/51520969-7a8f-44e5-bf70-3262e9d658c7" />
 <img width="1919" height="1080" alt="image" src="https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/assets/Shintakarajima-Sakanaction.png" />
 
-### 3. Modern Interface & Optimized Experience
+### 3. Lyrics Studio Editor, Backup & Multi-Source Sync
 
-- **Transparent background** — harmonizes with any Spicetify theme.
-- **Auto-hiding controls** — setting buttons only appear on hover, maximizing display space.
-- **Smooth transitions** — optimized animations for seamless line transitions.
-- **Multilingual UI** — fully localized into English, Tiếng Việt, 日本語, 한국어, 中文（简体）.
+- **Right-Click Context Menu & Studio Editor** — Right-click any lyric line to inline-edit text, copy by scope (current line or full song in original, translated, bilingual, or stripped LRC format), or open the Studio Editor to tweak timestamps, lyrics, translations, and phonetics.
+- **Unified Storage & Personal Backups** — Permanent user edits survive cache clears and updates, with JSON Export / Import / Reset controls in Settings.
+- **Multi-Source Lyrics & Manual Search** — Supports Spotify, Musixmatch, `lrc.red` (`Lyricsfile`), LRCLIB, NetEase, and Local cache/files, plus a unified Manual Search modal across providers.
+- **Modern UI & Customization** — Transparent theme blending, auto-hiding hover controls, custom UI accent/button colors, and 5 UI languages (English, Tiếng Việt, 日本語, 한국어, 中文（简体）).
 
 ---
 
@@ -99,10 +99,10 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 1. Open Spotify, click on your avatar → **Lyric Plus Translate config**
 2. Go to the **Translation** tab and configure:
    - **API Endpoint** — default Google Gemini endpoint (custom proxy URL supported).
-   - **Model Name** — pick from presets (`gemini-3.8-flash`, `gemini-3.7-flash`, etc.) or type a custom model name.
+   - **Model Name** — pick from presets (`gemini-4-hydrogen`, `gemini-3.8-flash`, `gemma-4-31b-it`, etc.) or type a custom model name.
    - **API Keys** — add one or more API keys (free tier available at [Google AI Studio](https://aistudio.google.com/)). Multiple keys automatically rotate round-robin with quota failover.
 
-   - **Reasoning Effort** — adjust thinking budget (`off`, `low`, `medium`, `high`, `auto`).
+   - **Reasoning Effort** — adjust thinking budget (`off`, `low`, `medium`, `high`).
    - **Response Format** — *Prompt Engineering* (universal) or *JSON Schema*.
    - **Pre-translation** — toggle on/off and configure lead time.
 3. Hover over lyrics and click the translation icon (⇄) to customize **Target Language**, **Display Modes**, **Translation Style**, and **Pronouns**.
@@ -121,12 +121,12 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 
 ### AI Mode (LLM Translation)
 
-| Source Language   | Display Mode 1 (Phonetics)      | Display Mode 2 (Translation)        |
-| ----------------- | ------------------------------- | ----------------------------------- |
-| Japanese (日本語)  | Furigana, Romaji (AI / Local)   | 6 languages (VI, EN, JA, KO, ZH, UK)|
-| Korean (한국어)    | Romaja (AI / Local)             | 6 languages (VI, EN, JA, KO, ZH, UK)|
-| Chinese (中文)    | Pinyin (AI / Local)             | 6 languages (VI, EN, JA, KO, ZH, UK)|
-| Other             | —                               | 6 languages (VI, EN, JA, KO, ZH, UK)|
+| Source Language   | Display Mode 1 (Phonetics)      | Display Mode 2 (Translation)                   |
+| ----------------- | ------------------------------- | ---------------------------------------------- |
+| Japanese (日本語)  | Furigana, Romaji (AI / Local)   | 9 languages (VI, EN, JA, KO, ZH, UK, ES, ID, TH) |
+| Korean (한국어)    | Romaja (AI / Local)             | 9 languages (VI, EN, JA, KO, ZH, UK, ES, ID, TH) |
+| Chinese (中文)    | Pinyin (AI / Local)             | 9 languages (VI, EN, JA, KO, ZH, UK, ES, ID, TH) |
+| Other             | —                               | 9 languages (VI, EN, JA, KO, ZH, UK, ES, ID, TH) |
 
 
 

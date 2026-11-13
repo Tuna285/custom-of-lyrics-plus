@@ -10,7 +10,7 @@
 > Phiên bản tùy chỉnh của **Lyrics Plus** dành cho Spicetify, tập trung vào dịch lời bài hát chất lượng cao bằng Google Gemini API, hỗ trợ đa ngôn ngữ, phiên âm Romaji/Furigana và video nền động.
 
 > [!NOTE]
-> **Hỗ trợ dịch 6 ngôn ngữ:** Tiếng Việt (`vi`), English (`en`), 日本語 (`ja`), 한국어 (`ko`), 中文 (`zh`), và Українська (`uk`).
+> **Hỗ trợ dịch 9 ngôn ngữ:** Tiếng Việt (`vi`), English (`en`), 日本語 (`ja`), 한국어 (`ko`), 中文 (`zh`), Українська (`uk`), Español (`es`), Bahasa Indonesia (`id`), và ภาษาไทย (`th`).
 
 ---
 
@@ -18,15 +18,15 @@
 
 ### 1. Dịch lời bài hát với Google Gemini API
 
-Sử dụng Google Gemini API để dịch lời bài hát tự nhiên và chính xác.
+Sử dụng Google Gemini API (hoặc mọi endpoint tương thích OpenAI) để dịch lời bài hát tự nhiên và chính xác.
 
-- **Hỗ trợ 6 ngôn ngữ dịch** — Dịch sang Tiếng Việt, Tiếng Anh, Tiếng Nhật, Tiếng Hàn, Tiếng Trung hoặc Tiếng Ukraina.
-- **Model có sẵn** — Dropdown chọn nhanh các model Gemini (`gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-3.5-flash-lite`, ...) hoặc nhập model tùy ý.
+- **Hỗ trợ 9 ngôn ngữ dịch** — Dịch sang Tiếng Việt, Tiếng Anh, Tiếng Nhật, Tiếng Hàn, Tiếng Trung, Tiếng Ukraina, Tiếng Tây Ban Nha, Tiếng Indonesia hoặc Tiếng Thái với prompt tinh chỉnh theo ngữ cảnh văn hóa từng ngôn ngữ.
+- **Model có sẵn** — Chọn nhanh các model Gemini & Gemma (`gemini-4-hydrogen`, `gemini-3.8-flash`–`3.5-flash`, `gemma-4-26b-a4b-it`, `gemma-4-31b-it`) hoặc nhập model tùy ý.
 - **Hai chế độ hiển thị đồng thời** — Furigana (Nhật `<ruby>`), Romaji (Nhật), Romaja (Hàn), Pinyin (Trung) + dịch thuật AI theo ngôn ngữ lựa chọn.
 - **Translation Style** — 6 phong cách dịch (Tự động / Thơ-Lãng mạn / Tuổi trẻ-Anime / Mạnh mẽ-Rap / Cổ điển / Sát nghĩa) phù hợp với mood bài hát.
 - **Khóa Pronoun** — 9 cặp đại từ tiếng Việt (Tự động, Anh-Em, Tớ-Cậu, Tao-Mày, ...) giữ giọng dịch nhất quán suốt bài.
 - **Multi-Key API** — Thêm nhiều API key (miễn phí từ [Google AI Studio](https://aistudio.google.com/)) tự động xoay vòng và đổi key khi hết hạn mức.
-- **Xem AI Reasoning real-time** — Cửa sổ stream trực tiếp quá trình suy nghĩ của model.
+- **Xem AI Reasoning real-time** — Cửa sổ stream trực tiếp quá trình suy nghĩ của model với mức suy luận (`off`, `low`, `medium`, `high`).
 - **Pre-translation** — Tự động dịch sẵn bài kế tiếp ở nền trước khi phát, có thể chỉnh thời gian.
 - **Định dạng response** — Chọn Prompt Engineering (mọi model) hoặc JSON Schema.
 
@@ -41,12 +41,12 @@ Tự động lấy MV YouTube làm nền động cho trang lyrics. Hỗ trợ t�
 
 <img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/51520969-7a8f-44e5-bf70-3262e9d658c7" />
 
-### 3. Giao diện hiện đại & Trải nghiệm tối ưu
+### 3. Lyrics Studio Editor, Sao lưu & Nguồn lời đa dạng
 
-- **Nền trong suốt** — hài hòa với mọi theme Spicetify.
-- **Tự động ẩn điều khiển** — nút cài đặt chỉ xuất hiện khi di chuột vào, tối đa hóa không gian hiển thị.
-- **Chuyển cảnh mượt mà** — hoạt ảnh tối ưu cho việc chuyển đổi dòng lời liền mạch.
-- **Giao diện đa ngôn ngữ** — hỗ trợ Tiếng Việt, English, 日本語, 한국어, 中文（简体）.
+- **Menu chuột phải & Studio Editor** — Chuột phải vào bất kỳ dòng lời nào để sửa nhanh tại chỗ, sao chép theo phạm vi (1 câu hoặc cả bài: lời gốc, bản dịch, song ngữ, hoặc LRC đã lọc tag ruby), hoặc mở Studio Editor chỉnh timestamp, lời gốc, phiên âm và bản dịch.
+- **Unified Storage & Sao lưu cá nhân** — Các chỉnh sửa thủ công, độ trễ theo bài và đại từ riêng được tách khỏi cache tạm để không bị mất khi xóa cache hay update; hỗ trợ Export / Import / Reset JSON trong Cài đặt.
+- **Đa nguồn lời & Tìm kiếm thủ công** — Hỗ trợ Spotify, Musixmatch, `lrc.red` (`Lyricsfile`), LRCLIB, NetEase, Local, kèm hộp thoại tìm lời thủ công đa nguồn.
+- **Giao diện hiện đại** — Nền trong suốt hài hòa theme Spicetify, tự ẩn nút điều khiển khi không rê chuột, tùy chỉnh màu UI/nút bấm và giao diện đa ngôn ngữ (Tiếng Việt, English, 日本語, 한국어, 中文（简体）).
 
 
 
@@ -98,9 +98,9 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 1. Mở Spotify, bấm vào avatar cá nhân → **Lyric Plus Translate config**
 2. Vào tab **Dịch (Translation)** và thiết lập:
    - **API Endpoint** — mặc định sử dụng Google Gemini (hỗ trợ dán endpoint proxy nếu cần).
-   - **Tên Model** — chọn model có sẵn (`gemini-3.8-flash`, `gemini-3.7-flash`, ...) hoặc nhập model tùy ý.
+   - **Tên Model** — chọn model có sẵn (`gemini-4-hydrogen`, `gemini-3.8-flash`, `gemma-4-31b-it`, ...) hoặc nhập model tùy ý.
    - **API Keys** — thêm một hoặc nhiều API key (lấy miễn phí tại [Google AI Studio](https://aistudio.google.com/)). Nhiều key sẽ tự động xoay vòng và chuyển đổi khi hết hạn mức.
-   - **Reasoning Effort** — chỉnh mức độ suy nghĩ (`off`, `low`, `medium`, `high`, `auto`).
+   - **Reasoning Effort** — chỉnh mức độ suy nghĩ (`off`, `low`, `medium`, `high`).
    - **Định dạng phản hồi** — *Prompt Engineering* hoặc *JSON Schema*.
    - **Pre-translation** — bật/tắt và chọn số giây dịch trước.
 3. Rê chuột vào lời bài hát và bấm biểu tượng chuyển đổi (⇄) để tùy chỉnh **Ngôn ngữ đích**, **Chế độ hiển thị**, **Phong cách dịch** và **Đại từ**.
@@ -119,12 +119,12 @@ iwr -useb https://raw.githubusercontent.com/Tuna285/custom-of-lyrics-plus/main/u
 
 ### Chế độ AI (Dịch thuật LLM)
 
-| Ngôn ngữ gốc      | Kiểu hiển thị 1 (Phiên âm)      | Kiểu hiển thị 2 (Bản dịch)        |
-| ----------------- | ------------------------------- | --------------------------------- |
-| Tiếng Nhật (日本語) | Furigana, Romaji (AI / Local)   | 6 ngôn ngữ (VI, EN, JA, KO, ZH, UK) |
-| Tiếng Hàn (한국어)  | Romaja (AI / Local)             | 6 ngôn ngữ (VI, EN, JA, KO, ZH, UK) |
-| Tiếng Trung (中文)  | Pinyin (AI / Local)             | 6 ngôn ngữ (VI, EN, JA, KO, ZH, UK) |
-| Mọi ngôn ngữ khác | Phiên âm chế độ Local           | 6 ngôn ngữ (VI, EN, JA, KO, ZH, UK) |
+| Ngôn ngữ gốc      | Kiểu hiển thị 1 (Phiên âm)      | Kiểu hiển thị 2 (Bản dịch)                   |
+| ----------------- | ------------------------------- | -------------------------------------------- |
+| Tiếng Nhật (日本語) | Furigana, Romaji (AI / Local)   | 9 ngôn ngữ (VI, EN, JA, KO, ZH, UK, ES, ID, TH) |
+| Tiếng Hàn (한국어)  | Romaja (AI / Local)             | 9 ngôn ngữ (VI, EN, JA, KO, ZH, UK, ES, ID, TH) |
+| Tiếng Trung (中文)  | Pinyin (AI / Local)             | 9 ngôn ngữ (VI, EN, JA, KO, ZH, UK, ES, ID, TH) |
+| Mọi ngôn ngữ khác | Phiên âm chế độ Local           | 9 ngôn ngữ (VI, EN, JA, KO, ZH, UK, ES, ID, TH) |
 
 
 
