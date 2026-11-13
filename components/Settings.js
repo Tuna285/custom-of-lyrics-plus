@@ -995,7 +995,7 @@ const ConfigHelper = () => {
 				react.createElement(CollapsibleSection, { title: getText("sections.aboutAndUpdates") },
 					react.createElement("div", { className: "lp-update-card" },
 						react.createElement("div", null,
-							react.createElement("div", { className: "lp-update-title" }, `Lyric Plus Translate v${window.UpdateService?.CURRENT_VERSION || "1.9.6"}`),
+							react.createElement("div", { className: "lp-update-title" }, `Lyric Plus Translate v${window.UpdateService?.CURRENT_VERSION || "1.9.7"}`),
 							react.createElement("div", { className: "lp-update-sub" }, getText("settings.updateAppSubtitle"))
 						),
 						react.createElement("button", {

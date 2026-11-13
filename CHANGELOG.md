@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.7] - 2026-11-13
+
+### Changed
+
+- **Idling Indicator Optimization**: Simplified gap/pause detection (`IdlingIndicator`) across synced and karaoke lyrics views, reducing extra React state churn and layout work during instrumental breaks.
+
+### Fixed
+
+- **Auto-Fetch Track Matching Accuracy**: Tightened fallback matching in `LRCLIB` (requiring verified title and artist/script similarity instead of duration-only matches), removed `NetEase`'s artist-only fallback and overly permissive `0.12` duration score threshold, skipped unintended instrumental variants when fetching vocal tracks, and validated `Musixmatch` matched duration (`<= 25s` delta) to prevent wrong-song lyrics from being selected automatically.
+- **Control Button Bar Alignment**: Restored bottom-right alignment for `.lyrics-config-button-container`.
+
 ## [1.9.6] - 2026-11-13
 
 ### Added

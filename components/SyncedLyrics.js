@@ -34,9 +34,10 @@ const IDLE_GRACE_MS = 1500;
 // Set to 5s to guarantee comfortable, unhurried 3-dot animation without fast flashing.
 const IDLE_MIN_VISIBLE_MS = 5000;
 // Minimum raw interval between consecutive lines before we'll even consider inserting "♪".
-// Raised to 8.5s: True musical instrumental breaks are >= 8.5s.
 const GAP_THRESHOLD_MIN = 10500;
 const GAP_THRESHOLD_MAX = 16000;
+// Minimum duration for a mid-song note line; shorter ones drop so the last sung line stays active.
+const MID_NOTE_MIN_DURATION_MS = 9000;
 // Safety floor ratio: assume singer holds line for at most this fraction of the interval.
 const LINE_END_INTERVAL_FLOOR_RATIO = 0.78;
 const INTRO_THRESHOLD_MIN = 3000;
@@ -48,7 +49,7 @@ const computeTimingStats = (lyrics) => {
     const fallback = {
         msPerChar: DEFAULT_MS_PER_CHAR,
         avgLineDur: 4000,
-        gapThreshold: 8500,
+        gapThreshold: GAP_THRESHOLD_MIN,
         introThreshold: 5000,
     };
     if (!Array.isArray(lyrics) || lyrics.length < 2) return fallback;
@@ -99,6 +100,139 @@ const estimateLineDuration = (line, stats) => {
     const text = line?.originalText || line?.text || "";
     const len = typeof text === "string" ? text.trim().length : 0;
     return Math.max(MIN_LINE_DUR, len * (stats?.msPerChar || DEFAULT_MS_PER_CHAR));
+};
+
+// Shared pause-line pipeline used by both compact and expanded synced views.
+const buildPaddedLyrics = (lyrics, leadingEmptyCount = 2) => {
+    const tagged = lyrics.map((l, idx) => ({ ...l, rawIndex: idx }));
+    const raw = [...Array(leadingEmptyCount).fill(emptyLine), ...tagged];
+    const processed = [];
+    const timingStats = computeTimingStats(lyrics);
+    const introTriggerIndex = leadingEmptyCount - 1;
+
+    for (let i = 0; i < raw.length; i++) {
+        const currentLine = raw[i];
+        const nextLine = raw[i + 1];
+
+        processed.push({ ...currentLine, lineNumber: processed.length });
+
+        // Insert intro indicator after leading empty lines when intro exceeds threshold
+        if (i === introTriggerIndex && lyrics.length > 0 && lyrics[0].startTime > timingStats.introThreshold) {
+            processed.push({
+                text: "♪",
+                startTime: 500,
+                isIntro: true,
+                lineNumber: processed.length,
+            });
+        }
+
+        if (currentLine && nextLine && currentLine.startTime && nextLine.startTime) {
+            const interval = nextLine.startTime - currentLine.startTime;
+            const estDur = estimateLineDuration(currentLine, timingStats);
+            const silentDuration = interval - estDur;
+
+            if (
+                silentDuration >= 4500 &&
+                interval >= timingStats.gapThreshold &&
+                !isNoteLineObject(currentLine) &&
+                !isNoteLineObject(nextLine)
+            ) {
+                const text = currentLine.originalText || currentLine.text || "";
+                const len = typeof text === "string" ? text.trim().length : 0;
+                const ratio = len < 10 ? 0.85 : len < 20 ? 0.80 : LINE_END_INTERVAL_FLOOR_RATIO;
+                const lineEnd = Number(currentLine.startTime) + Math.min(Math.max(estDur, interval * ratio), estDur * 1.5);
+                const insertTime = lineEnd + IDLE_GRACE_MS;
+
+                if (nextLine.startTime - insertTime >= MID_NOTE_MIN_DURATION_MS) {
+                    processed.push({
+                        text: "♪",
+                        startTime: insertTime,
+                        lineNumber: processed.length,
+                    });
+                }
+            }
+        }
+    }
+
+    // Merge consecutive note lines and drop short mid-song notes
+    const merged = [];
+    for (let i = 0; i < processed.length; i++) {
+        const current = processed[i];
+
+        if (isNoteLineObject(current)) {
+            let nextRealLine = null;
+            for (let j = i + 1; j < processed.length; j++) {
+                if (!isNoteLineObject(processed[j])) {
+                    nextRealLine = processed[j];
+                    break;
+                }
+            }
+            const durationToNext = nextRealLine ? nextRealLine.startTime - current.startTime : 0;
+            const minDuration = current.isIntro ? IDLE_MIN_VISIBLE_MS : MID_NOTE_MIN_DURATION_MS;
+
+            if (durationToNext > 0 && durationToNext < minDuration && nextRealLine) {
+                continue;
+            }
+
+            // Look-back merge: collapse consecutive note lines even across empty spacing artifacts
+            let lastNonEmptyIndex = merged.length - 1;
+            while (lastNonEmptyIndex >= 0) {
+                const item = merged[lastNonEmptyIndex];
+                const hasContent = item.text && (typeof item.text !== "string" || item.text.trim() !== "");
+                const hasOriginal = item.originalText && (typeof item.originalText !== "string" || item.originalText.trim() !== "");
+                if (hasContent || hasOriginal) break;
+                lastNonEmptyIndex--;
+            }
+
+            if (lastNonEmptyIndex >= 0 && isNoteLineObject(merged[lastNonEmptyIndex])) {
+                merged.length = lastNonEmptyIndex + 1;
+                continue;
+            }
+        }
+        merged.push(current);
+    }
+
+    // Strip trailing note lines and extend the last sung line to cover them
+    let lastNoteStartTime = null;
+    while (merged.length > 0 && isNoteLineObject(merged[merged.length - 1])) {
+        lastNoteStartTime = merged[merged.length - 1].startTime;
+        merged.pop();
+    }
+    if (lastNoteStartTime && merged.length > 0) {
+        merged[merged.length - 1].extendedEndTime = lastNoteStartTime;
+    }
+
+    return merged;
+};
+
+const renderIdlingIndicator = ({ startTime, nextLineStartTime, position, isActive, animationIndex, isPadding, key, ref }) => {
+    const currentStartTime = Number(startTime) || 0;
+    const nextStartTime = Number.isFinite(Number(nextLineStartTime)) && Number(nextLineStartTime) > 0
+        ? Number(nextLineStartTime)
+        : currentStartTime + IDLE_MIN_VISIBLE_MS;
+
+    const rawDuration = nextStartTime - currentStartTime;
+    if (rawDuration < IDLE_MIN_VISIBLE_MS) {
+        return null;
+    }
+
+    const duration = Math.max(rawDuration, IDLE_MIN_VISIBLE_MS);
+    const progress = Math.min(Math.max((position - currentStartTime) / duration, 0), 1);
+    // Discretize into 4 stages so React.memo skips 60fps intermediate frame updates
+    const stage = progress >= 0.66 ? 3 : progress >= 0.33 ? 2 : progress >= 0.05 ? 1 : 0;
+
+    return react.createElement(IdlingIndicator, {
+        isActive,
+        stage,
+        delay: duration / 3,
+        positionIndex: animationIndex,
+        animationIndex: (animationIndex < 0 ? 0 : animationIndex) + 1,
+        blurIndex: Math.abs(animationIndex),
+        isPadding,
+        isExiting: animationIndex < 0 || position >= nextStartTime,
+        key,
+        ref,
+    });
 };
 
 const renderLineContextPopover = (menuState, setMenuState, lyrics, trackUri, onOpenEditor) => {
@@ -156,133 +290,15 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
     }, []);
 
     useTrackPosition(() => {
-        const newPos = Spicetify.Player.getProgress();
-        const delay = CONFIG.visual["global-delay"] + CONFIG.visual.delay;
-        if (newPos !== position) {
-            setPosition(newPos + delay);
+        if (Spicetify.Player?.data && !Spicetify.Player.data.is_paused) {
+            const nextPos = Spicetify.Player.getProgress() + CONFIG.visual["global-delay"] + CONFIG.visual.delay;
+            if (nextPos !== position) {
+                setPosition(nextPos);
+            }
         }
     });
 
-    const lyricWithEmptyLines = useMemo(() => {
-        const tagged = lyrics.map((l, idx) => ({ ...l, rawIndex: idx }));
-        const raw = [emptyLine, emptyLine, ...tagged];
-        const processed = [];
-        let newIndex = 0;
-        const timingStats = computeTimingStats(lyrics);
-
-
-        for (let i = 0; i < raw.length; i++) {
-            const currentLine = raw[i];
-            const nextLine = raw[i + 1];
-
-            processed.push({
-                ...currentLine,
-                lineNumber: newIndex++,
-            });
-
-            // Insert intro indicator after emptyLines but before first lyric
-            if (i === 1 && lyrics.length > 0 && lyrics[0].startTime > timingStats.introThreshold) {
-                processed.push({
-                    text: "♪",
-                    startTime: 500,
-                    lineNumber: newIndex++,
-                });
-            }
-
-            if (currentLine && nextLine && currentLine.startTime && nextLine.startTime) {
-                                const interval = nextLine.startTime - currentLine.startTime;
-                const estDur = estimateLineDuration(currentLine, timingStats);
-                const silentDuration = interval - estDur;
-
-                const canInsert =
-                    silentDuration >= 4500 &&
-                    interval >= GAP_THRESHOLD_MIN &&
-                    !isNoteLineObject(currentLine) &&
-                    !isNoteLineObject(nextLine);
-
-                if (canInsert) {
-                    const text = currentLine.originalText || currentLine.text || "";
-                    const len = typeof text === "string" ? text.trim().length : 0;
-                    const ratio = len < 10 ? 0.85 : len < 20 ? 0.80 : LINE_END_INTERVAL_FLOOR_RATIO;
-
-                    const lineEnd = Number(currentLine.startTime) + Math.min(
-                        Math.max(estDur, interval * ratio),
-                        estDur * 1.5
-                    );
-                    const insertTime = lineEnd + IDLE_GRACE_MS;
-                    if (nextLine.startTime - insertTime >= IDLE_MIN_VISIBLE_MS) {
-                        processed.push({
-                            text: "♪",
-                            startTime: insertTime,
-                            lineNumber: newIndex++,
-                        });
-                    }
-                }
-            }
-        }
-
-        // Merge & Filter note lines
-        const merged = [];
-        for (let i = 0; i < processed.length; i++) {
-            const current = processed[i];
-
-            if (isNoteLineObject(current)) {
-                // Find next non-note line to determine duration
-                let nextRealLine = null;
-                for (let j = i + 1; j < processed.length; j++) {
-                    if (!isNoteLineObject(processed[j])) {
-                        nextRealLine = processed[j];
-                        break;
-                    }
-                }
-                const durationToNext = nextRealLine ? (nextRealLine.startTime - current.startTime) : 0;
-
-                // Drop short note lines (< 9000ms) so previous real lyric line holds continuously
-                if (durationToNext > 0 && durationToNext < 9000 && nextRealLine) {
-                    continue;
-                }
-
-                // Look-back Merge Strategy: merge consecutive note lines
-                let lastNonEmptyIndex = merged.length - 1;
-                while (lastNonEmptyIndex >= 0) {
-                    const item = merged[lastNonEmptyIndex];
-                    const hasContent = item.text && (typeof item.text !== "string" || item.text.trim() !== "");
-                    const hasOriginal = item.originalText && (typeof item.originalText !== "string" || item.originalText.trim() !== "");
-                    if (hasContent || hasOriginal) {
-                        break;
-                    }
-                    lastNonEmptyIndex--;
-                }
-
-                if (lastNonEmptyIndex >= 0 && isNoteLineObject(merged[lastNonEmptyIndex])) {
-                    merged.length = lastNonEmptyIndex + 1;
-                    continue;
-                }
-            }
-            merged.push(current);
-        }
-
-
-
-        // Capture trailing note timing before removing
-        let lastNoteStartTime = null;
-        while (merged.length > 0) {
-            const last = merged[merged.length - 1];
-            // Check both text and originalText for trailing notes
-            if (isNoteLineObject(last)) {
-                lastNoteStartTime = last.startTime; // Save timing before removal
-                merged.pop();
-            } else {
-                break;
-            }
-        }
-        // Extend the last real line's duration to cover removed trailing notes
-        if (lastNoteStartTime && merged.length > 0) {
-            merged[merged.length - 1].extendedEndTime = lastNoteStartTime;
-        }
-
-        return merged;
-    }, [lyrics]);
+    const lyricWithEmptyLines = useMemo(() => buildPaddedLyrics(lyrics, 2), [lyrics]);
 
     const lyricsId = useMemo(() => lyrics[0]?.text || "no-lyrics", [lyrics]);
 
@@ -357,37 +373,16 @@ const SyncedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copyright, i
                 const isNote = isReallyNote(mainText) && (!subText || isReallyNote(subText)) && (!subText2 || isReallyNote(subText2));
 
                 if (isNote) {
-                    // Find next line's start time to calculate progress
-                    const currentStartTime = Number(startTime) || 0;
-                    let nextStartTime = currentStartTime + 5000; // Default fallback
-
-                    // Find the next line in the activeLines array
-                    const nextCandidate = i < activeLines.length - 1 ? Number(activeLines[i + 1]?.startTime) : NaN;
-                    if (Number.isFinite(nextCandidate) && nextCandidate > 0) {
-                        nextStartTime = nextCandidate;
-                    }
-
-                    const rawDuration = nextStartTime - currentStartTime;
-                    if (rawDuration >= 4000) {
-                        const duration = Math.max(rawDuration, 5000);
-                        const elapsed = position - currentStartTime;
-                        const progress = Math.min(Math.max(elapsed / duration, 0), 1);
-
-                        return react.createElement(IdlingIndicator, {
-                            isActive: isActive,
-                            progress: progress,
-                            delay: duration / 3,
-                            positionIndex: animationIndex,
-                            animationIndex: (animationIndex < 0 ? 0 : animationIndex) + 1,
-                            blurIndex: Math.abs(animationIndex),
-                            isPadding: paddingLine,
-                            isExiting: animationIndex < 0 || position >= nextStartTime,
-                            key: lineNumber,
-                            ref: ref
-                        });
-                    }
-                    // Hide short note lines (< 4000ms) so raw "♪" text does not render between lines
-                    return null;
+                    return renderIdlingIndicator({
+                        startTime,
+                        nextLineStartTime: i < activeLines.length - 1 ? activeLines[i + 1]?.startTime : undefined,
+                        position,
+                        isActive,
+                        animationIndex,
+                        isPadding: paddingLine,
+                        key: lineNumber,
+                        ref,
+                    });
                 }
 
                 let lineInterval = 4000;
@@ -469,129 +464,14 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
 
     useTrackPosition(() => {
         if (Spicetify.Player?.data && !Spicetify.Player.data.is_paused) {
-            setPosition(Spicetify.Player.getProgress() + CONFIG.visual["global-delay"] + CONFIG.visual.delay);
+            const nextPos = Spicetify.Player.getProgress() + CONFIG.visual["global-delay"] + CONFIG.visual.delay;
+            if (nextPos !== position) {
+                setPosition(nextPos);
+            }
         }
     });
 
-    const padded = useMemo(() => {
-        const tagged = lyrics.map((l, idx) => ({ ...l, rawIndex: idx }));
-        const raw = [emptyLine, ...tagged];
-        const processed = [];
-        const timingStats = computeTimingStats(lyrics);
-
-
-        for (let i = 0; i < raw.length; i++) {
-            const currentLine = raw[i];
-            const nextLine = raw[i + 1];
-
-            processed.push(currentLine);
-
-            // Insert intro indicator after emptyLine but before first lyric
-            if (i === 0 && lyrics.length > 0 && lyrics[0].startTime > timingStats.introThreshold) {
-                processed.push({
-                    text: "♪",
-                    startTime: 500,
-                });
-            }
-
-            if (currentLine && nextLine && currentLine.startTime && nextLine.startTime) {
-                                const interval = nextLine.startTime - currentLine.startTime;
-                const estDur = estimateLineDuration(currentLine, timingStats);
-                const silentDuration = interval - estDur;
-
-                const canInsert =
-                    silentDuration >= 4500 &&
-                    interval >= GAP_THRESHOLD_MIN &&
-                    !isNoteLineObject(currentLine) &&
-                    !isNoteLineObject(nextLine);
-
-                if (canInsert) {
-                    const text = currentLine.originalText || currentLine.text || "";
-                    const len = typeof text === "string" ? text.trim().length : 0;
-                    const ratio = len < 10 ? 0.85 : len < 20 ? 0.80 : LINE_END_INTERVAL_FLOOR_RATIO;
-
-                    const lineEnd = Number(currentLine.startTime) + Math.min(
-                        Math.max(estDur, interval * ratio),
-                        estDur * 1.5
-                    );
-                    const insertTime = lineEnd + IDLE_GRACE_MS;
-                    if (nextLine.startTime - insertTime >= IDLE_MIN_VISIBLE_MS) {
-                        processed.push({
-                            text: "♪",
-                            startTime: insertTime,
-                        });
-                    }
-                }
-            }
-        }
-
-        // Merge consecutive note lines into one
-        const merged = [];
-        for (let i = 0; i < processed.length; i++) {
-            const current = processed[i];
-            const prev = merged[merged.length - 1];
-
-            // Use isNoteLineObject to properly detect notes after translation
-            if (isNoteLineObject(current)) {
-                // Find next non-note line to determine duration
-                let nextRealLine = null;
-                for (let j = i + 1; j < processed.length; j++) {
-                    if (!isNoteLineObject(processed[j])) {
-                        nextRealLine = processed[j];
-                        break;
-                    }
-                }
-                const durationToNext = nextRealLine ? (nextRealLine.startTime - current.startTime) : 0;
-
-                // Drop short note lines (< 9000ms) so previous real lyric line holds continuously
-                if (durationToNext > 0 && durationToNext < 9000 && nextRealLine) {
-                    continue;
-                }
-
-                // Look-back Merge Strategy:
-                // Check if the current note should be merged with a previous note (ignoring empty lines).
-                // This handles cases where auto-generated notes and original source notes are separated by artifacts.
-
-                // 1. Find the last non-empty item in the merged list
-                let lastNonEmptyIndex = merged.length - 1;
-                while (lastNonEmptyIndex >= 0) {
-                    const item = merged[lastNonEmptyIndex];
-                    // Check if item has any meaningful text content
-                    const hasContent = item.text && (typeof item.text !== "string" || item.text.trim() !== "");
-                    const hasOriginal = item.originalText && (typeof item.originalText !== "string" || item.originalText.trim() !== "");
-                    if (hasContent || hasOriginal) {
-                        break;
-                    }
-                    lastNonEmptyIndex--;
-                }
-
-                if (lastNonEmptyIndex >= 0 && isNoteLineObject(merged[lastNonEmptyIndex])) {
-                    merged.length = lastNonEmptyIndex + 1;
-                    continue; // Skip adding current note
-                }
-            }
-            merged.push(current);
-        }
-
-        // Capture trailing note timing before removing
-        let lastNoteStartTime = null;
-        while (merged.length > 0) {
-            const last = merged[merged.length - 1];
-            // Check both text and originalText for trailing notes
-            if (isNoteLineObject(last)) {
-                lastNoteStartTime = last.startTime; // Save timing before removal
-                merged.pop();
-            } else {
-                break;
-            }
-        }
-        // Extend the last real line's duration to cover removed trailing notes
-        if (lastNoteStartTime && merged.length > 0) {
-            merged[merged.length - 1].extendedEndTime = lastNoteStartTime;
-        }
-
-        return merged;
-    }, [lyrics]);
+    const padded = useMemo(() => buildPaddedLyrics(lyrics, 1), [lyrics]);
 
     const intialScroll = useMemo(() => [false], [lyrics]);
 
@@ -662,35 +542,16 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics: rawLyrics, provider, copy
             const isNote = isReallyNote(mainText) && (!subText || isReallyNote(subText)) && (!subText2 || isReallyNote(subText2));
 
             if (isNote) {
-                // Find next line's start time
-                const currentStartTime = Number(startTime) || 0;
-                let nextStartTime = currentStartTime + 5000; // Default fallback
-                const nextCandidate = i < padded.length - 1 ? Number(padded[i + 1]?.startTime) : NaN;
-                if (Number.isFinite(nextCandidate) && nextCandidate > 0) {
-                    nextStartTime = nextCandidate;
-                }
-
-                const rawDuration = nextStartTime - currentStartTime;
-                if (rawDuration >= 4000) {
-                    const duration = Math.max(rawDuration, 5000);
-                    const elapsed = position - currentStartTime;
-                    const progress = Math.min(Math.max(elapsed / duration, 0), 1);
-
-                    return react.createElement(IdlingIndicator, {
-                        isActive: isActive,
-                        progress: progress,
-                        delay: duration / 3,
-                        positionIndex: animationIndex,
-                        animationIndex: (animationIndex < 0 ? 0 : animationIndex) + 1,
-                        blurIndex: Math.abs(animationIndex),
-                        isPadding: paddingLine,
-                        isExiting: animationIndex < 0 || position >= nextStartTime,
-                        key: i,
-                        ref: ref
-                    });
-                }
-                // Hide short note lines (< 4000ms) so raw "♪" text does not render between lines
-                return null;
+                return renderIdlingIndicator({
+                    startTime,
+                    nextLineStartTime: i < padded.length - 1 ? padded[i + 1]?.startTime : undefined,
+                    position,
+                    isActive,
+                    animationIndex,
+                    isPadding: paddingLine,
+                    key: i,
+                    ref,
+                });
             }
 
             let lineInterval = 4000;

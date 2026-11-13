@@ -29,10 +29,10 @@ const CreditFooter = react.memo(({ provider, copyright }) => {
     );
 });
 
-// Optimized IdlingIndicator with memoization and performance improvements
+// Renders the 3-dot break indicator; memoized on discrete stage (0..3) instead of raw frame progress
 const IdlingIndicator = react.memo(react.forwardRef(({
     isActive = false,
-    progress = 0,
+    stage = 0,
     delay = 0,
     positionIndex = 0,
     animationIndex = 1,
@@ -40,32 +40,20 @@ const IdlingIndicator = react.memo(react.forwardRef(({
     isPadding = false,
     isExiting = false
 }, ref) => {
-    // Always show indicator, just change active state
-    const className = useMemo(() =>
-        `lyrics-idling-indicator lyrics-lyricsContainer-LyricsLine ${isActive ? "lyrics-lyricsContainer-LyricsLine-active" : ""} ${isPadding ? "lyrics-lyricsContainer-LyricsLine-paddingLine" : ""} ${isExiting ? "lyrics-idling-indicator-exiting" : ""}`,
-        [isActive, isPadding, isExiting]
-    );
-
-    const style = useMemo(() => ({
+    const className = `lyrics-idling-indicator lyrics-lyricsContainer-LyricsLine${isActive ? " lyrics-lyricsContainer-LyricsLine-active" : ""}${isPadding ? " lyrics-lyricsContainer-LyricsLine-paddingLine" : ""}${isExiting ? " lyrics-idling-indicator-exiting" : ""}`;
+    const style = {
         "--position-index": positionIndex,
         "--animation-index": animationIndex,
         "--blur-index": blurIndex,
         "--indicator-delay": `${delay}ms`,
-    }), [delay, positionIndex, animationIndex, blurIndex]);
-
-    // Memoize circle states to avoid unnecessary re-renders
-    const circleStates = useMemo(() => [
-        progress >= 0.05 ? "active" : "",
-        progress >= 0.33 ? "active" : "",
-        progress >= 0.66 ? "active" : ""
-    ], [progress]);
+    };
 
     return react.createElement(
         "div",
         { className, style, ref },
-        react.createElement("div", { className: `lyrics-idling-indicator__circle ${circleStates[0]}` }),
-        react.createElement("div", { className: `lyrics-idling-indicator__circle ${circleStates[1]}` }),
-        react.createElement("div", { className: `lyrics-idling-indicator__circle ${circleStates[2]}` })
+        react.createElement("div", { className: `lyrics-idling-indicator__circle${stage >= 1 ? " active" : ""}` }),
+        react.createElement("div", { className: `lyrics-idling-indicator__circle${stage >= 2 ? " active" : ""}` }),
+        react.createElement("div", { className: `lyrics-idling-indicator__circle${stage >= 3 ? " active" : ""}` })
     );
 }));
 

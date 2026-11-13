@@ -9,6 +9,7 @@ const ProviderNetease = (() => {
 
     const DEDICATED_WORKER_TEMPLATE = "https://spicetify-yt-proxy.spicetifylyricplus.workers.dev/?url={url}";
 
+    const INSTRUMENTAL_REGEX = /instrumental|off vocal|karaoke|カラオケ|伴奏/i;
     const METADATA_CREDITS_REGEX = /^(作词人?|作曲人?|编曲人?|演唱(?:者)?|制作(?:人|助理|室|公司)?|製作(?:人|助理|室|公司)?|监制|監製|出品人?|发行人?|發行人?|企划|企劃|统筹|統籌|人声(?:编辑|修音|录音)?|配唱(?:制作人|制作)?|后期(?:制作|工程)?|录音(?:师|室|棚|助理|工程师)?|混音(?:师|室|棚|助理|工程师)?|母带(?:师|室|棚|工程|工程师|后期)?|音频(?:工程|工程师|编辑)?|声音(?:工程|工程师)?|作詞人?|作曲人?|編曲人?|歌詞|演奏|歌|唄|唱|アーティスト|歌手|プロデューサー|ディレクター|レコーディング(?:エンジニア)?|ミキシング(?:エンジニア)?|マスタリング(?:エンジニア)?|エンジニア|吉他(?:录音|演奏)?|贝斯(?:录音|演奏)?|鼓(?:录音|演奏)?|弦乐(?:录音|编写|演奏|监制)?|和音(?:编写|录音)?|和声(?:编写|录音)?|(?:Recording|Mixing|Mastering|Audio|Sound)\s+(?:Engineer|Studio|Producer)|(?:Vocal|Track|Sound)\s+(?:Producer|Editor|Director)|Lyricist|Composer|Arranger|Producer|Lyrics|Vocals|Mixer|Mastering|Guitar|Bass|Drums|Strings|Recording|Artist|Singer|Lời|Nhạc|Phối khí|Trình bày|Sáng tác|Hòa âm)\s*[:：]|^(Written by|Composed by|Arranged by|Produced by|Mixed by|Mastered by|Recorded by|Sound Produced by|Directed by|Performed by|Vocals by|Music by|Lyrics by)\b|(テーマソング|主題歌|オープニングテーマ|エンディングテーマ|挿入歌|イメージソング|テーマ曲|\bTheme Song\b|\bOpening Theme\b|\bEnding Theme\b|\bInsert Song\b)|^(LRC|Lrc|lrc|Offset|offset|by|By|提供|字幕|翻译|翻譯|校对|潤色)\s*[:：]/i;
 
     function isValidLyricPayload(data) {
@@ -156,14 +157,26 @@ const ProviderNetease = (() => {
         const deltaMs = Math.abs((candidate.dt || candidate.duration || 0) - (info.duration || 0));
         if (info.duration > 0 && deltaMs > 45000) return 0;
 
-        const isInstSearch = /instrumental|off vocal|karaoke|カラオケ|伴奏/i.test(info.title || "");
-        const isInstCand = /instrumental|off vocal|karaoke|カラオケ|伴奏/i.test(candidate.name || "");
+        const isInstSearch = INSTRUMENTAL_REGEX.test(info.title || "");
+        const isInstCand = INSTRUMENTAL_REGEX.test(candidate.name || "");
         const penalty = (!isInstSearch && isInstCand) ? 0.35 : 0;
 
-        const artistStr = (candidate.ar || candidate.artists || []).map(a => a.name).join(" ");
-        let titleSim    = levenshtein(candidate.name, info.title);
-        let artistSim   = levenshtein(artistStr, info.artist);
-        const durScore  = Math.max(0, 1 - deltaMs / 10000);
+        const U = typeof Utils !== "undefined" ? Utils : (window.LyricsPlus?.Utils || {});
+        const stripTitle = (t) => U.removeSongFeat ? U.removeSongFeat(U.removeExtraInfo(t || "")) : (t || "");
+        const infoPrimaryArtist = (info.artist || "").split(/[,&]/)[0].trim();
+        const candArtists = candidate.ar || candidate.artists || [];
+        const artistStr = candArtists.map(a => a.name).join(" ");
+        const candPrimaryArtist = candArtists[0]?.name || "";
+
+        let titleSim = Math.max(
+            levenshtein(candidate.name, info.title),
+            levenshtein(stripTitle(candidate.name), stripTitle(info.title))
+        );
+        let artistSim = Math.max(
+            levenshtein(artistStr, info.artist),
+            levenshtein(candPrimaryArtist, infoPrimaryArtist)
+        );
+        const durScore = Math.max(0, 1 - deltaMs / 10000);
 
         // Cross-script tolerance: When title matches tightly and duration is near-exact,
         // do not let script mismatch (e.g. Romaji "Atarayo" vs Kanji/Kana "あたらよ") zero out candidate score
@@ -172,14 +185,20 @@ const ProviderNetease = (() => {
         }
 
         // Cross-script alias tolerance: When Spotify uses English/Romanized title & artist (e.g. "Crystal Cloud" / "Blooming Bungei")
-        // and NetEase search index resolves to the original CJK track ("雲海" / "文藝天国") with a near-exact duration match (< 3s)
+        // and NetEase search index resolves to the original CJK track ("雲海" / "文藝天国") with a near-exact duration match (< 2.5s)
         const hasCJK = (s) => /[\u3040-\u30ff\u4e00-\u9faf\uac00-\ud7af]/.test(s || "");
-        if (!hasCJK(info.title) && !hasCJK(info.artist) && (hasCJK(candidate.name) || hasCJK(artistStr)) && info.duration > 0 && deltaMs < 3000) {
+        const isCrossScriptAlias = !hasCJK(info.title) && !hasCJK(info.artist) && (hasCJK(candidate.name) || hasCJK(artistStr)) && info.duration > 0 && deltaMs < 2500;
+        if (isCrossScriptAlias) {
             if (titleSim < 0.5) titleSim = 0.5;
             if (artistSim < 0.4) artistSim = 0.4;
         }
 
-        return Math.max(0, titleSim * 0.4 + artistSim * 0.3 + durScore * 0.3 - penalty);
+        const rawScore = Math.max(0, titleSim * 0.4 + artistSim * 0.3 + durScore * 0.3 - penalty);
+        // Prevent wrong-title songs of the same artist from passing purely on artist + duration points
+        if (!isCrossScriptAlias && titleSim < 0.35) {
+            return rawScore * 0.25;
+        }
+        return rawScore;
     }
 
     const SCORE_THRESHOLD = 0.28;
@@ -226,11 +245,11 @@ const ProviderNetease = (() => {
             if (typeof IDBCache !== "undefined" && info.uri) {
                 try {
                     const cached = await IDBCache.get(`netease:lyrics:${info.uri}`);
-                    if (cached?.notFound && cached?.v === 2) {
+                    if (cached?.notFound && cached?.v === 3) {
                         DebugLogger.log(`[NetEase] Negative cache hit for "${info.title}"`);
                         return err("NetEase: cached not found");
                     }
-                    if (cached && (cached.synced || cached.unsynced)) {
+                    if (cached && cached._neteaseMatchV === 2 && (cached.synced || cached.unsynced)) {
                         DebugLogger.log(`[NetEase] IndexedDB cache hit for "${info.title}"`);
                         if (Array.isArray(cached.synced)) {
                             cached.synced = cached.synced.filter(l => !l?.text || !METADATA_CREDITS_REGEX.test(l.text));
@@ -267,23 +286,11 @@ const ProviderNetease = (() => {
                 }
             }
 
-            // Layered Fallback 2: If still poor, search by primary artist alone
             if (!scored.length || scored[0].score < SCORE_THRESHOLD) {
-                DebugLogger.log(`[NetEase] Title search score too low, falling back to artist: "${primaryArtist}"`);
-                const artistOnlySongs = await searchSongs(primaryArtist, 10);
-                const artistScored = artistOnlySongs
-                    .map(c => ({ c, score: scoreCandidate(c, info) }))
-                    .sort((a, b) => b.score - a.score);
-
-                if (artistScored.length && (!scored.length || artistScored[0].score > scored[0].score)) {
-                    scored = artistScored;
-                }
-            }
-            if (!scored.length) {
                 if (typeof IDBCache !== "undefined" && info.uri) {
-                    IDBCache.set(`netease:lyrics:${info.uri}`, { notFound: true, v: 2, savedAt: Date.now() }, 3 * 24 * 60 * 60 * 1000).catch(() => {});
+                    IDBCache.set(`netease:lyrics:${info.uri}`, { notFound: true, v: 3, savedAt: Date.now() }, 3 * 24 * 60 * 60 * 1000).catch(() => {});
                 }
-                return err("NetEase: no results");
+                return err("NetEase: no confident results");
             }
 
             DebugLogger.log(
@@ -293,18 +300,14 @@ const ProviderNetease = (() => {
 
             // Iterate through top candidates to find one with actual lyrics
             let bestUnsyncedResult = null;
+            const isInstSearch = INSTRUMENTAL_REGEX.test(info.title || "");
 
             for (const item of scored.slice(0, 3)) {
-                let threshold = SCORE_THRESHOLD;
                 const cand = item.c;
                 const deltaMs = Math.abs((cand.dt || cand.duration || 0) - (info.duration || 0));
-                if (deltaMs < 8000) {
-                    threshold = 0.12; // High confidence when duration is closely aligned
-                } else if (deltaMs < 15000) {
-                    threshold = 0.18;
-                }
 
-                if (item.score < threshold) continue;
+                if (item.score < SCORE_THRESHOLD) continue;
+                if (!isInstSearch && INSTRUMENTAL_REGEX.test(cand.name || "")) continue;
 
                 // Optimization: Don't waste Cloudflare proxy requests fetching lyrics for candidates with absurd duration mismatch (> 45s)
                 if (info.duration > 0 && deltaMs > 45000) continue;
@@ -350,6 +353,7 @@ const ProviderNetease = (() => {
                     neteaseTranslation,
                     _neteaseId:        songId,
                     _neteaseScore:     item.score,
+                    _neteaseMatchV:    2,
                 };
 
                 // Priority: Synced lyrics win immediately
@@ -374,7 +378,7 @@ const ProviderNetease = (() => {
             }
 
             if (typeof IDBCache !== "undefined" && info.uri) {
-                IDBCache.set(`netease:lyrics:${info.uri}`, { notFound: true, v: 2, savedAt: Date.now() }, 3 * 24 * 60 * 60 * 1000).catch(() => {});
+                IDBCache.set(`netease:lyrics:${info.uri}`, { notFound: true, v: 3, savedAt: Date.now() }, 3 * 24 * 60 * 60 * 1000).catch(() => {});
             }
             return err("NetEase: no valid lyrics found across top candidates");
 

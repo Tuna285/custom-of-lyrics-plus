@@ -1335,40 +1335,6 @@ input[type="range"].lp-range::-moz-range-track {
   opacity: 1;
 }
 
-.lyrics-idling-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: var(--lyrics-align-text);
-  gap: calc(var(--lyrics-font-size) / 4);
-  /* Inherit line height from lyrics line */
-  min-height: var(--lyrics-line-height, calc(4px + var(--lyrics-font-size)));
-}
-
-.lyrics-idling-indicator__circle {
-  background-color: var(--lyrics-color-inactive);
-  border-radius: 50%;
-  display: inline-block;
-  opacity: 0.4;
-  transform-origin: center;
-  transition-timing-function: linear;
-  transition-duration: var(--indicator-delay);
-  transition-property: transform, opacity, background-color;
-  height: var(--lyrics-font-size);
-  width: var(--lyrics-font-size);
-  transform: scale(0.5);
-  flex-shrink: 0;
-}
-
-/* When parent line is active, circles become active color */
-.lyrics-lyricsContainer-LyricsLine-active .lyrics-idling-indicator__circle {
-  background-color: var(--lyrics-color-active);
-}
-
-.lyrics-idling-indicator__circle.active {
-  opacity: 1;
-  transform: scale(0.7);
-}
-
 .lyrics-config-button-container {
   -webkit-margin-end: 32px;
   -webkit-box-pack: end;
@@ -1551,7 +1517,11 @@ input[type="range"].lp-range::-moz-range-track {
 
 /* Idling indicator */
 .lyrics-idling-indicator {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: var(--lyrics-align-text);
+  gap: calc(var(--lyrics-font-size) / 4);
+  min-height: var(--lyrics-line-height, calc(4px + var(--lyrics-font-size)));
   position: relative;
 }
 
@@ -1561,22 +1531,26 @@ input[type="range"].lp-range::-moz-range-track {
 }
 
 .lyrics-idling-indicator__circle {
-  background-color: var(--lyrics-color-active);
+  background-color: var(--lyrics-color-inactive);
   border-radius: 50%;
   display: inline-block;
-  margin-right: calc(var(--lyrics-font-size) / 4);
   height: var(--lyrics-font-size);
   width: var(--lyrics-font-size);
+  flex-shrink: 0;
 
   opacity: 0.4;
   transform: scale(0.4) translateY(0);
   transform-origin: center;
 
-  transition-property: transform, opacity, filter, box-shadow;
+  transition-property: transform, opacity, background-color, filter, box-shadow;
   transition-duration:
-    var(--indicator-delay), var(--indicator-delay),
+    var(--indicator-delay), var(--indicator-delay), 0.25s,
     calc(var(--indicator-delay) * 2), calc(var(--indicator-delay) * 2);
   transition-timing-function: linear;
+}
+
+.lyrics-lyricsContainer-LyricsLine-active .lyrics-idling-indicator__circle {
+  background-color: var(--lyrics-color-active);
 }
 
 .lyrics-idling-indicator__circle.active {

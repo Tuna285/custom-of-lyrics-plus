@@ -196,8 +196,16 @@ const ProviderMusixmatch = (() => {
 			};
 		}
 
-		const translationStatus = findTranslationStatus(body);
 		const meta = body?.["matcher.track.get"]?.message?.body;
+		const matchedDuration = meta?.track?.track_length;
+		if (durr > 0 && matchedDuration > 0 && Math.abs(matchedDuration - durr) > 25) {
+			return {
+				error: `Musixmatch duration mismatch (${matchedDuration}s vs ${Math.round(durr)}s)`,
+				uri: info.uri,
+			};
+		}
+
+		const translationStatus = findTranslationStatus(body);
 		const availableTranslations = Array.isArray(translationStatus) ? [...new Set(translationStatus.map((status) => status?.to).filter(Boolean))] : [];
 
 		Object.defineProperties(body, {
